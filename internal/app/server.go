@@ -22,7 +22,7 @@ import (
 )
 
 // Version is the application version (kept in sync with CHANGELOG.md).
-const Version = "0.0.1"
+const Version = "0.1.0"
 
 // ctxKey is the unexported request-context key type for this package.
 type ctxKey int
