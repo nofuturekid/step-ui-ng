@@ -13,6 +13,7 @@ import (
 
 	"github.com/nofuturekid/step-ui-ng/internal/app"
 	"github.com/nofuturekid/step-ui-ng/internal/config"
+	"github.com/nofuturekid/step-ui-ng/internal/store"
 )
 
 func main() {
@@ -20,6 +21,17 @@ func main() {
 	slog.SetDefault(logger)
 
 	cfg := config.Load()
+
+	st, err := store.Open(cfg.DataDir)
+	if err != nil {
+		slog.Error("open store", "err", err)
+		os.Exit(1)
+	}
+	defer func() { _ = st.Close() }()
+
+	if v, err := st.Version(); err == nil {
+		slog.Info("database ready", "schema_version", v)
+	}
 
 	srv := &http.Server{
 		Addr:              cfg.Addr,

@@ -3,16 +3,19 @@
 Authoritative workflow lives in [`AGENTS.md`](AGENTS.md). Summary:
 
 ## Project
+
 Self-contained Go web UI for Smallstep **Step-CA**. Server-rendered **Templ + htmx**
 (no Node/React), **pure-Go SQLite**, secrets encrypted at rest, built-in auth.
 Talks to Step-CA via **SDK/HTTP API** (no `step` CLI).
 
 ## Verify before committing
+
 - `make check` (runs `gofmt`, `go vet`, `golangci-lint`, `templ generate` check, `go test ./...`)
 
 ## Working conventions (IMPORTANT)
+
 - **Conventional Commits** (minimalistic), single subject line unless a body adds value.
-- **One branch + PR per logical change**, based on `master`; **no merge without approval**.
+- **One branch + PR per logical change**, based on `main`; **no merge without approval**.
 - **SemVer v0.0.x**: bump patch per completed spec; update `CHANGELOG.md`.
 - **SDD/TDD**: spec → failing test → implement → refactor. See `spec/` and `docs/adr/`.
 
