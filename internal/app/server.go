@@ -98,8 +98,21 @@ func NewHandler(deps Deps) http.Handler {
 	// Inventory & download (spec/0007): list, detail, ZIP bundle.
 	s.registerInventoryRoutes(mux)
 
+	// ACME enablement (spec/0010, admin+): list ACME provisioners + directory
+	// URLs, create/edit/delete (verb-tunnelled via action=), and per-provisioner
+	// EAB management (create → one-time HMAC display, list, revoke-via-action) +
+	// client snippets. All behind auth + CSRF; CA admin ops sign an x5c token. EAB
+	// lives under /acme/eab/{provisioner} (mirroring the CA's admin path
+	// /admin/acme/eab/{provisioner}) to avoid a router collision with the literal
+	// /acme/provisioners segment — the spec's "/acme/{provisioner}/eab" wording is
+	// reconciled to this unambiguous form.
+	mux.HandleFunc("GET /acme", s.requireAuth(s.requireRole(users.RoleAdmin, s.getACME)))
+	mux.HandleFunc("POST /acme/provisioners", s.requireAuth(s.requireRole(users.RoleAdmin, s.postACMEProvisioners)))
+	mux.HandleFunc("POST /acme/provisioners/{name}", s.requireAuth(s.requireRole(users.RoleAdmin, s.postACMEProvisioner)))
+	mux.HandleFunc("GET /acme/eab/{provisioner}", s.requireAuth(s.requireRole(users.RoleAdmin, s.getEAB)))
+	mux.HandleFunc("POST /acme/eab/{provisioner}", s.requireAuth(s.requireRole(users.RoleAdmin, s.postEAB)))
+
 	// Audit log (spec/0009): query/filter view (admin+).
-	// ACME events (spec/0010) will plug into the same table — leave room.
 	mux.HandleFunc("GET /audit", s.requireAuth(s.requireRole(users.RoleAdmin, s.getAudit)))
 
 	// Root → users (which itself enforces auth + first-run gating).

@@ -10,6 +10,51 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- ACME enablement (spec/0010, ADR-0010, ADR-0004, ADR-0006). Full ACME
+  management via the CA's admin API (no `step` CLI): create/edit/delete ACME
+  provisioners with allowed challenges (`http-01`, `dns-01`, `tls-alpn-01`) and
+  `requireEAB`; per-provisioner External Account Binding (EAB) key
+  create/list/revoke; the ACME directory URL with a copy button; and copy-paste
+  client snippets (certbot, acme.sh, Caddy, Traefik) parameterized with the
+  directory URL and, when EAB is required, the EAB keyID/HMAC. `internal/ca`
+  gains, over the existing two-phase pinned-trust client + x5c admin token
+  (spec/0005, no blanket skip-verify): `UpdateProvisioner`
+  (`PUT /admin/provisioners/{name}`); ACME options on `NewProvisionerSpec`
+  (`ACMEChallenges`, `ACMERequireEAB`) serialized into the linkedca
+  `details.ACME` protojson shape (`requireEab`, `challenges` as the protojson
+  enum names `HTTP_01`/`DNS_01`/`TLS_ALPN_01`); EAB ops `CreateEABKey`
+  (`POST /admin/acme/eab/{provisioner}` `{"reference":…}` → a single protojson
+  `linkedca.EABKey` `{id, hmacKey(base64), provisioner, reference, account,
+createdAt, boundAt}`), `ListEABKeys` (`GET …`, follows `nextCursor`) and
+  `DeleteEABKey` (`DELETE …/{keyID}`); and `DirectoryURL` returning
+  `{ca}/acme/{provisioner}/directory`. The **EAB HMAC is a secret shown EXACTLY
+  ONCE on creation**: `ListEABKeys` strips it from every row, the create result
+  is rendered inline with `Cache-Control: no-store`, and it is never persisted on
+  our side, never logged, and never written to an audit row. New admin-only
+  routes (auth + CSRF, `requireRole(RoleAdmin)`): `GET /acme`,
+  `POST /acme/provisioners` (create), `POST /acme/provisioners/{name}` (edit via
+  `action=edit`, delete via `action=delete`), `GET /acme/eab/{provisioner}` (list
+  - create form + snippets), `POST /acme/eab/{provisioner}` (create → one-time
+    display; revoke via `action=delete`). As reconciled for spec/0005, edit/delete
+    verbs are tunnelled through a POST `action` field (HTML forms + nosurf); the EAB
+    routes are mounted under `/acme/eab/{provisioner}` (mirroring the CA admin path)
+    to avoid a ServeMux collision with the literal `/acme/provisioners` segment.
+    Audit events for every change (`acme.provisioner.create/update/delete`,
+    `acme.eab.create/revoke`), attributed to the session user, never carrying the
+    HMAC/secret. The admin-API calls are proven by an `httptest` mock that
+    re-implements step-ca's `AuthorizeAdminToken` (x5c chain to root, leaf
+    digital-signature usage, JWS signature by the leaf key, audience/issuer/subject
+    claims) for both provisioner and EAB endpoints, with a non-vacuousness probe;
+    it is **not** validated against a live Step-CA (the OSS step-ca stubs the EAB
+    endpoints — EAB management is a Certificate Manager / remote-management feature
+    — so EAB behaviour against a real CA is not observable here). Acceptance tests
+    cover: create an ACME provisioner with `dns-01` + `requireEAB` (CA receives the
+    correct options; directory URL shown); EAB create shows keyID + HMAC once with
+    `no-store`, then is listed WITHOUT the HMAC (asserts the HMAC string is absent
+    from the list); revoke removes the key (CA receives the delete by keyID); client
+    snippets contain the directory URL and, after a create, the real EAB keyID/HMAC
+    (and `--eab-kid` params); audit events per change with `who`=session user and no
+    HMAC in the row; ACME provisioner edit/delete; and RBAC (viewer → 403).
 - Audit log query/filter UI and full event emission (spec/0009). All
   security-relevant actions now emit an audit event attributed to the
   authenticated session user (never "system" or empty): `login`, `logout`,
