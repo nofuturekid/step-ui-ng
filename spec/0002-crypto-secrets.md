@@ -13,8 +13,8 @@ encrypted at rest. See ADR-0006.
 ## Functional requirements
 
 - FR-1: On first start, generate a 32-byte master key, write `DATA_DIR/secret.key`
-  with mode 0600 (atomically, via `O_EXCL`); on later starts, load it and repair
-  the mode to 0600 if it was loosened.
+  with mode 0600 (atomically, via a temp file + `link(2)`); on later starts, load
+  it and repair the mode to 0600 if it was loosened.
 - FR-2: Provide `Seal(plaintext) -> (string, error)` and
   `Open(ciphertext) -> ([]byte, error)` using AES-256-GCM with a random nonce per
   message; output is base64. (The `error` returns are required by Go idiom —
