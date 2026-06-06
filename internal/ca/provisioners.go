@@ -112,10 +112,16 @@ type Provisioner struct {
 // type JWK and ignored otherwise. The plaintext secret never leaves this package
 // in the request body — only the public JWK and the JWE-encrypted private key
 // are sent.
+//
+// ACMEChallenges and ACMERequireEAB carry the ACME-provisioner options (spec/0010
+// FR-1): the allowed challenge types and whether External Account Binding is
+// required. They are only consulted when Type is "ACME".
 type NewProvisionerSpec struct {
-	Name      string
-	Type      string
-	JWKSecret string
+	Name           string
+	Type           string
+	JWKSecret      string
+	ACMEChallenges []string // allowed ACME challenges, e.g. "http-01","dns-01","tls-alpn-01"
+	ACMERequireEAB bool     // require External Account Binding for ACME
 }
 
 // AdminCredential is the x5c admin certificate chain plus its private key, used
@@ -207,6 +213,80 @@ type provisionersResponse struct {
 	NextCursor string `json:"nextCursor"`
 }
 
+// ACMEProvisioner is one ACME provisioner with the current options the edit form
+// needs to pre-fill and the update path needs to merge (spec/0010): the allowed
+// challenges (friendly names, e.g. "dns-01") and whether EAB is required. These
+// come from the public GET /provisioners list, which marshals the in-memory
+// provisioner.ACME objects directly — so the wire fields are the friendly
+// "challenges" names and "requireEAB" (NOT the linkedca protojson enum/camelCase
+// the admin API uses for create/update bodies).
+type ACMEProvisioner struct {
+	Name       string
+	Challenges []string // friendly names; empty means the CA's default (all allowed)
+	RequireEAB bool
+}
+
+// acmeProvisionerWire mirrors the ACME fields of GET /provisioners. Both fields
+// are omitempty on the CA side, so an absent "requireEAB" is false and absent
+// "challenges" means the CA applies its default — we preserve that distinction by
+// leaving Challenges nil rather than inventing a default set.
+type acmeProvisionerWire struct {
+	Type       string   `json:"type"`
+	Name       string   `json:"name"`
+	RequireEAB bool     `json:"requireEAB"`
+	Challenges []string `json:"challenges"`
+}
+
+// ListACMEProvisioners fetches GET {caURL}/provisioners and returns only the ACME
+// provisioners with their current options parsed (challenges + requireEAB), so the
+// app layer can pre-fill the edit form and merge updates instead of clobbering the
+// unspecified fields (spec/0010). No admin token is required; pagination is
+// followed like ListProvisioners.
+func ListACMEProvisioners(ctx context.Context, caURL, fingerprint string) ([]ACMEProvisioner, error) {
+	base, err := baseURL(caURL)
+	if err != nil {
+		return nil, err
+	}
+	client, err := pinnedClientFor(ctx, caURL, fingerprint)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []ACMEProvisioner
+	cursor := ""
+	for {
+		u := base + "/provisioners"
+		if cursor != "" {
+			u += "?cursor=" + url.QueryEscape(cursor)
+		}
+		body, err := fetch(ctx, u, client)
+		if err != nil {
+			return nil, err
+		}
+		var page struct {
+			Provisioners []acmeProvisionerWire `json:"provisioners"`
+			NextCursor   string                `json:"nextCursor"`
+		}
+		if err := json.Unmarshal(body, &page); err != nil {
+			return nil, fmt.Errorf("%w: decode provisioners: %v", ErrMalformedResponse, err)
+		}
+		for _, p := range page.Provisioners {
+			if p.Type != "ACME" {
+				continue
+			}
+			out = append(out, ACMEProvisioner{
+				Name:       p.Name,
+				Challenges: p.Challenges,
+				RequireEAB: p.RequireEAB,
+			})
+		}
+		if page.NextCursor == "" {
+			return out, nil
+		}
+		cursor = page.NextCursor
+	}
+}
+
 // CreateProvisioner creates a provisioner via POST {caURL}/admin/provisioners
 // with an SDK-signed admin token (FR-3). It validates the spec, builds the
 // linkedca-shaped JSON body (for JWK it generates a keypair and encrypts the
@@ -296,6 +376,13 @@ func validateSpec(spec NewProvisionerSpec) error {
 	if spec.Type == "JWK" && len(spec.JWKSecret) < minJWKSecretLen {
 		return fmt.Errorf("%w: JWK secret must be at least %d characters", ErrInvalidProvisioner, minJWKSecretLen)
 	}
+	if spec.Type == "ACME" {
+		for _, c := range spec.ACMEChallenges {
+			if !validACMEChallenge(c) {
+				return fmt.Errorf("%w: unknown ACME challenge %q", ErrInvalidProvisioner, c)
+			}
+		}
+	}
 	return nil
 }
 
@@ -315,7 +402,7 @@ func buildCreateBody(spec NewProvisionerSpec) ([]byte, error) {
 			"encryptedPrivateKey": base64.StdEncoding.EncodeToString(encPriv),
 		}
 	case "ACME":
-		details["ACME"] = map[string]any{}
+		details["ACME"] = acmeDetails(spec)
 	case "SSHPOP":
 		details["SSHPOP"] = map[string]any{}
 	default:

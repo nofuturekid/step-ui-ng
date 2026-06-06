@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"time"
 
@@ -38,6 +39,15 @@ templ layout(d pageData) {
 					var m = document.querySelector('meta[name="csrf-token"]');
 					if (m) { e.detail.headers["X-CSRF-Token"] = m.getAttribute("content"); }
 				});
+				function copyText(btn) {
+					var f = btn.parentElement.querySelector("input,textarea");
+					if (!f) { return; }
+					f.select();
+					var done = function() { var t = btn.textContent; btn.textContent = "Copied"; setTimeout(function(){ btn.textContent = t; }, 1200); };
+					if (navigator.clipboard && navigator.clipboard.writeText) {
+						navigator.clipboard.writeText(f.value).then(done, function(){ document.execCommand("copy"); done(); });
+					} else { document.execCommand("copy"); done(); }
+				}
 			</script>
 		</head>
 		<body>
@@ -49,6 +59,7 @@ templ layout(d pageData) {
 						<a href="/issue">Issue</a>
 						<a href="/sign-csr">Sign CSR</a>
 						<a href="/provisioners">Provisioners</a>
+						<a href="/acme">ACME</a>
 						<a href="/settings">CA settings</a>
 						<a href="/audit">Audit log</a>
 					}
@@ -704,7 +715,11 @@ templ auditPage(d pageData, v auditView) {
 					@auditActionOption("sign", v.Filter.Action)
 					@auditActionOption("revoke", v.Filter.Action)
 					@auditActionOption("renew", v.Filter.Action)
-					// ACME actions (spec/0010) — add options here when implemented.
+					@auditActionOption("acme.provisioner.create", v.Filter.Action)
+					@auditActionOption("acme.provisioner.update", v.Filter.Action)
+					@auditActionOption("acme.provisioner.delete", v.Filter.Action)
+					@auditActionOption("acme.eab.create", v.Filter.Action)
+					@auditActionOption("acme.eab.revoke", v.Filter.Action)
 				</select>
 				<label for="audit-who">User</label>
 				<input id="audit-who" name="who" type="text" value={ v.Filter.Who } placeholder="username"/>
@@ -759,6 +774,213 @@ templ auditActionOption(val, current string) {
 	} else {
 		<option value={ val }>{ val }</option>
 	}
+}
+
+// acmePage lists the CA's ACME provisioners with their directory URLs (+ copy
+// button) and offers create/edit/delete controls when an admin credential is
+// configured (spec/0010, admin+). It never renders any secret.
+templ acmePage(d pageData, v acmeView) {
+	@layout(d) {
+		<div class="card">
+			<h1>ACME provisioners</h1>
+			<p class="muted">Manage ACME provisioners on the CA. Each has a directory URL clients point at; use the EAB page to issue per-client credentials when required.</p>
+			if v.ListError != "" {
+				<div class="flash error" role="alert">{ v.ListError }</div>
+			}
+			if v.CASettings {
+				if len(v.Provisioners) == 0 && v.ListError == "" {
+					<p class="muted">No ACME provisioners yet. Create one below.</p>
+				} else {
+					<table>
+						<thead>
+							<tr><th>Name</th><th>Directory URL</th><th>Actions</th></tr>
+						</thead>
+						<tbody>
+							for _, p := range v.Provisioners {
+								@acmeProvRowTempl(d, p, v.HasAdminCred, v.Challenges)
+							}
+						</tbody>
+					</table>
+				}
+			}
+		</div>
+		if v.CASettings {
+			<div class="card">
+				<h1>Create ACME provisioner</h1>
+				if !v.HasAdminCred {
+					<p class="muted">Managing ACME provisioners requires an admin credential. Add an admin certificate and key on the CA settings page.</p>
+				} else {
+					<form method="post" action="/acme/provisioners">
+						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+						<label for="acme-name">Name</label>
+						<input id="acme-name" name="name" type="text" required pattern="[a-zA-Z0-9._-]+" placeholder="my-acme"/>
+						<fieldset>
+							<legend>Allowed challenges</legend>
+							for _, c := range v.Challenges {
+								<label class="inline">
+									<input type="checkbox" name="challenge" value={ c }/> { c }
+								</label>
+							}
+							<p class="muted">Leave all unchecked to allow the CA's defaults.</p>
+						</fieldset>
+						<label class="inline">
+							<input type="checkbox" name="require_eab"/> Require External Account Binding (EAB)
+						</label>
+						<p></p>
+						<button type="submit">Create</button>
+					</form>
+				}
+			</div>
+		}
+	}
+}
+
+// acmeProvRowTempl renders one ACME provisioner: name, copyable directory URL,
+// a link to its EAB page, and (with an admin credential) edit/delete controls.
+templ acmeProvRowTempl(d pageData, p acmeProvRow, hasAdminCred bool, challenges []string) {
+	<tr>
+		<td>{ p.Name }</td>
+		<td>
+			@copyField(p.DirectoryURL)
+		</td>
+		<td>
+			<div class="actions">
+				<a class="button secondary" href={ templ.SafeURL("/acme/eab/" + p.Name) }>EAB &amp; snippets</a>
+				if hasAdminCred {
+					<form method="post" action={ templ.SafeURL("/acme/provisioners/" + p.Name) }>
+						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+						<input type="hidden" name="action" value="edit"/>
+						// require_eab_present marks that this form carries an explicit
+						// requireEAB intent, so the handler can tell "unchecked" from
+						// "field not edited" and merge correctly (spec/0010).
+						<input type="hidden" name="require_eab_present" value="1"/>
+						for _, c := range challenges {
+							<label class="inline">
+								<input type="checkbox" name="challenge" value={ c } checked?={ slices.Contains(p.Challenges, c) }/> { c }
+							</label>
+						}
+						<label class="inline"><input type="checkbox" name="require_eab" checked?={ p.RequireEAB }/> EAB</label>
+						<button class="secondary" type="submit">Save options</button>
+					</form>
+					<form method="post" action={ templ.SafeURL("/acme/provisioners/" + p.Name) } onsubmit="return confirm('Delete this ACME provisioner at the CA?');">
+						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+						<input type="hidden" name="action" value="delete"/>
+						<button class="danger" type="submit">Delete</button>
+					</form>
+				}
+			</div>
+		</td>
+	</tr>
+}
+
+// eabPage manages EAB keys for one ACME provisioner (spec/0010, admin+). It shows
+// the directory URL, the existing keys (keyID + status, NEVER the HMAC), a create
+// form, the one-time keyID + HMAC display after a create, and the client snippets.
+templ eabPage(d pageData, v eabView) {
+	@layout(d) {
+		<div class="card">
+			<h1>EAB — { v.Provisioner }</h1>
+			<p class="muted">External Account Binding keys for the ACME provisioner <strong>{ v.Provisioner }</strong>.</p>
+			<label>ACME directory URL</label>
+			@copyField(v.DirectoryURL)
+			<p><a href="/acme">← Back to ACME provisioners</a></p>
+		</div>
+		if v.Created != nil {
+			<div class="card">
+				<h2>New EAB key — shown once</h2>
+				<p class="error"><strong>Save the HMAC now — it is shown only this once and is NOT retrievable later.</strong></p>
+				<label>Key ID</label>
+				@copyField(v.Created.KeyID)
+				<label>HMAC (base64)</label>
+				@copyField(v.Created.HMAC)
+			</div>
+		}
+		if v.ListError != "" {
+			<div class="card"><div class="flash error" role="alert">{ v.ListError }</div></div>
+		}
+		<div class="card">
+			<h2>Existing keys</h2>
+			if len(v.Keys) == 0 {
+				<p class="muted">No EAB keys yet.</p>
+			} else {
+				<table>
+					<thead>
+						<tr><th>Key ID</th><th>Reference</th><th>Status</th><th>Actions</th></tr>
+					</thead>
+					<tbody>
+						for _, k := range v.Keys {
+							<tr>
+								<td class="mono">{ k.KeyID }</td>
+								<td>{ k.Reference }</td>
+								<td>
+									if k.Bound() {
+										<span class="badge ok">bound</span>
+									} else {
+										<span class="badge">unbound</span>
+									}
+								</td>
+								<td>
+									if v.HasAdminCred {
+										<form method="post" action={ templ.SafeURL("/acme/eab/" + v.Provisioner) } onsubmit="return confirm('Revoke this EAB key?');">
+											<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+											<input type="hidden" name="action" value="delete"/>
+											<input type="hidden" name="key_id" value={ k.KeyID }/>
+											<button class="danger" type="submit">Revoke</button>
+										</form>
+									}
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			}
+		</div>
+		if v.HasAdminCred {
+			<div class="card">
+				<h2>Create EAB key</h2>
+				<p class="muted">The HMAC is shown exactly once on creation. Store it securely; it cannot be retrieved later.</p>
+				<form method="post" action={ templ.SafeURL("/acme/eab/" + v.Provisioner) }>
+					<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+					<label for="eab-ref">Reference (optional label)</label>
+					<input id="eab-ref" name="reference" type="text" maxlength="256" placeholder="e.g. laptop-01"/>
+					<p></p>
+					<button type="submit">Create EAB key</button>
+				</form>
+			</div>
+		}
+		<div class="card">
+			<h2>Client snippets</h2>
+			<p class="muted">Copy-paste onboarding for common ACME clients, parameterized with this directory URL{ eabSnippetNote(v.RequireEAB) }.</p>
+			for _, s := range v.Snippets {
+				<label>{ s.Client }</label>
+				@copyBlock(s.Code)
+			}
+		</div>
+	}
+}
+
+// copyField renders a read-only single-line value with a copy button.
+templ copyField(value string) {
+	<div class="copy">
+		<input type="text" readonly value={ value } class="mono"/>
+		<button type="button" class="secondary" onclick="copyText(this)">Copy</button>
+	</div>
+}
+
+// copyBlock renders a read-only multi-line code block with a copy button.
+templ copyBlock(value string) {
+	<div class="copy">
+		<textarea rows="6" readonly class="mono">{ value }</textarea>
+		<button type="button" class="secondary" onclick="copyText(this)">Copy</button>
+	</div>
+}
+
+// eabSnippetNote appends a note about EAB params when EAB is in use.
+func eabSnippetNote(requireEAB bool) string {
+	if requireEAB {
+		return " and EAB credentials"
+	}
+	return ""
 }
 
 // auditPageURL builds a relative URL for a given audit page + existing filters.

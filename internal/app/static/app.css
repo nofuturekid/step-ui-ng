@@ -146,6 +146,44 @@ th {
 .muted {
   color: var(--muted);
 }
+
+/* ACME copy fields/blocks (spec/0010): a value plus an inline Copy button. */
+.copy {
+  display: flex;
+  gap: 0.4rem;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+}
+.copy input,
+.copy textarea {
+  flex: 1;
+}
+.copy button {
+  flex: 0 0 auto;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+label.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-right: 0.9rem;
+  font-weight: 400;
+}
+label.inline input {
+  width: auto;
+}
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.8rem;
+}
+fieldset legend {
+  font-weight: 500;
+  padding: 0 0.3rem;
+}
 .badge {
   font-size: 0.75rem;
   padding: 0.1rem 0.45rem;
