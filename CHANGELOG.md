@@ -10,6 +10,39 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- Revoke & renew certificates (spec/0008, ADR-0004). Revocation is now **real**:
+  it is performed against the CA (no longer a local-only mark). New
+  `POST /certificates/{id}/revoke` and `POST /certificates/{id}/renew` (both
+  admin+, behind auth + CSRF), with Revoke (reason + OCSP reason code + a typed
+  `REVOKE` confirmation) and Renew (validity, defaulted from config) controls on
+  the certificate detail view. `internal/ca` gains `RevokeCert`: it signs a JWK
+  provisioner **OTT** whose subject is the certificate **serial** and whose
+  audience is `{ca}/1.0/revoke` (step-ca's revoke contract — `authorizeRevoke`
+  rejects a token whose subject ≠ serial), then `POST {ca}/1.0/revoke`
+  `{serial, ott, reasonCode, reason, passive:true}` (step-ca only implements
+  passive revocation). It reuses the two-phase pinned-trust client (no blanket
+  skip-verify); typed errors `ErrRevokeInvalid`, `ErrRevokeFailed`. The token
+  format follows smallstep/cli's revoke token flow and smallstep/certificates'
+  `api/revoke.go`. `internal/certs` gains `Revoke` and `Renew`: `Revoke` calls
+  the CA FIRST and sets local `status=revoked` + records an audit event **only on
+  CA success** (a CA failure leaves the local row UNCHANGED — the atomicity the
+  predecessor lacked), refuses an already-revoked cert (`ErrAlreadyRevoked`) and
+  requires a reason (`ErrReasonRequired`). `Renew` re-issues for the SAME CN/SANs
+  via the existing issue path (new server keypair → CSR → CA sign → sealed key →
+  new inventory row) with the chosen validity, bounded by the provisioner's max
+  at the CA, and records a `renew` audit event. The default renew validity is
+  **configurable**, not hard-coded: new `RENEW_DEFAULT_DAYS` env (default 90) in
+  `internal/config` (`Config.RenewDefaultDays`/`DefaultRenewDays`); the renew form
+  shows it pre-filled and the user can override. Acceptance tests (mock CA via
+  httptest) cover: revoke success (CA receives the call by serial + OTT subject ==
+  serial + passive:true, local status → revoked); CA rejects → local status
+  unchanged + error shown (atomicity, fails on regression); already-revoked guard
+  (no CA call); reason required; renew with 30 days → new cert, same CN/SANs,
+  not_after ≈ now+30d; renew over provisioner max → rejected; configurable default
+  (env-driven, not hard-coded); RBAC (viewer → 403); audit events for revoke and
+  renew with the session actor. Limitation: as with issue/sign, behaviour is
+  proven against an httptest mock CA, not a live Step-CA.
+
 - Certificate inventory & encrypted re-download (spec/0007). New
   `GET /inventory` (list with htmx live-filter by status and CN/SAN text
   search), `GET /certificates/{id}` (detail view), and

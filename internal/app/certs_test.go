@@ -45,6 +45,14 @@ type signCAFixture struct {
 	password    string
 	root        *x509.Certificate
 	rootKey     *ecdsa.PrivateKey
+	// Revoke-flow capture/config (spec/0008). rejectRevoke makes /1.0/revoke fail
+	// so the handler/atomicity tests can exercise the CA-failure path.
+	rejectRevoke  bool
+	revokeCalled  bool
+	revokeSerial  string
+	revokeReason  string
+	revokeOTTSub  string
+	revokePassive bool
 }
 
 func startSignCAFixture(t *testing.T) *signCAFixture {
@@ -102,8 +110,9 @@ func startSignCAFixture(t *testing.T) *signCAFixture {
 	mux.HandleFunc("POST /1.0/sign", func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 		var req struct {
-			CSR string `json:"csr"`
-			OTT string `json:"ott"`
+			CSR      string `json:"csr"`
+			OTT      string `json:"ott"`
+			NotAfter string `json:"notAfter"`
 		}
 		_ = json.Unmarshal(body, &req)
 
@@ -139,11 +148,19 @@ func startSignCAFixture(t *testing.T) *signCAFixture {
 			return
 		}
 
+		// Honor the requested notAfter (as a real CA does within its bound), so
+		// renewed certs carry the chosen validity; default to 24h when absent.
+		notAfter := time.Now().Add(24 * time.Hour)
+		if req.NotAfter != "" {
+			if parsed, perr := time.Parse(time.RFC3339, req.NotAfter); perr == nil {
+				notAfter = parsed
+			}
+		}
 		leafTmpl := &x509.Certificate{
 			SerialNumber:   big.NewInt(time.Now().UnixNano() + 99),
 			Subject:        csr.Subject,
 			NotBefore:      time.Now().Add(-time.Minute),
-			NotAfter:       time.Now().Add(24 * time.Hour),
+			NotAfter:       notAfter,
 			KeyUsage:       x509.KeyUsageDigitalSignature,
 			ExtKeyUsage:    []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 			DNSNames:       csr.DNSNames,
@@ -159,6 +176,54 @@ func startSignCAFixture(t *testing.T) *signCAFixture {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"crt": leafPEM, "ca": caPEM, "certChain": []string{leafPEM, caPEM},
 		})
+	})
+	revokeAud := f.url + "/1.0/revoke"
+	mux.HandleFunc("POST /1.0/revoke", func(w http.ResponseWriter, r *http.Request) {
+		f.revokeCalled = true
+		body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		var req struct {
+			Serial     string `json:"serial"`
+			OTT        string `json:"ott"`
+			ReasonCode int    `json:"reasonCode"`
+			Reason     string `json:"reason"`
+			Passive    bool   `json:"passive"`
+		}
+		_ = json.Unmarshal(body, &req)
+		f.revokeSerial = req.Serial
+		f.revokeReason = req.Reason
+		f.revokePassive = req.Passive
+
+		jwt, perr := jose.ParseSigned(req.OTT)
+		if perr != nil {
+			http.Error(w, `{"message":"bad token"}`, http.StatusUnauthorized)
+			return
+		}
+		var claims jose.Claims
+		if perr := jwt.Claims(pubKey.Public(), &claims); perr != nil {
+			http.Error(w, `{"message":"invalid token signature"}`, http.StatusUnauthorized)
+			return
+		}
+		if perr := claims.ValidateWithLeeway(jose.Expected{
+			Issuer:   provName,
+			Audience: jose.Audience{revokeAud},
+			Time:     time.Now().UTC(),
+		}, time.Minute); perr != nil {
+			http.Error(w, `{"message":"invalid claims"}`, http.StatusUnauthorized)
+			return
+		}
+		f.revokeOTTSub = claims.Subject
+		// The revoke crux: token subject must equal the serial.
+		if claims.Subject != req.Serial {
+			http.Error(w, `{"message":"token subject and serial number do not match"}`, http.StatusUnauthorized)
+			return
+		}
+		if f.rejectRevoke {
+			http.Error(w, `{"message":"certificate with serial number not found"}`, http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 	srv.Config.Handler = mux
 	return f

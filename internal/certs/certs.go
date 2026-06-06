@@ -80,22 +80,41 @@ func (f caSignerFunc) SignCSR(ctx context.Context, p ca.SignParams) (ca.SignResu
 // LiveSigner returns a Signer backed by the real ca.SignCSR.
 func LiveSigner() Signer { return caSignerFunc(ca.SignCSR) }
 
+// Revoker revokes a certificate at the CA by serial (spec/0008 FR-1). It matches
+// ca.RevokeCert so the production wiring passes it directly; tests substitute a
+// fake that can be made to fail.
+type Revoker interface {
+	RevokeCert(ctx context.Context, p ca.RevokeParams) error
+}
+
+// caRevokerFunc adapts ca.RevokeCert (a plain func) to the Revoker interface.
+type caRevokerFunc func(ctx context.Context, p ca.RevokeParams) error
+
+func (f caRevokerFunc) RevokeCert(ctx context.Context, p ca.RevokeParams) error {
+	return f(ctx, p)
+}
+
+// LiveRevoker returns a Revoker backed by the real ca.RevokeCert.
+func LiveRevoker() Revoker { return caRevokerFunc(ca.RevokeCert) }
+
 // Recorder is the audit sink (internal/audit.Recorder satisfies it).
 type Recorder interface {
 	Record(ctx context.Context, who, action, target, details string) error
 }
 
-// Service issues and signs certificates and persists them.
+// Service issues, signs, renews and revokes certificates and persists them.
 type Service struct {
-	db     *sql.DB
-	box    *appcrypto.Box
-	audit  Recorder
-	signer Signer
+	db      *sql.DB
+	box     *appcrypto.Box
+	audit   Recorder
+	signer  Signer
+	revoker Revoker
 }
 
-// NewService wires the persistence, sealing box, audit recorder and CA signer.
-func NewService(db *sql.DB, box *appcrypto.Box, audit Recorder, signer Signer) *Service {
-	return &Service{db: db, box: box, audit: audit, signer: signer}
+// NewService wires the persistence, sealing box, audit recorder, CA signer and
+// CA revoker.
+func NewService(db *sql.DB, box *appcrypto.Box, audit Recorder, signer Signer, revoker Revoker) *Service {
+	return &Service{db: db, box: box, audit: audit, signer: signer, revoker: revoker}
 }
 
 // now is overridable in tests; defaults to wall-clock unix seconds.

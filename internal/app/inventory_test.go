@@ -407,7 +407,7 @@ func invSeedServerCert(t *testing.T, e *testEnv, cn string) int64 {
 	t.Helper()
 	// Build a certs.Service wired to the same DB + box as the handler so the
 	// sealed key can be opened during download.
-	svc := certs.NewService(e.db, e.box, audit.NewRecorder(e.db), invFakeSigner(t))
+	svc := certs.NewService(e.db, e.box, audit.NewRecorder(e.db), invFakeSigner(t), nil)
 	cert, err := svc.Issue(context.Background(), certs.IssueParams{
 		Actor: "root", ProvisionerName: "p", Password: "x",
 		CAURL: "https://ca.test", Fingerprint: "fp",

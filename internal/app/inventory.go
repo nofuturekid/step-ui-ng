@@ -71,7 +71,7 @@ func (s *server) getCertDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d := s.page(r, "Certificate — "+cert.CN)
-	s.render(w, r, http.StatusOK, certDetailPage(d, cert))
+	s.render(w, r, http.StatusOK, certDetailPage(d, certDetailView{Cert: cert, RenewDefaultDays: s.renewDefaultDays()}))
 }
 
 // postCertDownload assembles a ZIP bundle in memory and streams it to the
@@ -156,4 +156,11 @@ func (s *server) registerInventoryRoutes(mux *http.ServeMux) {
 	// Bundle download — POST with PFX password in body (never in URL), admin+ only.
 	mux.HandleFunc("POST /certificates/{id}/download",
 		s.requireAuth(s.requireRole(users.RoleAdmin, s.postCertDownload)))
+
+	// Revoke & renew (spec/0008) — admin+ only, behind auth + CSRF. Revoke is real
+	// (calls the CA); renew re-issues for the same CN/SANs.
+	mux.HandleFunc("POST /certificates/{id}/revoke",
+		s.requireAuth(s.requireRole(users.RoleAdmin, s.postCertRevoke)))
+	mux.HandleFunc("POST /certificates/{id}/renew",
+		s.requireAuth(s.requireRole(users.RoleAdmin, s.postCertRenew)))
 }

@@ -49,7 +49,7 @@ func main() {
 
 	userRepo := users.NewRepo(st.DB())
 	settingsRepo := settings.NewRepo(st.DB(), box)
-	certsSvc := certs.NewService(st.DB(), box, audit.NewRecorder(st.DB()), certs.LiveSigner())
+	certsSvc := certs.NewService(st.DB(), box, audit.NewRecorder(st.DB()), certs.LiveSigner(), certs.LiveRevoker())
 	sessions := app.NewSessionManager(st.DB(), cfg.SecureCookies)
 
 	srv := &http.Server{
