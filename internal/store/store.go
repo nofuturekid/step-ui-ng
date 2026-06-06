@@ -36,10 +36,20 @@ func Open(dataDir string) (*Store, error) {
 		return nil, fmt.Errorf("create data dir: %w", err)
 	}
 
-	db, err := sql.Open("sqlite", filepath.Join(dataDir, dbFile))
+	// _txlock=immediate makes every db.BeginTx acquire the write lock up front
+	// (BEGIN IMMEDIATE), so the check+write inside a transaction is atomic against
+	// concurrent writers rather than failing late at COMMIT. busy_timeout lets a
+	// contending writer wait for the lock instead of erroring out immediately.
+	dsn := "file:" + filepath.Join(dataDir, dbFile) +
+		"?_txlock=immediate&_pragma=busy_timeout(5000)"
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
+	// SQLite permits a single writer; serialising connections avoids spurious
+	// SQLITE_BUSY under our low concurrency. Defence-in-depth only — the atomic
+	// transactions in internal/users are what actually close the TOCTOU window.
+	db.SetMaxOpenConns(1)
 
 	migrations, err := fs.Sub(migrationsFS, "migrations")
 	if err != nil {

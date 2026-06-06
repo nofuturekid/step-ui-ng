@@ -1,0 +1,157 @@
+:root {
+  --fg: #1a1a1a;
+  --bg: #f7f7f8;
+  --card: #ffffff;
+  --border: #d7d7db;
+  --accent: #2d6cdf;
+  --danger: #c0392b;
+  --muted: #6b6b70;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+  line-height: 1.5;
+}
+
+header.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+
+header.topbar a {
+  color: var(--fg);
+  text-decoration: none;
+  font-weight: 600;
+}
+header.topbar .who {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+main {
+  max-width: 56rem;
+  margin: 2rem auto;
+  padding: 0 1.25rem;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.auth {
+  max-width: 24rem;
+  margin: 4rem auto;
+}
+
+label {
+  display: block;
+  margin: 0.75rem 0 0.25rem;
+  font-weight: 500;
+}
+
+input[type="text"],
+input[type="password"],
+select {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  background: #fff;
+}
+
+button {
+  font: inherit;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #fff;
+  color: var(--fg);
+  border-color: var(--border);
+}
+button.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th,
+td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.actions form {
+  display: inline;
+}
+
+.flash {
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+.flash.error {
+  background: #fdecea;
+  color: var(--danger);
+  border: 1px solid #f5c6c0;
+}
+.flash.info {
+  background: #e8f0fe;
+  color: var(--accent);
+  border: 1px solid #c6d8f7;
+}
+
+.muted {
+  color: var(--muted);
+}
+.badge {
+  font-size: 0.75rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #eee;
+}
+h1 {
+  font-size: 1.4rem;
+}

@@ -1,0 +1,190 @@
+package app
+
+import (
+	"strconv"
+
+	"github.com/nofuturekid/step-ui-ng/internal/users"
+)
+
+// pageData carries the bits every page needs: the CSRF token (rendered into a
+// hidden field and an htmx header) and the current user (may be nil).
+type pageData struct {
+	Title     string
+	CSRFToken string
+	User      *users.User
+	Flash     string // non-fatal info message
+	Error     string // error message
+}
+
+// layout is the shared HTML shell. htmx is configured to attach the CSRF token
+// to every request via the X-CSRF-Token header, matching the hidden form field.
+templ layout(d pageData) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ d.Title } · step-ui-ng</title>
+			<link rel="stylesheet" href="/static/app.css"/>
+			<script src="/static/htmx.min.js"></script>
+			<meta name="csrf-token" content={ d.CSRFToken }/>
+			<script>
+				document.body && document.addEventListener("htmx:configRequest", function(e) {
+					var m = document.querySelector('meta[name="csrf-token"]');
+					if (m) { e.detail.headers["X-CSRF-Token"] = m.getAttribute("content"); }
+				});
+			</script>
+		</head>
+		<body>
+			if d.User != nil {
+				<header class="topbar">
+					<a href="/users">step-ui-ng</a>
+					<span class="who">
+						{ d.User.Username } <span class="badge">{ string(d.User.Role) }</span>
+						<form method="post" action="/logout" style="display:inline">
+							<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+							<button class="secondary" type="submit">Log out</button>
+						</form>
+					</span>
+				</header>
+			}
+			<main>
+				if d.Error != "" {
+					<div class="flash error" role="alert">{ d.Error }</div>
+				}
+				if d.Flash != "" {
+					<div class="flash info">{ d.Flash }</div>
+				}
+				{ children... }
+			</main>
+		</body>
+	</html>
+}
+
+// setupPage renders the first-run super-admin creation form (FR-1).
+templ setupPage(d pageData) {
+	@layout(d) {
+		<div class="card auth">
+			<h1>Welcome — create the first admin</h1>
+			<p class="muted">No users exist yet. This account becomes the superadmin.</p>
+			<form method="post" action="/setup">
+				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+				<label for="username">Username</label>
+				<input id="username" name="username" type="text" autocomplete="username" required minlength="3" maxlength="64"/>
+				<label for="password">Password (min 12 characters)</label>
+				<input id="password" name="password" type="password" autocomplete="new-password" required minlength="12"/>
+				<p></p>
+				<button type="submit">Create superadmin</button>
+			</form>
+		</div>
+	}
+}
+
+// loginPage renders the login form.
+templ loginPage(d pageData) {
+	@layout(d) {
+		<div class="card auth">
+			<h1>Log in</h1>
+			<form method="post" action="/login">
+				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+				<label for="username">Username</label>
+				<input id="username" name="username" type="text" autocomplete="username" required/>
+				<label for="password">Password</label>
+				<input id="password" name="password" type="password" autocomplete="current-password" required/>
+				<p></p>
+				<button type="submit">Log in</button>
+			</form>
+		</div>
+	}
+}
+
+// usersPage lists users with per-row actions and a create form (admin+).
+templ usersPage(d pageData, list []users.User) {
+	@layout(d) {
+		<div class="card">
+			<h1>Users</h1>
+			<table>
+				<thead>
+					<tr>
+						<th>ID</th><th>Username</th><th>Role</th><th>Status</th><th>Actions</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, u := range list {
+						@userRow(d, u)
+					}
+				</tbody>
+			</table>
+		</div>
+		<div class="card">
+			<h1>Create user</h1>
+			<form method="post" action="/users">
+				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+				<label for="new-username">Username</label>
+				<input id="new-username" name="username" type="text" required minlength="3" maxlength="64"/>
+				<label for="new-password">Password (min 12 characters)</label>
+				<input id="new-password" name="password" type="password" required minlength="12"/>
+				<label for="new-role">Role</label>
+				<select id="new-role" name="role">
+					<option value="viewer">viewer</option>
+					<option value="admin">admin</option>
+					<option value="superadmin">superadmin</option>
+				</select>
+				<p></p>
+				<button type="submit">Create</button>
+			</form>
+		</div>
+	}
+}
+
+// userRow renders a single user with role/disable/delete controls.
+templ userRow(d pageData, u users.User) {
+	<tr>
+		<td>{ strconv.FormatInt(u.ID, 10) }</td>
+		<td>{ u.Username }</td>
+		<td>{ string(u.Role) }</td>
+		<td>
+			if u.Disabled {
+				<span class="badge">disabled</span>
+			} else {
+				<span class="badge">active</span>
+			}
+		</td>
+		<td>
+			<div class="actions">
+				<form method="post" action={ templ.SafeURL("/users/" + strconv.FormatInt(u.ID, 10)) }>
+					<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+					<input type="hidden" name="action" value="set_role"/>
+					<select name="role" onchange="this.form.submit()" aria-label="role">
+						@roleOption(users.RoleViewer, u.Role)
+						@roleOption(users.RoleAdmin, u.Role)
+						@roleOption(users.RoleSuperadmin, u.Role)
+					</select>
+				</form>
+				<form method="post" action={ templ.SafeURL("/users/" + strconv.FormatInt(u.ID, 10)) }>
+					<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+					if u.Disabled {
+						<input type="hidden" name="action" value="enable"/>
+						<button class="secondary" type="submit">Enable</button>
+					} else {
+						<input type="hidden" name="action" value="disable"/>
+						<button class="secondary" type="submit">Disable</button>
+					}
+				</form>
+				<form method="post" action={ templ.SafeURL("/users/" + strconv.FormatInt(u.ID, 10)) }>
+					<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+					<input type="hidden" name="action" value="delete"/>
+					<button class="danger" type="submit">Delete</button>
+				</form>
+			</div>
+		</td>
+	</tr>
+}
+
+templ roleOption(opt users.Role, current users.Role) {
+	if opt == current {
+		<option value={ string(opt) } selected>{ string(opt) }</option>
+	} else {
+		<option value={ string(opt) }>{ string(opt) }</option>
+	}
+}
