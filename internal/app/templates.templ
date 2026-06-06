@@ -1,7 +1,9 @@
 package app
 
 import (
+	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/nofuturekid/step-ui-ng/internal/certs"
 	"github.com/nofuturekid/step-ui-ng/internal/settings"
@@ -41,6 +43,7 @@ templ layout(d pageData) {
 			if d.User != nil {
 				<header class="topbar">
 					<a href="/users">step-ui-ng</a>
+					<a href="/inventory">Certificates</a>
 					if d.User.Role.AtLeast(users.RoleAdmin) {
 						<a href="/issue">Issue</a>
 						<a href="/sign-csr">Sign CSR</a>
@@ -459,4 +462,170 @@ templ certResult(c certs.Certificate) {
 			<p><a download={ pfxFilename(c.CN) } href={ pfxDataURI(c.PFX) }>Download PKCS#12 bundle ({ pfxFilename(c.CN) }, { strconv.Itoa(len(c.PFX)) } bytes)</a></p>
 		}
 	</div>
+}
+
+// inventoryPage renders the certificate inventory list with live-filter controls
+// (spec/0007, FR-1). htmx swaps only the table body on filter changes.
+templ inventoryPage(d pageData, v inventoryView) {
+	@layout(d) {
+		<div class="card">
+			<h1>Certificates</h1>
+			<form
+				hx-get="/inventory"
+				hx-target="#inventory-table"
+				hx-trigger="change, input delay:300ms"
+				hx-push-url="false"
+			>
+				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+				<label for="inv-status">Status</label>
+				<select id="inv-status" name="status">
+					<option value="">All</option>
+					@invStatusOption("active", "Active", v.Filter.Status)
+					@invStatusOption("expired", "Expired", v.Filter.Status)
+					@invStatusOption("revoked", "Revoked", v.Filter.Status)
+				</select>
+				<label for="inv-search">Search (CN / SAN)</label>
+				<input id="inv-search" name="q" type="search" placeholder="e.g. example.test" value={ v.Filter.Search }/>
+			</form>
+			<div id="inventory-table">
+				@inventoryTable(d, v)
+			</div>
+		</div>
+	}
+}
+
+templ invStatusOption(val, label, current string) {
+	if val == current {
+		<option value={ val } selected>{ label }</option>
+	} else {
+		<option value={ val }>{ label }</option>
+	}
+}
+
+// inventoryTable is the htmx-swappable table partial for the inventory list.
+templ inventoryTable(d pageData, v inventoryView) {
+	if len(v.Items) == 0 {
+		<p class="muted">No certificates match the current filter.</p>
+	} else {
+		<table>
+			<thead>
+				<tr>
+					<th>Common name</th>
+					<th>SANs</th>
+					<th>Serial</th>
+					<th>Status</th>
+					<th>Expires</th>
+					<th>Strategy</th>
+					<th>Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, item := range v.Items {
+					@inventoryRow(d, item)
+				}
+			</tbody>
+		</table>
+	}
+}
+
+// inventoryRow renders a single inventory row with a status badge, days-to-
+// expiry, and a compact download form (FR-5). The download is a POST so the
+// optional PFX password travels in the form body, never in the URL.
+templ inventoryRow(d pageData, item certs.InventoryItem) {
+	<tr>
+		<td><a href={ templ.SafeURL("/certificates/" + strconv.FormatInt(item.ID, 10)) }>{ item.CN }</a></td>
+		<td>{ joinSANs(item.SANs) }</td>
+		<td class="mono">{ item.Serial }</td>
+		<td>@statusBadge(item.Status)</td>
+		<td>{ fmtExpiry(item.NotAfter, item.DaysLeft) }</td>
+		<td>{ item.KeyStrategy }</td>
+		<td>
+			<a class="button" href={ templ.SafeURL("/certificates/" + strconv.FormatInt(item.ID, 10)) }>View</a>
+			<form method="post" action={ templ.SafeURL("/certificates/" + strconv.FormatInt(item.ID, 10) + "/download") } style="display:inline">
+				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+				<input type="password" name="pfx_password" placeholder="PFX password (optional)" style="width:12em"/>
+				<button class="secondary" type="submit">Download</button>
+			</form>
+		</td>
+	</tr>
+}
+
+// statusBadge renders a coloured badge for the derived certificate status.
+templ statusBadge(status string) {
+	switch status {
+	case "active":
+		<span class="badge ok">active</span>
+	case "expired":
+		<span class="badge warn">expired</span>
+	case "revoked":
+		<span class="badge error">revoked</span>
+	default:
+		<span class="badge">{ status }</span>
+	}
+}
+
+// certDetailPage renders the full certificate detail view (spec/0007, FR-1).
+// It shows all metadata, PEM blocks (read-only textareas), and a prominent
+// Download button (FR-5).  The download link goes to the ZIP bundle endpoint.
+templ certDetailPage(d pageData, c certs.Certificate) {
+	@layout(d) {
+		<div class="card">
+			<h1>Certificate detail</h1>
+			<table>
+				<tbody>
+					<tr><th>Common name</th><td>{ c.CN }</td></tr>
+					<tr><th>Serial</th><td class="mono">{ c.Serial }</td></tr>
+					<tr><th>SANs</th><td>{ joinSANs(c.SANs) }</td></tr>
+					<tr><th>Key strategy</th><td>{ c.KeyStrategy }</td></tr>
+					<tr>
+						<th>Status</th>
+						<td>
+							{ func() string { st, _ := certs.DeriveStatus(c.Status, c.NotAfter); return st }() }
+						</td>
+					</tr>
+					<tr><th>Not before</th><td>{ fmtUnix(c.NotBefore) }</td></tr>
+					<tr><th>Not after</th><td>{ fmtUnix(c.NotAfter) }</td></tr>
+				</tbody>
+			</table>
+			<form method="post" action={ templ.SafeURL("/certificates/" + strconv.FormatInt(c.ID, 10) + "/download") }>
+				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+				<label for="dl-pfx-pass">PFX password (optional — adds PKCS#12 bundle to ZIP)</label>
+				<input id="dl-pfx-pass" type="password" name="pfx_password" placeholder="leave blank for PEM-only bundle" style="width:22em"/>
+				<p></p>
+				<button type="submit">Download bundle (ZIP)</button>
+			</form>
+		</div>
+		<div class="card">
+			<h2>PEM material</h2>
+			<label>Certificate (PEM)</label>
+			<textarea rows="10" readonly>{ c.CertPEM }</textarea>
+			if c.ChainPEM != "" {
+				<label>Chain (PEM)</label>
+				<textarea rows="8" readonly>{ c.ChainPEM }</textarea>
+			}
+			<label>Full chain (PEM)</label>
+			<textarea rows="12" readonly>{ c.FullchainPEM }</textarea>
+		</div>
+		<p><a href="/inventory">← Back to inventory</a></p>
+	}
+}
+
+// fmtUnix formats a Unix timestamp as a human-readable UTC date-time.
+func fmtUnix(unix int64) string {
+	if unix == 0 {
+		return "—"
+	}
+	return time.Unix(unix, 0).UTC().Format("2006-01-02 15:04:05 UTC")
+}
+
+// fmtExpiry formats the expiry date + days-left for the inventory table.
+func fmtExpiry(notAfter int64, daysLeft int) string {
+	date := time.Unix(notAfter, 0).UTC().Format("2006-01-02")
+	if daysLeft > 0 {
+		return fmt.Sprintf("%s (%d days)", date, daysLeft)
+	}
+	if daysLeft == 0 {
+		return date + " (today)"
+	}
+	return fmt.Sprintf("%s (%d days ago)", date, -daysLeft)
 }

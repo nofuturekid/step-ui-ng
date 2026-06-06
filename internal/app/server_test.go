@@ -33,6 +33,7 @@ type testEnv struct {
 	repo         *users.Repo
 	settingsRepo *settings.Repo
 	db           *sql.DB
+	box          *crypto.Box // exposed so inventory tests can seed server certs
 	client       *http.Client
 }
 
@@ -73,7 +74,7 @@ func newTestEnv(t *testing.T) *testEnv {
 			return http.ErrUseLastResponse
 		},
 	}
-	return &testEnv{srv: srv, repo: repo, settingsRepo: settingsRepo, db: st.DB(), client: client}
+	return &testEnv{srv: srv, repo: repo, settingsRepo: settingsRepo, db: st.DB(), box: box, client: client}
 }
 
 var csrfFieldRe = regexp.MustCompile(`name="csrf_token" value="([^"]*)"`)
