@@ -24,6 +24,14 @@ Versions are bumped only when a release is cut; in-progress work lives under
   changelog heading only when cutting a release (ADR-0011, supersedes the per-spec
   bump cadence of ADR-0008).
 
+### Fixed
+
+- Pin templ as a go.mod `tool` dependency and run `go tool templ generate`
+  everywhere (CI + Makefile), silencing the "templ not found in go.mod" version
+  warning and making generation reproducible.
+- Bump `golangci-lint-action` v8 → v9 (runs on Node.js 24), silencing the GitHub
+  Actions Node.js 20 deprecation warning ahead of the 2026-06-16 cutover.
+
 ## [0.0.1] - 2026-06-06
 
 ### Added
