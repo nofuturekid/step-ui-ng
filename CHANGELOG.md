@@ -10,6 +10,36 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- Provisioner management (spec/0005, ADR-0004, ADR-0012). New migration
+  `0004_provisioners.sql` extends `ca_settings` with the selected provisioner
+  (`selected_provisioner` + sealed `selected_provisioner_secret_sealed`) and the
+  admin credential for x5c admin-token signing (`admin_cert_pem`, the public
+  chain, plus sealed `admin_key_sealed`). `internal/ca` gains provisioner
+  operations over the existing two-phase pinned-trust client (no blanket
+  skip-verify): `ListProvisioners` (`GET /provisioners`, no admin auth, follows
+  the CA's `nextCursor` pagination), `CreateProvisioner`
+  (`POST /admin/provisioners`) and `DeleteProvisioner`
+  (`DELETE /admin/provisioners/{name}`). Create/delete authenticate with an
+  SDK-signed x5c admin JWT built via `go.step.sm/crypto/jose`
+  (`iss=step-admin-client/1.0`, `sub=<admin leaf CN>`, `aud=<endpoint URL>`,
+  `jti`, short validity; admin chain in the `x5c` header; token placed verbatim
+  in the `Authorization` header) — the exact format Step-CA's
+  `AuthorizeAdminToken` validates. JWK provisioners are created by generating a
+  keypair and shipping the public JWK plus the JWE-encrypted private key (the
+  plaintext password never leaves the process). `internal/settings` gains
+  `SelectProvisioner` (seals the secret), `SaveAdminCredential`/`AdminCredential`
+  (seals the private key, write-only toward the client) and `SelectedSecret`. New
+  admin-only routes `GET /provisioners`, `POST /provisioners` (create),
+  `POST /provisioners/select`, `POST /provisioners/{name}` (delete via
+  `action=delete`), with a Templ page listing provisioners + types, marking the
+  active one, and create/select/delete controls. Deleting the currently selected
+  provisioner is refused with a clear error (FR-4). Validation: name
+  `^[a-zA-Z0-9._-]+$`, type ∈ {JWK, ACME, SSHPOP}, JWK secret ≥ 8 chars. The
+  admin-token signing is proven by an `httptest` mock that re-implements Step-CA's
+  verification (x5c chain to root, leaf digital-signature usage, JWS signature by
+  the leaf key, claim checks); it is **not** validated against a live CA. Audit
+  events for provisioner actions (FR-5) are **deferred to spec/0009**;
+  ACME-specific options / EAB to spec/0010.
 - Step-CA connection configured in the UI (spec/0004, ADR-0004, ADR-0006). New
   migration `0003_ca_settings.sql` adds a single-row `ca_settings` table
   (STRICT, `CHECK (id = 1)`). New `internal/ca` package talks to Step-CA over its

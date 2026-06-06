@@ -120,6 +120,59 @@ func TestConnection(ctx context.Context, caURL, fingerprint string) ([]*x509.Cer
 	return roots, nil
 }
 
+// baseURL trims trailing slashes/whitespace and validates the https scheme,
+// returning the CA base URL ready for path joining. It shares the scheme guard
+// with rootsEndpoint.
+func baseURL(caURL string) (string, error) {
+	u := strings.TrimRight(strings.TrimSpace(caURL), "/")
+	if !strings.HasPrefix(u, "https://") {
+		return "", fmt.Errorf("%w: CA URL must be https", ErrBadTLS)
+	}
+	return u, nil
+}
+
+// pinnedClientFor establishes the two-phase pinned trust to caURL/fingerprint
+// (see the package doc) and returns an *http.Client whose transport trusts ONLY
+// the verified pinned root (RootCAs pool, InsecureSkipVerify:false). Every CA
+// operation beyond Test connection (list/create/delete provisioners, spec/0005)
+// reuses this so they share the same anchored-trust guarantee — no blanket
+// skip-verify. caURL must be https. Returns ErrUnreachable/ErrBadTLS/
+// ErrFingerprintMismatch/ErrMalformedResponse as appropriate.
+func pinnedClientFor(ctx context.Context, caURL, fingerprint string) (*http.Client, error) {
+	want, err := normalizeFingerprint(fingerprint)
+	if err != nil {
+		return nil, err
+	}
+	rootsURL, err := rootsEndpoint(caURL)
+	if err != nil {
+		return nil, err
+	}
+
+	// Phase 1: pinned bootstrap fetch of /roots (no trust anchor yet).
+	body, err := fetch(ctx, rootsURL, pinnedClient(want))
+	if err != nil {
+		return nil, err
+	}
+	roots, err := parseRoots(body)
+	if err != nil {
+		return nil, err
+	}
+	pinned := matchFingerprint(roots, want)
+	if pinned == nil {
+		return nil, ErrFingerprintMismatch
+	}
+
+	// Phase 2: build the steady-state client anchored in the verified root and
+	// prove the live chain anchors there before handing it back.
+	pool := x509.NewCertPool()
+	pool.AddCert(pinned)
+	client := pooledClient(pool)
+	if _, err := fetch(ctx, rootsURL, client); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrBadTLS, err)
+	}
+	return client, nil
+}
+
 // normalizeFingerprint lower-cases and strips separators, then validates the
 // 40–64 hex-character rule (FR-4).
 func normalizeFingerprint(fp string) (string, error) {

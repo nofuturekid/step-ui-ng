@@ -41,6 +41,7 @@ templ layout(d pageData) {
 				<header class="topbar">
 					<a href="/users">step-ui-ng</a>
 					if d.User.Role.AtLeast(users.RoleAdmin) {
+						<a href="/provisioners">Provisioners</a>
 						<a href="/settings">CA settings</a>
 					}
 					<span class="who">
@@ -256,4 +257,99 @@ templ testResult(ok bool, msg string) {
 	} else {
 		<div class="flash error" role="alert">{ msg }</div>
 	}
+}
+
+// provisionersPage lists the CA provisioners with their types, marks the active
+// one, and (when an admin credential is configured) offers create/delete and
+// select controls (spec/0005, admin+). It never renders any secret value.
+templ provisionersPage(d pageData, v provisionersView) {
+	@layout(d) {
+		<div class="card">
+			<h1>Provisioners</h1>
+			<p class="muted">The CA owns provisioners; this list is read from the CA. Pick the active one for issuance.</p>
+			if v.ListError != "" {
+				<div class="flash error" role="alert">{ v.ListError }</div>
+			}
+			if v.CASettings {
+				<table>
+					<thead>
+						<tr>
+							<th>Name</th><th>Type</th><th>Active</th><th>Actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, p := range v.Provisioners {
+							@provisionerRowTempl(d, p, v.HasAdminCred)
+						}
+					</tbody>
+				</table>
+				if len(v.Provisioners) == 0 && v.ListError == "" {
+					<p class="muted">No provisioners returned by the CA.</p>
+				}
+			}
+		</div>
+		if v.CASettings {
+			<div class="card">
+				<h1>Select active provisioner</h1>
+				<p class="muted">The active provisioner (and its secret) is used for issuance. Secrets are encrypted at rest and never shown.</p>
+				<form method="post" action="/provisioners/select">
+					<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+					<label for="select-name">Provisioner name</label>
+					<input id="select-name" name="name" type="text" required value={ v.Selected } placeholder="provisioner name"/>
+					<label for="select-secret">Provisioner secret (optional)</label>
+					<input id="select-secret" name="secret" type="password" autocomplete="new-password" placeholder="leave blank for none"/>
+					<p></p>
+					<button type="submit">Set active</button>
+				</form>
+			</div>
+			<div class="card">
+				<h1>Create provisioner</h1>
+				if !v.HasAdminCred {
+					<p class="muted">Creating and deleting provisioners requires an admin credential. Add an admin certificate and key on the CA settings page.</p>
+				} else {
+					<form method="post" action="/provisioners">
+						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+						<label for="prov-name">Name</label>
+						<input id="prov-name" name="name" type="text" required pattern="[a-zA-Z0-9._-]+" placeholder="my-provisioner"/>
+						<label for="prov-type">Type</label>
+						<select id="prov-type" name="type">
+							<option value="JWK">JWK</option>
+							<option value="ACME">ACME</option>
+							<option value="SSHPOP">SSHPOP</option>
+						</select>
+						<label for="prov-secret">JWK secret (min 8 chars; JWK only)</label>
+						<input id="prov-secret" name="secret" type="password" autocomplete="new-password" minlength="8" placeholder="encrypts the generated JWK key"/>
+						<p></p>
+						<button type="submit">Create</button>
+					</form>
+				}
+			</div>
+		}
+	}
+}
+
+// provisionerRowTempl renders one provisioner with its active marker and a delete
+// control (only when an admin credential is configured; the active provisioner
+// cannot be deleted — the handler enforces and the UI hides the button).
+templ provisionerRowTempl(d pageData, p provisionerRow, hasAdminCred bool) {
+	<tr>
+		<td>{ p.Name }</td>
+		<td>{ p.Type }</td>
+		<td>
+			if p.Active {
+				<span class="badge">active</span>
+			}
+		</td>
+		<td>
+			<div class="actions">
+				if hasAdminCred && !p.Active {
+					<form method="post" action={ templ.SafeURL("/provisioners/" + p.Name) }>
+						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+						<input type="hidden" name="action" value="delete"/>
+						<button class="danger" type="submit">Delete</button>
+					</form>
+				}
+			</div>
+		</td>
+	</tr>
 }
