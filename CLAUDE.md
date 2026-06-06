@@ -16,7 +16,8 @@ Talks to Step-CA via **SDK/HTTP API** (no `step` CLI).
 
 - **Conventional Commits** (minimalistic), single subject line unless a body adds value.
 - **One branch + PR per logical change**, based on `main`; **no merge without approval**.
-- **SemVer v0.0.x**: bump patch per completed spec; update `CHANGELOG.md`.
+- **SemVer (pre-1.0)**: bump the version only at releases (ADR-0011); per spec, add
+  a `CHANGELOG.md` entry under `[Unreleased]`.
 - **SDD/TDD**: spec → failing test → implement → refactor. See `spec/` and `docs/adr/`.
 
 > Commits in this environment may carry a required session-link trailer; it is a

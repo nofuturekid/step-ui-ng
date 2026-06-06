@@ -21,14 +21,11 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Install templ
-        run: go install github.com/a-h/templ/cmd/templ@latest
-
       - name: templ generate (check for diffs)
         run: |
-          templ generate
+          go tool templ generate
           git diff --exit-code -- '*_templ.go' || {
-            echo "templ output is stale; run 'templ generate' and commit"; exit 1;
+            echo "templ output is stale; run 'go tool templ generate' and commit"; exit 1;
           }
 
       - name: gofmt
@@ -40,7 +37,7 @@ jobs:
         run: go vet ./...
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.2
 
