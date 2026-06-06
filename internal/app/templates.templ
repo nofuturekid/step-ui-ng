@@ -3,6 +3,7 @@ package app
 import (
 	"strconv"
 
+	"github.com/nofuturekid/step-ui-ng/internal/certs"
 	"github.com/nofuturekid/step-ui-ng/internal/settings"
 	"github.com/nofuturekid/step-ui-ng/internal/users"
 )
@@ -41,6 +42,8 @@ templ layout(d pageData) {
 				<header class="topbar">
 					<a href="/users">step-ui-ng</a>
 					if d.User.Role.AtLeast(users.RoleAdmin) {
+						<a href="/issue">Issue</a>
+						<a href="/sign-csr">Sign CSR</a>
 						<a href="/provisioners">Provisioners</a>
 						<a href="/settings">CA settings</a>
 					}
@@ -352,4 +355,108 @@ templ provisionerRowTempl(d pageData, p provisionerRow, hasAdminCred bool) {
 			</div>
 		</td>
 	</tr>
+}
+
+// issuePage renders the issue form (CN, SANs, validity, format) and, after a
+// successful issue, the resulting certificate (spec/0006, admin+). The
+// server-generated private key is shown only here as an explicit download
+// payload; it is never persisted in clear text.
+templ issuePage(d pageData, v issueView) {
+	@layout(d) {
+		<div class="card">
+			<h1>Issue certificate</h1>
+			<p class="muted">Generate a keypair and obtain a certificate via the active provisioner. The private key is shown once — store it now.</p>
+			<form method="post" action="/issue">
+				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+				<label for="issue-cn">Common name</label>
+				<input id="issue-cn" name="cn" type="text" required placeholder="example.test" value={ v.CN }/>
+				<label for="issue-sans">Subject alternative names (comma or newline separated; DNS/IP/email/URI)</label>
+				<textarea id="issue-sans" name="sans" rows="3" placeholder="www.example.test, 10.0.0.1, admin@example.test">{ v.SANs }</textarea>
+				<label for="issue-validity">Validity (days)</label>
+				<input id="issue-validity" name="validity" type="number" min="1" required value={ v.Validity }/>
+				<label for="issue-format">Format</label>
+				<select id="issue-format" name="format">
+					@formatOption("pem", "PEM bundle", v.Format)
+					@formatOption("pfx", "PKCS#12 (PFX)", v.Format)
+				</select>
+				<label for="issue-pfx-pass">PFX password (PKCS#12 only)</label>
+				<input id="issue-pfx-pass" name="pfx_password" type="password" autocomplete="new-password" placeholder="required for the PKCS#12 format"/>
+				<p></p>
+				<button type="submit">Issue</button>
+			</form>
+		</div>
+		if v.Result != nil {
+			@certResult(*v.Result)
+		}
+	}
+}
+
+templ formatOption(val, label, current string) {
+	if val == current {
+		<option value={ val } selected>{ label }</option>
+	} else {
+		<option value={ val }>{ label }</option>
+	}
+}
+
+// signCSRPage renders the sign-csr form (a CSR textarea) and the result. The CN
+// and SANs are taken from the CSR; no private key is stored (spec/0006, admin+).
+templ signCSRPage(d pageData, v signView) {
+	@layout(d) {
+		<div class="card">
+			<h1>Sign CSR</h1>
+			<p class="muted">Paste a PEM certificate signing request. Its signature is verified before the CA is contacted; the CN and SANs are taken from the CSR.</p>
+			<form method="post" action="/sign-csr">
+				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+				<label for="sign-csr">CSR (PEM)</label>
+				<textarea id="sign-csr" name="csr" rows="12" required placeholder="-----BEGIN CERTIFICATE REQUEST-----">{ v.CSR }</textarea>
+				<label for="sign-validity">Validity (days)</label>
+				<input id="sign-validity" name="validity" type="number" min="1" required value={ v.Validity }/>
+				<p></p>
+				<button type="submit">Sign</button>
+			</form>
+		</div>
+		if v.Result != nil {
+			@certResult(*v.Result)
+		}
+	}
+}
+
+// certResult renders the issued/signed certificate: metadata plus the PEM
+// material and, for a server-generated key, the private key / PFX as a one-shot
+// download. The key material is delivered inline (a data: download link, plus a
+// readonly textarea for the PEM key) because it is never retrievable later;
+// persistent re-download is spec/0007. The handler marks this response no-store.
+templ certResult(c certs.Certificate) {
+	<div class="card">
+		<h1>Result</h1>
+		if c.PrivateKeyPEM != "" || len(c.PFX) > 0 {
+			<p class="error"><strong>Save this now — the private key is shown once and is NOT retrievable later.</strong></p>
+		}
+		<table>
+			<tbody>
+				<tr><th>Common name</th><td>{ c.CN }</td></tr>
+				<tr><th>Serial</th><td>{ c.Serial }</td></tr>
+				<tr><th>Key strategy</th><td>{ c.KeyStrategy }</td></tr>
+				<tr><th>SANs</th><td>{ joinSANs(c.SANs) }</td></tr>
+			</tbody>
+		</table>
+		<label>Certificate (PEM)</label>
+		<textarea rows="10" readonly>{ c.CertPEM }</textarea>
+		if c.ChainPEM != "" {
+			<label>Chain (PEM)</label>
+			<textarea rows="8" readonly>{ c.ChainPEM }</textarea>
+		}
+		<label>Full chain (PEM)</label>
+		<textarea rows="12" readonly>{ c.FullchainPEM }</textarea>
+		if c.PrivateKeyPEM != "" {
+			<label>Private key (PEM) — shown once, store it now</label>
+			<textarea rows="8" readonly>{ c.PrivateKeyPEM }</textarea>
+			<p><a download={ keyFilename(c.CN) } href={ pemKeyDataURI(c.PrivateKeyPEM) }>Download private key ({ keyFilename(c.CN) })</a></p>
+		}
+		if len(c.PFX) > 0 {
+			<label>PKCS#12 (PFX) bundle — password-protected, shown once</label>
+			<p><a download={ pfxFilename(c.CN) } href={ pfxDataURI(c.PFX) }>Download PKCS#12 bundle ({ pfxFilename(c.CN) }, { strconv.Itoa(len(c.PFX)) } bytes)</a></p>
+		}
+	</div>
 }

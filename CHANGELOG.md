@@ -10,6 +10,52 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- Issue certificate & sign CSR (spec/0006, ADR-0004; audit foundation from
+  spec/0009). New migration `0005_certificates_audit.sql` adds two STRICT tables:
+  `certificates` (the issued/signed inventory: cn, sans_json, serial,
+  not_before/after, status, key_strategy ∈ {server, csr}, cert/chain/fullchain
+  PEM, nullable sealed `privkey_sealed`, created_by, timestamps) and the
+  append-only `audit_events` (id, who, action, target, details, created_at) — the
+  exact spec/0009 data model, introduced early so FR-4 is satisfiable. New
+  `internal/audit` package: a minimal append-only `Recorder.Record(ctx, who,
+action, target, details)` that rejects an empty actor (the actor is always the
+  authenticated session user, never "system"); spec/0009 will add the
+  query/filter UI on top. `internal/ca` gains provisioner **OTT (one-time token)**
+  signing over the existing two-phase pinned-trust client (no blanket
+  skip-verify): `SignCSR` fetches the active JWK provisioner from
+  `GET /provisioners`, decrypts its `encryptedKey` (a JWE) with the selected
+  provisioner password (`jose.Decrypt`), builds a short-lived OTT JWT
+  (`sub`=CN, `sans`=SAN list, `aud={ca}/1.0/sign`, `iss`=provisioner name,
+  `iat/nbf/exp`, `jti`, header `kid`=JWK key id) signed with the provisioner JWK
+  via `go.step.sm/crypto/jose`, then `POST {ca}/1.0/sign` `{csr, ott, notAfter}`
+  and parses the returned `crt`/`certChain`. The OTT format follows
+  smallstep/cli's token package (`sans` claim) and smallstep/certificates' JWK
+  provisioner `authorizeToken` (`iss`==provisioner name, non-empty `sub`, JWS
+  verified against the public JWK); typed errors `ErrProvisionerNotFound`,
+  `ErrProvisionerKey`, `ErrInvalidCSR`, `ErrSignRejected`, `ErrSignFailed`. New
+  `internal/certs` domain + persistence: `Issue` (FR-1) generates an EC keypair
+  server-side, builds a CSR (CN added as a SAN; SANs classified into DNS/IP/email/
+  URI), obtains the cert, seals the private key (`key_strategy=server`), and can
+  bundle PEM or PKCS#12/PFX (`software.sslmate.com/src/go-pkcs12`, Modern/AES);
+  `Sign` (FR-2) parses the PEM CSR with `crypto/x509`, **verifies the CSR
+  signature** (rejecting on failure) and takes CN+SANs from it
+  (`key_strategy=csr`, no private key). Both persist metadata (serial,
+  not_before/after parsed from the issued leaf, status=valid) and emit an audit
+  event attributed to the session user (FR-4). New admin-only routes
+  `GET/POST /issue` and `GET/POST /sign-csr` (auth + admin via `requireRole`,
+  behind CSRF), with Templ pages for the issue form (CN, SANs, validity, format)
+  and the sign-csr form (CSR textarea), each rendering the result (metadata + PEM
+  display; the server-generated private key/PFX is shown once as a download, never
+  persisted in clear). Clear validation errors (FR-5) for a bad/garbled CSR,
+  validity over the provisioner max (surfaced from the CA's 4xx), and a missing/
+  unselected provisioner. The OTT signing is proven by an `httptest` mock that
+  publishes a JWK provisioner whose `encryptedKey` the test controls and whose
+  `/1.0/sign` verifies the OTT signature + claims against the published public JWK
+  before issuing (plus a white-box non-vacuousness probe); it is **not** validated
+  against a live Step-CA (real provisioner validity policy, templates and
+  DB-backed token reuse are only observable against a real CA). Re-download UX and
+  the full inventory view are spec/0007; revoke/renew spec/0008; the audit
+  query/filter UI and remaining emit points spec/0009.
 - Provisioner management (spec/0005, ADR-0004, ADR-0012). New migration
   `0004_provisioners.sql` extends `ca_settings` with the selected provisioner
   (`selected_provisioner` + sealed `selected_provisioner_secret_sealed`) and the

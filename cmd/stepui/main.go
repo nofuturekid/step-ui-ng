@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/nofuturekid/step-ui-ng/internal/app"
+	"github.com/nofuturekid/step-ui-ng/internal/audit"
+	"github.com/nofuturekid/step-ui-ng/internal/certs"
 	"github.com/nofuturekid/step-ui-ng/internal/config"
 	"github.com/nofuturekid/step-ui-ng/internal/crypto"
 	"github.com/nofuturekid/step-ui-ng/internal/settings"
@@ -47,6 +49,7 @@ func main() {
 
 	userRepo := users.NewRepo(st.DB())
 	settingsRepo := settings.NewRepo(st.DB(), box)
+	certsSvc := certs.NewService(st.DB(), box, audit.NewRecorder(st.DB()), certs.LiveSigner())
 	sessions := app.NewSessionManager(st.DB(), cfg.SecureCookies)
 
 	srv := &http.Server{
@@ -55,6 +58,7 @@ func main() {
 			DB:       st.DB(),
 			Users:    userRepo,
 			Settings: settingsRepo,
+			Certs:    certsSvc,
 			Sessions: sessions,
 			Config:   cfg,
 		}),

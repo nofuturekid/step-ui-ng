@@ -11,6 +11,7 @@ require (
 	github.com/pressly/goose/v3 v3.27.1
 	go.step.sm/crypto v0.81.1
 	modernc.org/sqlite v1.51.0
+	software.sslmate.com/src/go-pkcs12 v0.7.1
 )
 
 require (

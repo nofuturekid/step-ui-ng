@@ -240,5 +240,6 @@ func TestSaveFingerprintValidation(t *testing.T) {
 func renderAllFields(v settings.View) string {
 	return strings.Join([]string{
 		v.CAURL, v.RootFingerprint, v.AdminProvisioner, v.AdminSubject,
+		v.SelectedProvisioner, v.AdminCertPEM,
 	}, "\x00")
 }

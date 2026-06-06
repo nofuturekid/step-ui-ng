@@ -14,6 +14,7 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/justinas/nosurf"
 
+	"github.com/nofuturekid/step-ui-ng/internal/certs"
 	"github.com/nofuturekid/step-ui-ng/internal/config"
 	"github.com/nofuturekid/step-ui-ng/internal/settings"
 	"github.com/nofuturekid/step-ui-ng/internal/users"
@@ -32,6 +33,7 @@ type Deps struct {
 	DB       *sql.DB
 	Users    *users.Repo
 	Settings *settings.Repo
+	Certs    *certs.Service
 	Sessions *scs.SessionManager
 	Config   config.Config
 }
@@ -40,6 +42,7 @@ type Deps struct {
 type server struct {
 	users    *users.Repo
 	settings *settings.Repo
+	certs    *certs.Service
 	sessions *scs.SessionManager
 	cfg      config.Config
 }
@@ -48,7 +51,7 @@ type server struct {
 // handler is the full middleware stack: nosurf (CSRF) → session LoadAndSave →
 // loadUser → first-run gating → router.
 func NewHandler(deps Deps) http.Handler {
-	s := &server{users: deps.Users, settings: deps.Settings, sessions: deps.Sessions, cfg: deps.Config}
+	s := &server{users: deps.Users, settings: deps.Settings, certs: deps.Certs, sessions: deps.Sessions, cfg: deps.Config}
 
 	mux := http.NewServeMux()
 
@@ -81,6 +84,13 @@ func NewHandler(deps Deps) http.Handler {
 	mux.HandleFunc("POST /provisioners", s.requireAuth(s.requireRole(users.RoleAdmin, s.postProvisioners)))
 	mux.HandleFunc("POST /provisioners/select", s.requireAuth(s.requireRole(users.RoleAdmin, s.postProvisionerSelect)))
 	mux.HandleFunc("POST /provisioners/{name}", s.requireAuth(s.requireRole(users.RoleAdmin, s.postProvisioner)))
+
+	// Issuance (admin+): issue a server-generated certificate, or sign a client
+	// CSR, via the active provisioner's OTT (spec/0006).
+	mux.HandleFunc("GET /issue", s.requireAuth(s.requireRole(users.RoleAdmin, s.getIssue)))
+	mux.HandleFunc("POST /issue", s.requireAuth(s.requireRole(users.RoleAdmin, s.postIssue)))
+	mux.HandleFunc("GET /sign-csr", s.requireAuth(s.requireRole(users.RoleAdmin, s.getSignCSR)))
+	mux.HandleFunc("POST /sign-csr", s.requireAuth(s.requireRole(users.RoleAdmin, s.postSignCSR)))
 
 	// Root → users (which itself enforces auth + first-run gating).
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
