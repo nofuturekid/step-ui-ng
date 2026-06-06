@@ -1,0 +1,14 @@
+services:
+  step-ui-ng:
+    build: .
+    image: ghcr.io/nofuturekid/step-ui-ng:latest
+    container_name: step-ui-ng
+    ports:
+      - "8080:8080"
+    environment:
+      # The only optional knobs; everything else is configured in the UI.
+      - PORT=8080
+      - DATA_DIR=/data
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

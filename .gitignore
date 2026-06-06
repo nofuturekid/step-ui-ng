@@ -1,0 +1,23 @@
+# Binaries
+/bin/
+/stepui
+*.exe
+
+# Data / runtime
+/data/
+*.db
+*.db-*
+secret.key
+
+# Go
+*.test
+*.out
+coverage.*
+
+# Templ generated (regenerate via `templ generate`)
+*_templ.go
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
