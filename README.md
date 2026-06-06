@@ -3,9 +3,11 @@
 A modern, self-contained web UI to operate a **Smallstep Step-CA** — greenfield
 rewrite of `step-ui`.
 
-> **Status: `v0.0.1` — scaffold.** This repository is a _seed_ for an AI agent to
-> implement feature-by-feature using **Spec-Driven Development (SDD)** and
-> **Test-Driven Development (TDD)**. Start at [`spec/0001-foundation.md`](spec/0001-foundation.md).
+> **Status: all feature specs (0001–0010) implemented.** Built-in auth & users,
+> CA settings, provisioners, issue/sign, inventory & encrypted download, real
+> revoke/renew, audit log, and ACME (provisioners, EAB, client onboarding) — each
+> built **Spec-Driven (SDD)** + **Test-Driven (TDD)**, reviewed, and merged. The
+> version stays `v0.0.1` until the first release is cut (ADR-0011).
 
 ## What this is
 

@@ -36,12 +36,12 @@ under `[Unreleased]` (versions are bumped only at releases — ADR-0011). See
 
 ## Feature-parity checklist (must match predecessor, then improve)
 
-- [ ] Issue certificate (CN, SANs, validity, PEM/PFX)
-- [ ] Sign CSR (parse CN/SANs from the CSR)
-- [ ] Inventory (list/filter/detail)
-- [ ] Download bundle (cert/chain/fullchain/key; key encrypted at rest)
-- [ ] Provisioner list + select + create + delete
-- [ ] Audit log (filterable)
-- [ ] CA settings (managed in UI)
-- [ ] Renew + **real** revoke
-- [ ] NEW: built-in auth + users; ACME management
+- [x] Issue certificate (CN, SANs, validity, PEM/PFX)
+- [x] Sign CSR (parse CN/SANs from the CSR)
+- [x] Inventory (list/filter/detail)
+- [x] Download bundle (cert/chain/fullchain/key; key encrypted at rest)
+- [x] Provisioner list + select + create + delete
+- [x] Audit log (filterable)
+- [x] CA settings (managed in UI)
+- [x] Renew + **real** revoke
+- [x] NEW: built-in auth + users; ACME management
