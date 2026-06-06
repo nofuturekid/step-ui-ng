@@ -8,6 +8,8 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-07
+
 ### Added
 
 - ACME enablement (spec/0010, ADR-0010, ADR-0004, ADR-0006). Full ACME
