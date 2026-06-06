@@ -18,7 +18,7 @@ This repo is a **seed**. Implement it feature-by-feature with **SDD + TDD**.
 ## Workflow per spec
 
 ```
-spec → write failing test(s) → implement → refactor → make check → commit → bump version → PR
+spec → write failing test(s) → implement → refactor → make check → commit → changelog → PR
 ```
 
 ## Conventions
@@ -29,9 +29,11 @@ spec → write failing test(s) → implement → refactor → make check → com
 - **Branches:** `type/short-kebab`, branched from `main`. One logical change each.
 - **Pull Requests** to `main`, Conventional title; **do not merge without the
   maintainer's approval**.
-- **Versioning (SemVer, pre-1.0):** start at `v0.0.1`. Each completed spec → patch
-  bump, with a `CHANGELOG.md` entry (Keep a Changelog). A release tag triggers the
-  image build (`.github/workflows/release.yml`).
+- **Versioning (SemVer, pre-1.0):** bump the version **only at releases** (ADR-0011).
+  Per spec, add a `CHANGELOG.md` entry under `[Unreleased]` (Keep a Changelog); do
+  not bump the `Version` constant. At release time, promote `[Unreleased]` to
+  `vX.Y.Z` with a date and publish a GitHub release, whose tag triggers the image
+  build (`.github/workflows/release.yml`).
 
 ## Quality gate (`make check` must pass)
 

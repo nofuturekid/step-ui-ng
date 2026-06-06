@@ -11,7 +11,7 @@ import (
 )
 
 // Version is the application version (kept in sync with CHANGELOG.md).
-const Version = "0.0.2"
+const Version = "0.0.1"
 
 // NewHandler returns the root HTTP handler.
 func NewHandler() http.Handler {
