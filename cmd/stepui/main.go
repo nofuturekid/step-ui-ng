@@ -13,6 +13,7 @@ import (
 
 	"github.com/nofuturekid/step-ui-ng/internal/app"
 	"github.com/nofuturekid/step-ui-ng/internal/config"
+	"github.com/nofuturekid/step-ui-ng/internal/crypto"
 	"github.com/nofuturekid/step-ui-ng/internal/store"
 )
 
@@ -32,6 +33,14 @@ func main() {
 	if v, err := st.Version(); err == nil {
 		slog.Info("database ready", "schema_version", v)
 	}
+
+	// Ensure the master key exists (created on first start) so secrets can be
+	// encrypted at rest. The box itself is consumed by later specs.
+	if _, err := crypto.NewBox(cfg.DataDir); err != nil {
+		slog.Error("init secrets encryption", "err", err)
+		os.Exit(1)
+	}
+	slog.Info("secrets encryption ready")
 
 	srv := &http.Server{
 		Addr:              cfg.Addr,
