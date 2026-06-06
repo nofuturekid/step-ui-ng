@@ -10,6 +10,23 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- Audit log query/filter UI and full event emission (spec/0009). All
+  security-relevant actions now emit an audit event attributed to the
+  authenticated session user (never "system" or empty): `login`, `logout`,
+  `user.create`, `user.update`, `user.delete`, `settings.update`,
+  `provisioner.create`, `provisioner.select`, `provisioner.delete`, `issue`,
+  `sign`, `revoke`, `renew`. `internal/audit` gains `List(ctx, Filter)`:
+  parameterized SQL only, filters on action/who/from/to (Unix timestamps),
+  newest-first, paginated with limit+offset. New admin-only route
+  `GET /audit` (behind auth + CSRF, `requireRole(RoleAdmin)`): a filter form
+  (action dropdown, user text, from/to date) and a paginated table (who,
+  action, target, details, timestamp, newest first). A clear ACME extension
+  point is left in the action dropdown for spec/0010. No secrets or passwords
+  are ever written to any audit row. Acceptance tests cover: actor = session
+  user (not "system") per action (table-driven, 8 actions); filter by
+  action/who/time range; the `/audit` page renders events and is admin-only
+  (viewer → 403); all existing cert/revoke/renew audit tests remain green.
+
 - Revoke & renew certificates (spec/0008, ADR-0004). Revocation is now **real**:
   it is performed against the CA (no longer a local-only mark). New
   `POST /certificates/{id}/revoke` and `POST /certificates/{id}/renew` (both

@@ -35,6 +35,7 @@ type testEnv struct {
 	db           *sql.DB
 	box          *crypto.Box // exposed so inventory tests can seed server certs
 	client       *http.Client
+	auditRec     *audit.Recorder
 }
 
 func newTestEnv(t *testing.T) *testEnv {
@@ -61,13 +62,15 @@ func newTestEnvWithConfig(t *testing.T, cfg config.Config) *testEnv {
 
 	repo := users.NewRepo(st.DB())
 	settingsRepo := settings.NewRepo(st.DB(), box)
-	certsSvc := certs.NewService(st.DB(), box, audit.NewRecorder(st.DB()), certs.LiveSigner(), certs.LiveRevoker())
+	rec := audit.NewRecorder(st.DB())
+	certsSvc := certs.NewService(st.DB(), box, rec, certs.LiveSigner(), certs.LiveRevoker())
 	sessions := app.NewSessionManager(st.DB(), false)
 	h := app.NewHandler(app.Deps{
 		DB:       st.DB(),
 		Users:    repo,
 		Settings: settingsRepo,
 		Certs:    certsSvc,
+		Audit:    rec,
 		Sessions: sessions,
 		Config:   cfg,
 	})
@@ -82,7 +85,7 @@ func newTestEnvWithConfig(t *testing.T, cfg config.Config) *testEnv {
 			return http.ErrUseLastResponse
 		},
 	}
-	return &testEnv{srv: srv, repo: repo, settingsRepo: settingsRepo, db: st.DB(), box: box, client: client}
+	return &testEnv{srv: srv, repo: repo, settingsRepo: settingsRepo, db: st.DB(), box: box, client: client, auditRec: rec}
 }
 
 var csrfFieldRe = regexp.MustCompile(`name="csrf_token" value="([^"]*)"`)

@@ -67,13 +67,17 @@ func (s *server) getProvisioners(w http.ResponseWriter, r *http.Request) {
 }
 
 // postProvisionerSelect persists the active provisioner + sealed secret (FR-2).
+// An audit event is recorded on success (spec/0009 FR-2).
 func (s *server) postProvisionerSelect(w http.ResponseWriter, r *http.Request) {
+	actor := userFromContext(r.Context())
 	name := r.PostFormValue("name")
 	secret := r.PostFormValue("secret")
 	if err := s.settings.SelectProvisioner(r.Context(), name, secret); err != nil {
 		s.sessions.Put(r.Context(), errorKey, provisionerSelectErrorMessage(err))
 	} else {
 		s.sessions.Put(r.Context(), flashKey, "Active provisioner updated.")
+		// Secret is write-only and never logged; only the name is recorded.
+		_ = s.audit.Record(r.Context(), actor.Username, "provisioner.select", name, "")
 	}
 	http.Redirect(w, r, "/provisioners", http.StatusSeeOther)
 }
@@ -105,6 +109,7 @@ func (s *server) postProvisioners(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actor := userFromContext(r.Context())
 	spec := ca.NewProvisionerSpec{
 		Name:      r.PostFormValue("name"),
 		Type:      r.PostFormValue("type"),
@@ -114,6 +119,9 @@ func (s *server) postProvisioners(w http.ResponseWriter, r *http.Request) {
 		s.sessions.Put(r.Context(), errorKey, provisionerCreateErrorMessage(err))
 	} else {
 		s.sessions.Put(r.Context(), flashKey, "Provisioner created.")
+		// JWK secret is write-only and never logged.
+		_ = s.audit.Record(r.Context(), actor.Username, "provisioner.create", spec.Name,
+			"type="+spec.Type)
 	}
 	http.Redirect(w, r, "/provisioners", http.StatusSeeOther)
 }
@@ -158,10 +166,12 @@ func (s *server) postProvisioner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actor := userFromContext(r.Context())
 	if err := ca.DeleteProvisioner(r.Context(), view.CAURL, view.RootFingerprint, cred, name); err != nil {
 		s.sessions.Put(r.Context(), errorKey, provisionerCreateErrorMessage(err))
 	} else {
 		s.sessions.Put(r.Context(), flashKey, "Provisioner deleted.")
+		_ = s.audit.Record(r.Context(), actor.Username, "provisioner.delete", name, "")
 	}
 	http.Redirect(w, r, "/provisioners", http.StatusSeeOther)
 }

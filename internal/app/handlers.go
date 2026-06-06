@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -95,7 +96,8 @@ func (s *server) getLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 // postLogin authenticates and, on success, renews the session token and stores
-// the user id (FR-3, FR-7).
+// the user id (FR-3, FR-7). An audit event is recorded with the authenticated
+// user as actor (spec/0009 FR-2).
 func (s *server) postLogin(w http.ResponseWriter, r *http.Request) {
 	username := r.PostFormValue("username")
 	password := r.PostFormValue("password")
@@ -112,6 +114,8 @@ func (s *server) postLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	// Record after a successful login; the actor is the authenticated user.
+	_ = s.audit.Record(r.Context(), u.Username, "login", u.Username, "")
 	http.Redirect(w, r, "/users", http.StatusSeeOther)
 }
 
@@ -124,8 +128,15 @@ func (s *server) login(r *http.Request, id int64) error {
 	return nil
 }
 
-// postLogout destroys the session and returns to /login.
+// postLogout records an audit event attributed to the current session user,
+// then destroys the session and returns to /login (spec/0009 FR-2).
 func (s *server) postLogout(w http.ResponseWriter, r *http.Request) {
+	// Capture the actor BEFORE destroying the session; after Destroy the context
+	// user is gone.
+	actor := userFromContext(r.Context())
+	if actor != nil {
+		_ = s.audit.Record(r.Context(), actor.Username, "logout", actor.Username, "")
+	}
 	if err := s.sessions.Destroy(r.Context()); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -163,10 +174,13 @@ func (s *server) postUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := s.users.Create(r.Context(), username, password, role); err != nil {
+	u, err := s.users.Create(r.Context(), username, password, role)
+	if err != nil {
 		s.sessions.Put(r.Context(), errorKey, createErrorMessage(err))
 	} else {
 		s.sessions.Put(r.Context(), flashKey, "User created.")
+		_ = s.audit.Record(r.Context(), actor.Username, "user.create", u.Username,
+			fmt.Sprintf("role=%s", u.Role))
 	}
 	http.Redirect(w, r, "/users", http.StatusSeeOther)
 }
@@ -200,6 +214,7 @@ func (s *server) postUser(w http.ResponseWriter, r *http.Request) {
 
 	action := r.PostFormValue("action")
 	var actErr error
+	var auditAction, auditDetails string
 	switch action {
 	case "set_role":
 		newRole := users.Role(r.PostFormValue("role"))
@@ -210,12 +225,20 @@ func (s *server) postUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		actErr = s.users.SetRole(r.Context(), id, newRole)
+		auditAction = "user.update"
+		auditDetails = fmt.Sprintf("action=set_role role=%s", newRole)
 	case "disable":
 		actErr = s.users.SetDisabled(r.Context(), id, true)
+		auditAction = "user.update"
+		auditDetails = "action=disable"
 	case "enable":
 		actErr = s.users.SetDisabled(r.Context(), id, false)
+		auditAction = "user.update"
+		auditDetails = "action=enable"
 	case "delete":
 		actErr = s.users.Delete(r.Context(), id)
+		auditAction = "user.delete"
+		auditDetails = ""
 	default:
 		http.Error(w, "unknown action", http.StatusBadRequest)
 		return
@@ -225,6 +248,7 @@ func (s *server) postUser(w http.ResponseWriter, r *http.Request) {
 		s.sessions.Put(r.Context(), errorKey, actionErrorMessage(actErr))
 	} else {
 		s.sessions.Put(r.Context(), flashKey, "Done.")
+		_ = s.audit.Record(r.Context(), actor.Username, auditAction, target.Username, auditDetails)
 	}
 	http.Redirect(w, r, "/users", http.StatusSeeOther)
 }

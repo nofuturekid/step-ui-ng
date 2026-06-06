@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -49,6 +50,7 @@ templ layout(d pageData) {
 						<a href="/sign-csr">Sign CSR</a>
 						<a href="/provisioners">Provisioners</a>
 						<a href="/settings">CA settings</a>
+						<a href="/audit">Audit log</a>
 					}
 					<span class="who">
 						{ d.User.Username } <span class="badge">{ string(d.User.Role) }</span>
@@ -676,3 +678,106 @@ func fmtExpiry(notAfter int64, daysLeft int) string {
 	}
 	return fmt.Sprintf("%s (%d days ago)", date, -daysLeft)
 }
+
+// auditPage renders the audit log with a filter form and a paginated table
+// (spec/0009 FR-3, admin+). ACME-specific filter options are reserved for
+// spec/0010; the table is already future-proof because it shows raw action names.
+templ auditPage(d pageData, v auditView) {
+	@layout(d) {
+		<div class="card">
+			<h1>Audit log</h1>
+			<p class="muted">Security-relevant events, newest first. Actor is always the authenticated session user.</p>
+			<form method="get" action="/audit">
+				<label for="audit-action">Action</label>
+				<select id="audit-action" name="action" onchange="this.form.submit()">
+					<option value="">All actions</option>
+					@auditActionOption("login", v.Filter.Action)
+					@auditActionOption("logout", v.Filter.Action)
+					@auditActionOption("user.create", v.Filter.Action)
+					@auditActionOption("user.update", v.Filter.Action)
+					@auditActionOption("user.delete", v.Filter.Action)
+					@auditActionOption("settings.update", v.Filter.Action)
+					@auditActionOption("provisioner.create", v.Filter.Action)
+					@auditActionOption("provisioner.select", v.Filter.Action)
+					@auditActionOption("provisioner.delete", v.Filter.Action)
+					@auditActionOption("issue", v.Filter.Action)
+					@auditActionOption("sign", v.Filter.Action)
+					@auditActionOption("revoke", v.Filter.Action)
+					@auditActionOption("renew", v.Filter.Action)
+					// ACME actions (spec/0010) — add options here when implemented.
+				</select>
+				<label for="audit-who">User</label>
+				<input id="audit-who" name="who" type="text" value={ v.Filter.Who } placeholder="username"/>
+				<label for="audit-from">From (date)</label>
+				<input id="audit-from" name="from" type="date" value={ v.Filter.From }/>
+				<label for="audit-to">To (date)</label>
+				<input id="audit-to" name="to" type="date" value={ v.Filter.To }/>
+				<p></p>
+				<button type="submit">Filter</button>
+				<a class="button secondary" href="/audit">Clear filters</a>
+			</form>
+		</div>
+		<div class="card">
+			if len(v.Events) == 0 {
+				<p class="muted">No events match the current filter.</p>
+			} else {
+				<table>
+					<thead>
+						<tr>
+							<th>When</th><th>Who</th><th>Action</th><th>Target</th><th>Details</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, e := range v.Events {
+							<tr>
+								<td class="mono">{ fmtUnix(e.CreatedAt) }</td>
+								<td>{ e.Who }</td>
+								<td>{ e.Action }</td>
+								<td>{ e.Target }</td>
+								<td>{ e.Details }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+				<div class="actions">
+					if v.Page > 0 {
+						<a class="button secondary" href={ auditPageURL(v.Filter, v.PrevPage) }>← Newer</a>
+					}
+					if v.HasMore {
+						<a class="button secondary" href={ auditPageURL(v.Filter, v.NextPage) }>Older →</a>
+					}
+				</div>
+			}
+		</div>
+	}
+}
+
+// auditActionOption renders a select option for the action filter.
+templ auditActionOption(val, current string) {
+	if val == current {
+		<option value={ val } selected>{ val }</option>
+	} else {
+		<option value={ val }>{ val }</option>
+	}
+}
+
+// auditPageURL builds a relative URL for a given audit page + existing filters.
+// Each filter value is percent-encoded so that values containing &, =, or spaces
+// do not corrupt the query string (spec/0009 pagination correctness).
+func auditPageURL(ff auditFilterForm, page int) templ.SafeURL {
+	u := "/audit?page=" + strconv.Itoa(page)
+	if ff.Action != "" {
+		u += "&action=" + url.QueryEscape(ff.Action)
+	}
+	if ff.Who != "" {
+		u += "&who=" + url.QueryEscape(ff.Who)
+	}
+	if ff.From != "" {
+		u += "&from=" + url.QueryEscape(ff.From)
+	}
+	if ff.To != "" {
+		u += "&to=" + url.QueryEscape(ff.To)
+	}
+	return templ.SafeURL(u)
+}
+
