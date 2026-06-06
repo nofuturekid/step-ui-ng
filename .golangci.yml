@@ -1,16 +1,29 @@
-run:
-  timeout: 5m
+version: "2"
 linters:
   enable:
-    - gofmt
-    - govet
-    - errcheck
-    - staticcheck
-    - ineffassign
-    - unused
     - misspell
     - revive
-issues:
-  exclude-rules:
-    - path: _templ\.go
-      linters: [all]
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - all
+        path: _templ\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
