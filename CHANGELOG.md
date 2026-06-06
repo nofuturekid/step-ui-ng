@@ -10,6 +10,22 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- Step-CA connection configured in the UI (spec/0004, ADR-0004, ADR-0006). New
+  migration `0003_ca_settings.sql` adds a single-row `ca_settings` table
+  (STRICT, `CHECK (id = 1)`). New `internal/ca` package talks to Step-CA over its
+  HTTPS API only — no `step` CLI — with `TestConnection` fetching `GET /roots`
+  and verifying the pinned root fingerprint (SHA-256 of the root's DER), plus
+  typed errors (unreachable, fingerprint mismatch, bad TLS, malformed response).
+  TLS is pinned to the fingerprint in two phases: a bootstrap fetch whose
+  `VerifyConnection` callback enforces the pin (never trusts arbitrary certs),
+  then steady-state verification against a `RootCAs` pool built from the verified
+  root with `InsecureSkipVerify:false`. New `internal/settings` repo loads/saves
+  the row, sealing the admin secret via `internal/crypto` (AES-256-GCM) on write
+  and never decrypting it toward the client (write-only field; an empty value
+  preserves the stored secret), with `ca_url` http(s) and 40–64-hex-fingerprint
+  validation. New admin-only routes `GET/POST /settings` and `POST /settings/test`
+  (htmx result partial), rendered with a Templ settings page that shows the admin
+  secret only as set/empty.
 - Foundation persistence (`internal/store`): pure-Go SQLite opened under
   `DATA_DIR`, with embedded, idempotent goose migrations applied on startup
   (spec/0001). Wired into server boot; logs the applied schema version.
@@ -35,7 +51,10 @@ Versions are bumped only when a release is cut; in-progress work lives under
 - `internal/config`: add `SecureCookies` (env `COOKIE_SECURE`, default false) to
   set the `Secure` attribute on session/CSRF cookies behind TLS.
 - `app.NewHandler` now takes its dependencies (`app.Deps`: DB, users repo,
-  session manager, config) instead of being argument-less.
+  settings repo, session manager, config) instead of being argument-less.
+- The startup `crypto.Box` is now retained and wired into the web layer (via the
+  settings repo) to seal CA admin secrets, rather than being created and
+  discarded.
 - Align repo conventions and CI to the `main` branch (docs + workflow triggers).
 - CI derives the Go version from `go.mod` (now `1.25`, required by the SQLite/goose
   dependencies) and enables module caching.

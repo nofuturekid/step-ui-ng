@@ -14,6 +14,7 @@ import (
 	"github.com/nofuturekid/step-ui-ng/internal/app"
 	"github.com/nofuturekid/step-ui-ng/internal/config"
 	"github.com/nofuturekid/step-ui-ng/internal/crypto"
+	"github.com/nofuturekid/step-ui-ng/internal/settings"
 	"github.com/nofuturekid/step-ui-ng/internal/store"
 	"github.com/nofuturekid/step-ui-ng/internal/users"
 )
@@ -36,14 +37,16 @@ func main() {
 	}
 
 	// Ensure the master key exists (created on first start) so secrets can be
-	// encrypted at rest. The box itself is consumed by later specs.
-	if _, err := crypto.NewBox(cfg.DataDir); err != nil {
+	// encrypted at rest, and keep the Box to seal CA admin secrets (spec/0004).
+	box, err := crypto.NewBox(cfg.DataDir)
+	if err != nil {
 		slog.Error("init secrets encryption", "err", err)
 		os.Exit(1)
 	}
 	slog.Info("secrets encryption ready")
 
 	userRepo := users.NewRepo(st.DB())
+	settingsRepo := settings.NewRepo(st.DB(), box)
 	sessions := app.NewSessionManager(st.DB(), cfg.SecureCookies)
 
 	srv := &http.Server{
@@ -51,6 +54,7 @@ func main() {
 		Handler: app.NewHandler(app.Deps{
 			DB:       st.DB(),
 			Users:    userRepo,
+			Settings: settingsRepo,
 			Sessions: sessions,
 			Config:   cfg,
 		}),

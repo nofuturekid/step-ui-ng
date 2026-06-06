@@ -15,6 +15,7 @@ import (
 	"github.com/justinas/nosurf"
 
 	"github.com/nofuturekid/step-ui-ng/internal/config"
+	"github.com/nofuturekid/step-ui-ng/internal/settings"
 	"github.com/nofuturekid/step-ui-ng/internal/users"
 )
 
@@ -30,6 +31,7 @@ const userCtxKey ctxKey = iota
 type Deps struct {
 	DB       *sql.DB
 	Users    *users.Repo
+	Settings *settings.Repo
 	Sessions *scs.SessionManager
 	Config   config.Config
 }
@@ -37,6 +39,7 @@ type Deps struct {
 // server bundles the dependencies for the handler methods.
 type server struct {
 	users    *users.Repo
+	settings *settings.Repo
 	sessions *scs.SessionManager
 	cfg      config.Config
 }
@@ -45,7 +48,7 @@ type server struct {
 // handler is the full middleware stack: nosurf (CSRF) → session LoadAndSave →
 // loadUser → first-run gating → router.
 func NewHandler(deps Deps) http.Handler {
-	s := &server{users: deps.Users, sessions: deps.Sessions, cfg: deps.Config}
+	s := &server{users: deps.Users, settings: deps.Settings, sessions: deps.Sessions, cfg: deps.Config}
 
 	mux := http.NewServeMux()
 
@@ -65,6 +68,11 @@ func NewHandler(deps Deps) http.Handler {
 	mux.HandleFunc("GET /users", s.requireAuth(s.requireRole(users.RoleAdmin, s.getUsers)))
 	mux.HandleFunc("POST /users", s.requireAuth(s.requireRole(users.RoleAdmin, s.postUsers)))
 	mux.HandleFunc("POST /users/{id}", s.requireAuth(s.requireRole(users.RoleAdmin, s.postUser)))
+
+	// CA settings (admin+): view/save the connection, test connectivity (spec/0004).
+	mux.HandleFunc("GET /settings", s.requireAuth(s.requireRole(users.RoleAdmin, s.getSettings)))
+	mux.HandleFunc("POST /settings", s.requireAuth(s.requireRole(users.RoleAdmin, s.postSettings)))
+	mux.HandleFunc("POST /settings/test", s.requireAuth(s.requireRole(users.RoleAdmin, s.postSettingsTest)))
 
 	// Root → users (which itself enforces auth + first-run gating).
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {

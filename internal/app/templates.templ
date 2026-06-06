@@ -3,6 +3,7 @@ package app
 import (
 	"strconv"
 
+	"github.com/nofuturekid/step-ui-ng/internal/settings"
 	"github.com/nofuturekid/step-ui-ng/internal/users"
 )
 
@@ -39,6 +40,9 @@ templ layout(d pageData) {
 			if d.User != nil {
 				<header class="topbar">
 					<a href="/users">step-ui-ng</a>
+					if d.User.Role.AtLeast(users.RoleAdmin) {
+						<a href="/settings">CA settings</a>
+					}
 					<span class="who">
 						{ d.User.Username } <span class="badge">{ string(d.User.Role) }</span>
 						<form method="post" action="/logout" style="display:inline">
@@ -186,5 +190,70 @@ templ roleOption(opt users.Role, current users.Role) {
 		<option value={ string(opt) } selected>{ string(opt) }</option>
 	} else {
 		<option value={ string(opt) }>{ string(opt) }</option>
+	}
+}
+
+// settingsPage renders the CA connection form (spec/0004, admin+). The admin
+// secret is write-only: the form never renders the stored value, only whether
+// one is set (FR-5).
+templ settingsPage(d pageData, v settings.View) {
+	@layout(d) {
+		<div class="card">
+			<h1>CA connection</h1>
+			<p class="muted">Configure the Step-CA this UI talks to. Secrets are encrypted at rest and never shown.</p>
+			<form method="post" action="/settings">
+				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+				<label for="ca_url">CA URL</label>
+				<input id="ca_url" name="ca_url" type="url" inputmode="url" required placeholder="https://ca.example:9000" value={ v.CAURL }/>
+				<label for="root_fingerprint">Root fingerprint (SHA-256 hex)</label>
+				<input id="root_fingerprint" name="root_fingerprint" type="text" required minlength="40" maxlength="64" pattern="[0-9a-fA-F]{40,64}" value={ v.RootFingerprint }/>
+				<label for="admin_provisioner">Admin provisioner (optional)</label>
+				<input id="admin_provisioner" name="admin_provisioner" type="text" value={ v.AdminProvisioner }/>
+				<label for="admin_subject">Admin subject (optional)</label>
+				<input id="admin_subject" name="admin_subject" type="text" value={ v.AdminSubject }/>
+				<label for="admin_secret">
+					Admin secret
+					if v.HasAdminSecret {
+						<span class="badge">set</span>
+					} else {
+						<span class="badge">empty</span>
+					}
+				</label>
+				<input id="admin_secret" name="admin_secret" type="password" autocomplete="new-password" placeholder="leave blank to keep the current secret"/>
+				<p class="muted">Leave the secret blank to keep the stored value unchanged.</p>
+				<button type="submit">Save</button>
+			</form>
+		</div>
+		<div class="card">
+			<h1>Test connection</h1>
+			<p class="muted">Fetches the CA roots over HTTPS and verifies the configured fingerprint.</p>
+			<form
+				method="post"
+				action="/settings/test"
+				hx-post="/settings/test"
+				hx-target="#test-result"
+				hx-swap="innerHTML"
+			>
+				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+				<button class="secondary" type="submit">Test connection</button>
+			</form>
+			<div id="test-result"></div>
+		</div>
+	}
+}
+
+// testSuccess is the htmx partial shown when the connection test passes (FR-2).
+templ testSuccess(rootCount int) {
+	<div class="flash info" role="status">
+		Connection OK — fetched { strconv.Itoa(rootCount) } root certificate(s) and verified the fingerprint.
+	</div>
+}
+
+// testResult is the generic htmx partial; ok toggles the styling.
+templ testResult(ok bool, msg string) {
+	if ok {
+		<div class="flash info" role="status">{ msg }</div>
+	} else {
+		<div class="flash error" role="alert">{ msg }</div>
 	}
 }

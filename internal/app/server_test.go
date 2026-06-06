@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -15,6 +16,8 @@ import (
 
 	"github.com/nofuturekid/step-ui-ng/internal/app"
 	"github.com/nofuturekid/step-ui-ng/internal/config"
+	"github.com/nofuturekid/step-ui-ng/internal/crypto"
+	"github.com/nofuturekid/step-ui-ng/internal/settings"
 	"github.com/nofuturekid/step-ui-ng/internal/store"
 	"github.com/nofuturekid/step-ui-ng/internal/users"
 )
@@ -24,24 +27,34 @@ const testPassword = "correct-horse-battery-staple"
 // testEnv bundles a running server, its repo, and a cookie-jar client that does
 // NOT auto-follow redirects (so tests can assert on Location/status directly).
 type testEnv struct {
-	srv    *httptest.Server
-	repo   *users.Repo
-	client *http.Client
+	srv          *httptest.Server
+	repo         *users.Repo
+	settingsRepo *settings.Repo
+	db           *sql.DB
+	client       *http.Client
 }
 
 func newTestEnv(t *testing.T) *testEnv {
 	t.Helper()
-	st, err := store.Open(t.TempDir())
+	dir := t.TempDir()
+	st, err := store.Open(dir)
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
 
+	box, err := crypto.NewBox(dir)
+	if err != nil {
+		t.Fatalf("crypto.NewBox: %v", err)
+	}
+
 	repo := users.NewRepo(st.DB())
+	settingsRepo := settings.NewRepo(st.DB(), box)
 	sessions := app.NewSessionManager(st.DB(), false)
 	h := app.NewHandler(app.Deps{
 		DB:       st.DB(),
 		Users:    repo,
+		Settings: settingsRepo,
 		Sessions: sessions,
 		Config:   config.Config{},
 	})
@@ -56,7 +69,7 @@ func newTestEnv(t *testing.T) *testEnv {
 			return http.ErrUseLastResponse
 		},
 	}
-	return &testEnv{srv: srv, repo: repo, client: client}
+	return &testEnv{srv: srv, repo: repo, settingsRepo: settingsRepo, db: st.DB(), client: client}
 }
 
 var csrfFieldRe = regexp.MustCompile(`name="csrf_token" value="([^"]*)"`)
