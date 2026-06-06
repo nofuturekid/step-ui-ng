@@ -13,6 +13,10 @@ Versions are bumped only when a release is cut; in-progress work lives under
 - Foundation persistence (`internal/store`): pure-Go SQLite opened under
   `DATA_DIR`, with embedded, idempotent goose migrations applied on startup
   (spec/0001). Wired into server boot; logs the applied schema version.
+- Secrets encryption at rest (`internal/crypto`): AES-256-GCM secret box with a
+  32-byte master key auto-generated at `DATA_DIR/secret.key` (mode 0600) on first
+  start and loaded thereafter; `Seal`/`Open` use a fresh random nonce per message
+  and base64 output (spec/0002, ADR-0006). Key creation is wired into startup.
 
 ### Changed
 
