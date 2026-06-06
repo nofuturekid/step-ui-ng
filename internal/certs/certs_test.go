@@ -122,9 +122,28 @@ func maxInt(a, b int) int {
 	return b
 }
 
+// fakeRevoker stands in for the live CA revoke flow: it records the params it was
+// called with and returns a configurable error so the domain's revoke logic
+// (already-revoked guard, status-only-on-success, audit) is tested
+// deterministically. The real OTT revoke flow is proven in internal/ca against
+// an httptest CA.
+type fakeRevoker struct {
+	calls      int
+	lastSerial string
+	lastReason string
+	err        error
+}
+
+func (f *fakeRevoker) RevokeCert(_ context.Context, p ca.RevokeParams) error {
+	f.calls++
+	f.lastSerial = p.Serial
+	f.lastReason = p.Reason
+	return f.err
+}
+
 // testService builds a certs.Service over an in-memory DB, a real crypto.Box, an
-// audit.Recorder and the fake signer.
-func testService(t *testing.T) (*certs.Service, *sql.DB, *fakeSigner) {
+// audit.Recorder, the fake signer and the fake revoker.
+func testService(t *testing.T) (*certs.Service, *sql.DB, *fakeSigner, *fakeRevoker) {
 	t.Helper()
 	db, err := sql.Open("sqlite", "file:"+t.Name()+"?mode=memory&cache=shared")
 	if err != nil {
@@ -139,8 +158,9 @@ func testService(t *testing.T) (*certs.Service, *sql.DB, *fakeSigner) {
 		t.Fatalf("new box: %v", err)
 	}
 	signer := newFakeSigner(t)
-	svc := certs.NewService(db, box, audit.NewRecorder(db), signer)
-	return svc, db, signer
+	revoker := &fakeRevoker{}
+	svc := certs.NewService(db, box, audit.NewRecorder(db), signer, revoker)
+	return svc, db, signer, revoker
 }
 
 func mustExec(t *testing.T, db *sql.DB, q string) {
@@ -168,7 +188,7 @@ const auditSchema = `CREATE TABLE audit_events (
 // --- Acceptance: Issue for example.test + a SAN → stored (FR-1) -------------
 
 func TestIssueStoresCertificateAndKey(t *testing.T) {
-	svc, db, signer := testService(t)
+	svc, db, signer, _ := testService(t)
 
 	cert, err := svc.Issue(context.Background(), certs.IssueParams{
 		Actor:           "alice",
@@ -228,7 +248,7 @@ func TestIssueStoresCertificateAndKey(t *testing.T) {
 // --- Acceptance: audit actor recorded for issue (FR-4) ----------------------
 
 func TestIssueRecordsAuditActor(t *testing.T) {
-	svc, db, _ := testService(t)
+	svc, db, _, _ := testService(t)
 	if _, err := svc.Issue(context.Background(), certs.IssueParams{
 		Actor: "alice", ProvisionerName: "p", Password: "x",
 		CAURL: "https://ca.test", Fingerprint: "fp",
@@ -252,7 +272,7 @@ func TestIssueRecordsAuditActor(t *testing.T) {
 // --- Issue rejects an empty CN (FR-5) ---------------------------------------
 
 func TestIssueRejectsEmptyCN(t *testing.T) {
-	svc, _, _ := testService(t)
+	svc, _, _, _ := testService(t)
 	_, err := svc.Issue(context.Background(), certs.IssueParams{
 		Actor: "alice", ProvisionerName: "p", Password: "x",
 		CAURL: "https://ca.test", Fingerprint: "fp",
@@ -266,7 +286,7 @@ func TestIssueRejectsEmptyCN(t *testing.T) {
 // --- Issue PFX format produces a PKCS#12 bundle -----------------------------
 
 func TestIssuePFXReturnsBundle(t *testing.T) {
-	svc, _, _ := testService(t)
+	svc, _, _, _ := testService(t)
 	cert, err := svc.Issue(context.Background(), certs.IssueParams{
 		Actor: "alice", ProvisionerName: "p", Password: "x",
 		CAURL: "https://ca.test", Fingerprint: "fp",
@@ -295,7 +315,7 @@ func TestIssuePFXReturnsBundle(t *testing.T) {
 // page's textarea, defeating the point. This test FAILS if the format-conditional
 // assignment is reverted to unconditionally setting PrivateKeyPEM.
 func TestIssuePFXDoesNotLeakPlaintextKey(t *testing.T) {
-	svc, _, _ := testService(t)
+	svc, _, _, _ := testService(t)
 	cert, err := svc.Issue(context.Background(), certs.IssueParams{
 		Actor: "alice", ProvisionerName: "p", Password: "x",
 		CAURL: "https://ca.test", Fingerprint: "fp",
@@ -317,7 +337,7 @@ func TestIssuePFXDoesNotLeakPlaintextKey(t *testing.T) {
 //
 // The two key payloads are mutually exclusive by format: exactly one is set.
 func TestIssuePEMDeliversKeyAndNoPFX(t *testing.T) {
-	svc, _, _ := testService(t)
+	svc, _, _, _ := testService(t)
 	cert, err := svc.Issue(context.Background(), certs.IssueParams{
 		Actor: "alice", ProvisionerName: "p", Password: "x",
 		CAURL: "https://ca.test", Fingerprint: "fp",
@@ -338,7 +358,7 @@ func TestIssuePEMDeliversKeyAndNoPFX(t *testing.T) {
 // --- Acceptance: Sign a valid CSR → CN/SANs from the CSR (FR-2) -------------
 
 func TestSignCSRTakesCNAndSANsFromCSR(t *testing.T) {
-	svc, db, signer := testService(t)
+	svc, db, signer, _ := testService(t)
 
 	csrPEM := buildClientCSR(t, "client.test",
 		[]string{"alt.client.test"},
@@ -386,7 +406,7 @@ func TestSignCSRTakesCNAndSANsFromCSR(t *testing.T) {
 // --- Acceptance: invalid/garbled CSR → rejected (FR-2/FR-5) -----------------
 
 func TestSignRejectsGarbledCSR(t *testing.T) {
-	svc, _, _ := testService(t)
+	svc, _, _, _ := testService(t)
 	_, err := svc.Sign(context.Background(), certs.SignParams{
 		Actor: "bob", ProvisionerName: "p", Password: "x",
 		CAURL: "https://ca.test", Fingerprint: "fp",
@@ -401,7 +421,7 @@ func TestSignRejectsGarbledCSR(t *testing.T) {
 // BEFORE any CA call (FR-2 "verify the CSR signature"). -----------------------
 
 func TestSignRejectsBadSignatureCSR(t *testing.T) {
-	svc, _, signer := testService(t)
+	svc, _, signer, _ := testService(t)
 	csrPEM := tamperedCSR(t, "evil.test")
 	_, err := svc.Sign(context.Background(), certs.SignParams{
 		Actor: "bob", ProvisionerName: "p", Password: "x",
@@ -419,7 +439,7 @@ func TestSignRejectsBadSignatureCSR(t *testing.T) {
 // --- Sign records the audit actor (FR-4) ------------------------------------
 
 func TestSignRecordsAuditActor(t *testing.T) {
-	svc, db, _ := testService(t)
+	svc, db, _, _ := testService(t)
 	csrPEM := buildClientCSR(t, "sign-audit.test", nil, nil, nil, nil)
 	if _, err := svc.Sign(context.Background(), certs.SignParams{
 		Actor: "carol", ProvisionerName: "p", Password: "x",

@@ -8,6 +8,7 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("PORT", "")
 	t.Setenv("DATA_DIR", "")
 	t.Setenv("COOKIE_SECURE", "")
+	t.Setenv("RENEW_DEFAULT_DAYS", "")
 	cfg := Load()
 	if cfg.Addr != ":8080" {
 		t.Fatalf("Addr = %q, want :8080", cfg.Addr)
@@ -17,6 +18,34 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.SecureCookies {
 		t.Fatalf("SecureCookies = true, want false by default")
+	}
+	if cfg.RenewDefaultDays != DefaultRenewDays {
+		t.Fatalf("RenewDefaultDays = %d, want %d (the configurable default, not hard-coded)",
+			cfg.RenewDefaultDays, DefaultRenewDays)
+	}
+}
+
+// TestRenewDefaultDaysFromEnv proves the renew default is CONFIGURABLE (spec/0008
+// FR-2): a valid RENEW_DEFAULT_DAYS overrides the built-in default, and an
+// invalid/zero/negative value falls back to it (never hard-coded to 90 elsewhere).
+func TestRenewDefaultDaysFromEnv(t *testing.T) {
+	for _, tc := range []struct {
+		val  string
+		want int
+	}{
+		{"30", 30},
+		{"365", 365},
+		{"", DefaultRenewDays},
+		{"0", DefaultRenewDays},
+		{"-5", DefaultRenewDays},
+		{"notanumber", DefaultRenewDays},
+	} {
+		t.Run(tc.val, func(t *testing.T) {
+			t.Setenv("RENEW_DEFAULT_DAYS", tc.val)
+			if got := Load().RenewDefaultDays; got != tc.want {
+				t.Fatalf("RENEW_DEFAULT_DAYS=%q → RenewDefaultDays=%d, want %d", tc.val, got, tc.want)
+			}
+		})
 	}
 }
 

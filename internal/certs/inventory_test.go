@@ -29,7 +29,7 @@ import (
 // AND privkey.pem.  The sealed DB value is NOT the plaintext key and
 // round-trips via Box.Open.
 func TestBundleServerStrategyContainsKey(t *testing.T) {
-	svc, db, _ := testService(t)
+	svc, db, _, _ := testService(t)
 	cert, err := svc.Issue(context.Background(), certs.IssueParams{
 		Actor: "alice", ProvisionerName: "p", Password: "x",
 		CAURL: "https://ca.test", Fingerprint: "fp",
@@ -79,7 +79,7 @@ func TestBundleServerStrategyContainsKey(t *testing.T) {
 
 // Given a CSR-signed certificate (key_strategy=csr), the bundle omits privkey.pem.
 func TestBundleCSRStrategyOmitsKey(t *testing.T) {
-	svc, _, _ := testService(t)
+	svc, _, _, _ := testService(t)
 	csrPEM := buildClientCSR(t, "bundle-csr.test", nil, nil, nil, nil)
 	cert, err := svc.Sign(context.Background(), certs.SignParams{
 		Actor: "bob", ProvisionerName: "p", Password: "x",
@@ -106,7 +106,7 @@ func TestBundleCSRStrategyOmitsKey(t *testing.T) {
 // FR-3 optional cert.p12: when a PFX password is provided, the ZIP includes
 // cert.p12 that decodes with that password.
 func TestBundleIncludesPFXWhenPasswordProvided(t *testing.T) {
-	svc, _, _ := testService(t)
+	svc, _, _, _ := testService(t)
 	cert, err := svc.Issue(context.Background(), certs.IssueParams{
 		Actor: "alice", ProvisionerName: "p", Password: "x",
 		CAURL: "https://ca.test", Fingerprint: "fp",
@@ -131,7 +131,7 @@ func TestBundleIncludesPFXWhenPasswordProvided(t *testing.T) {
 
 // Without a PFX password the ZIP must NOT contain cert.p12.
 func TestBundleOmitsPFXWhenNoPassword(t *testing.T) {
-	svc, _, _ := testService(t)
+	svc, _, _, _ := testService(t)
 	cert, err := svc.Issue(context.Background(), certs.IssueParams{
 		Actor: "alice", ProvisionerName: "p", Password: "x",
 		CAURL: "https://ca.test", Fingerprint: "fp",
@@ -217,7 +217,7 @@ func TestDeriveStatusRevokedAndExpiredRevokedWins(t *testing.T) {
 // any single character at that position. A LIKE `_` without an ESCAPE clause
 // would be a wildcard and match any character, causing false positives.
 func TestListSearchUnderscoreEscaped(t *testing.T) {
-	svc, db, _ := testService(t)
+	svc, db, _, _ := testService(t)
 	now := time.Now()
 	// Insert two certs: one whose CN contains an underscore, one that does not.
 	seedCert(t, db, "under_score.test", `["under_score.test"]`, "valid", now.Add(30*24*time.Hour).Unix())
@@ -248,7 +248,7 @@ func TestListSearchUnderscoreEscaped(t *testing.T) {
 // string would match. This proves the query is parameterized: the value is
 // treated as data, not as SQL.
 func TestListSearchInjectionSafetyMatchesNothing(t *testing.T) {
-	svc, db, _ := testService(t)
+	svc, db, _, _ := testService(t)
 	now := time.Now()
 	seedCert(t, db, "legit.test", `["legit.test"]`, "valid", now.Add(30*24*time.Hour).Unix())
 
@@ -270,7 +270,7 @@ func TestListSearchInjectionSafetyMatchesNothing(t *testing.T) {
 
 // Table-driven filter tests over a seeded certificate set.
 func TestListFilters(t *testing.T) {
-	svc, db, _ := testService(t)
+	svc, db, _, _ := testService(t)
 
 	// Seed three certificates:
 	//  1. CN=alpha.test  status=valid  not_after=future
@@ -360,7 +360,7 @@ func TestListFilters(t *testing.T) {
 // --- FR-1: Detail view (Get by ID) ------------------------------------------
 
 func TestGetReturnsDetail(t *testing.T) {
-	svc, db, _ := testService(t)
+	svc, db, _, _ := testService(t)
 	now := time.Now()
 	id := seedCert(t, db, "detail.test", `["detail.test"]`, "valid", now.Add(30*24*time.Hour).Unix())
 
@@ -377,7 +377,7 @@ func TestGetReturnsDetail(t *testing.T) {
 }
 
 func TestGetNotFoundError(t *testing.T) {
-	svc, _, _ := testService(t)
+	svc, _, _, _ := testService(t)
 	_, err := svc.Get(context.Background(), 99999)
 	if err == nil {
 		t.Fatal("expected error for missing cert ID")

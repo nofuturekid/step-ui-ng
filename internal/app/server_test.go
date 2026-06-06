@@ -39,6 +39,14 @@ type testEnv struct {
 
 func newTestEnv(t *testing.T) *testEnv {
 	t.Helper()
+	return newTestEnvWithConfig(t, config.Config{RenewDefaultDays: config.DefaultRenewDays})
+}
+
+// newTestEnvWithConfig creates a test environment using the supplied config,
+// allowing individual tests to override fields such as RenewDefaultDays without
+// affecting unrelated tests that rely on newTestEnv's defaults.
+func newTestEnvWithConfig(t *testing.T, cfg config.Config) *testEnv {
+	t.Helper()
 	dir := t.TempDir()
 	st, err := store.Open(dir)
 	if err != nil {
@@ -53,7 +61,7 @@ func newTestEnv(t *testing.T) *testEnv {
 
 	repo := users.NewRepo(st.DB())
 	settingsRepo := settings.NewRepo(st.DB(), box)
-	certsSvc := certs.NewService(st.DB(), box, audit.NewRecorder(st.DB()), certs.LiveSigner())
+	certsSvc := certs.NewService(st.DB(), box, audit.NewRecorder(st.DB()), certs.LiveSigner(), certs.LiveRevoker())
 	sessions := app.NewSessionManager(st.DB(), false)
 	h := app.NewHandler(app.Deps{
 		DB:       st.DB(),
@@ -61,7 +69,7 @@ func newTestEnv(t *testing.T) *testEnv {
 		Settings: settingsRepo,
 		Certs:    certsSvc,
 		Sessions: sessions,
-		Config:   config.Config{},
+		Config:   cfg,
 	})
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)

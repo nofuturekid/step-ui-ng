@@ -564,11 +564,22 @@ templ statusBadge(status string) {
 	}
 }
 
-// certDetailPage renders the full certificate detail view (spec/0007, FR-1).
-// It shows all metadata, PEM blocks (read-only textareas), and a prominent
-// Download button (FR-5).  The download link goes to the ZIP bundle endpoint.
-templ certDetailPage(d pageData, c certs.Certificate) {
+// certDetailView carries the certificate plus the view inputs the detail page
+// needs that are not part of the stored certificate (spec/0008): the
+// configurable default renew validity (FR-2, shown pre-filled on the renew form).
+type certDetailView struct {
+	Cert             certs.Certificate
+	RenewDefaultDays int
+}
+
+// certDetailPage renders the full certificate detail view (spec/0007 FR-1;
+// spec/0008 revoke/renew). It shows all metadata, PEM blocks (read-only
+// textareas), a Download button (FR-5), and — for admin+ — the Revoke (reason +
+// typed confirmation) and Renew (validity, defaulted from config) controls.
+templ certDetailPage(d pageData, v certDetailView) {
 	@layout(d) {
+		{{ c := v.Cert }}
+		{{ status, _ := certs.DeriveStatus(c.Status, c.NotAfter) }}
 		<div class="card">
 			<h1>Certificate detail</h1>
 			<table>
@@ -579,9 +590,7 @@ templ certDetailPage(d pageData, c certs.Certificate) {
 					<tr><th>Key strategy</th><td>{ c.KeyStrategy }</td></tr>
 					<tr>
 						<th>Status</th>
-						<td>
-							{ func() string { st, _ := certs.DeriveStatus(c.Status, c.NotAfter); return st }() }
-						</td>
+						<td>@statusBadge(status)</td>
 					</tr>
 					<tr><th>Not before</th><td>{ fmtUnix(c.NotBefore) }</td></tr>
 					<tr><th>Not after</th><td>{ fmtUnix(c.NotAfter) }</td></tr>
@@ -595,6 +604,44 @@ templ certDetailPage(d pageData, c certs.Certificate) {
 				<button type="submit">Download bundle (ZIP)</button>
 			</form>
 		</div>
+		if d.User != nil && d.User.Role.AtLeast(users.RoleAdmin) {
+			<div class="card">
+				<h2>Renew</h2>
+				<p class="muted">Re-issue a new certificate for the same common name and SANs. A new private key is generated and sealed; the renewed certificate appears in the inventory.</p>
+				<form method="post" action={ templ.SafeURL("/certificates/" + strconv.FormatInt(c.ID, 10) + "/renew") }>
+					<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+					<label for="renew-validity">Validity (days)</label>
+					<input id="renew-validity" type="number" name="validity" min="1" value={ strconv.Itoa(v.RenewDefaultDays) } style="width:8em" required/>
+					<p class="muted">Default { strconv.Itoa(v.RenewDefaultDays) } days; the provisioner's maximum still applies.</p>
+					<button type="submit">Renew certificate</button>
+				</form>
+			</div>
+			<div class="card">
+				<h2>Revoke</h2>
+				if status == "revoked" {
+					<p class="muted">This certificate is already revoked.</p>
+				} else {
+					<p class="muted">Revocation is <strong>permanent</strong> and is performed at the CA. Provide a reason and type <code>REVOKE</code> to confirm.</p>
+					<form method="post" action={ templ.SafeURL("/certificates/" + strconv.FormatInt(c.ID, 10) + "/revoke") } onsubmit="return confirm('Revoke this certificate at the CA? This cannot be undone.');">
+						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+						<label for="revoke-reason">Reason (required)</label>
+						<input id="revoke-reason" type="text" name="reason" placeholder="e.g. key compromise" style="width:22em" required/>
+						<label for="revoke-reason-code">OCSP reason code</label>
+						<select id="revoke-reason-code" name="reason_code">
+							<option value="0">0 — unspecified</option>
+							<option value="1">1 — key compromise</option>
+							<option value="3">3 — affiliation changed</option>
+							<option value="4">4 — superseded</option>
+							<option value="5">5 — cessation of operation</option>
+						</select>
+						<label for="revoke-confirm">Type REVOKE to confirm</label>
+						<input id="revoke-confirm" type="text" name="confirm" placeholder="REVOKE" autocomplete="off" style="width:12em" required/>
+						<p></p>
+						<button class="danger" type="submit">Revoke certificate</button>
+					</form>
+				}
+			</div>
+		}
 		<div class="card">
 			<h2>PEM material</h2>
 			<label>Certificate (PEM)</label>
