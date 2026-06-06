@@ -14,6 +14,7 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/justinas/nosurf"
 
+	"github.com/nofuturekid/step-ui-ng/internal/audit"
 	"github.com/nofuturekid/step-ui-ng/internal/certs"
 	"github.com/nofuturekid/step-ui-ng/internal/config"
 	"github.com/nofuturekid/step-ui-ng/internal/settings"
@@ -34,6 +35,7 @@ type Deps struct {
 	Users    *users.Repo
 	Settings *settings.Repo
 	Certs    *certs.Service
+	Audit    *audit.Recorder
 	Sessions *scs.SessionManager
 	Config   config.Config
 }
@@ -43,6 +45,7 @@ type server struct {
 	users    *users.Repo
 	settings *settings.Repo
 	certs    *certs.Service
+	audit    *audit.Recorder
 	sessions *scs.SessionManager
 	cfg      config.Config
 }
@@ -51,7 +54,7 @@ type server struct {
 // handler is the full middleware stack: nosurf (CSRF) → session LoadAndSave →
 // loadUser → first-run gating → router.
 func NewHandler(deps Deps) http.Handler {
-	s := &server{users: deps.Users, settings: deps.Settings, certs: deps.Certs, sessions: deps.Sessions, cfg: deps.Config}
+	s := &server{users: deps.Users, settings: deps.Settings, certs: deps.Certs, audit: deps.Audit, sessions: deps.Sessions, cfg: deps.Config}
 
 	mux := http.NewServeMux()
 
@@ -94,6 +97,10 @@ func NewHandler(deps Deps) http.Handler {
 
 	// Inventory & download (spec/0007): list, detail, ZIP bundle.
 	s.registerInventoryRoutes(mux)
+
+	// Audit log (spec/0009): query/filter view (admin+).
+	// ACME events (spec/0010) will plug into the same table — leave room.
+	mux.HandleFunc("GET /audit", s.requireAuth(s.requireRole(users.RoleAdmin, s.getAudit)))
 
 	// Root → users (which itself enforces auth + first-run gating).
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
