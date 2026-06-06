@@ -92,6 +92,9 @@ func NewHandler(deps Deps) http.Handler {
 	mux.HandleFunc("GET /sign-csr", s.requireAuth(s.requireRole(users.RoleAdmin, s.getSignCSR)))
 	mux.HandleFunc("POST /sign-csr", s.requireAuth(s.requireRole(users.RoleAdmin, s.postSignCSR)))
 
+	// Inventory & download (spec/0007): list, detail, ZIP bundle.
+	s.registerInventoryRoutes(mux)
+
 	// Root → users (which itself enforces auth + first-run gating).
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/users", http.StatusSeeOther)

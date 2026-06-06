@@ -10,6 +10,25 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- Certificate inventory & encrypted re-download (spec/0007). New
+  `GET /inventory` (list with htmx live-filter by status and CN/SAN text
+  search), `GET /certificates/{id}` (detail view), and
+  `GET /certificates/{id}/download` (ZIP bundle; admin+ only — may contain
+  the private key). Status derivation (active/expired/revoked + days-until-
+  expiry) is computed in Go from `not_after` vs now and the persisted `status`
+  column (revoked is authoritative; expired is derived from date). The ZIP is
+  assembled in memory: `cert.pem`, `chain.pem`, `fullchain.pem`, `README.txt`
+  always; `privkey.pem` only when `key_strategy=server` (FR-6); `cert.p12`
+  only when `?pfx_password` is supplied (FR-3). The sealed private key is
+  decrypted in-memory only via `internal/crypto Box.Open` — never written to
+  disk or logged (FR-4). Download is admin+ (RBAC comment in handler), carries
+  `Cache-Control: no-store, no-cache, must-revalidate` and
+  `Content-Disposition: attachment`. The inventory link is added to the nav
+  (all authenticated roles). Acceptance tests cover: bundle contents per key
+  strategy; sealed-at-rest assertion; status derivation (active/expired/
+  revoked + days); filter logic (8 table-driven cases); RBAC (viewer→403);
+  response headers (no-store, attachment, application/zip); PFX inclusion.
+
 - Issue certificate & sign CSR (spec/0006, ADR-0004; audit foundation from
   spec/0009). New migration `0005_certificates_audit.sql` adds two STRICT tables:
   `certificates` (the issued/signed inventory: cn, sans_json, serial,
