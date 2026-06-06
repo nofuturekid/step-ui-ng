@@ -74,6 +74,14 @@ func NewHandler(deps Deps) http.Handler {
 	mux.HandleFunc("POST /settings", s.requireAuth(s.requireRole(users.RoleAdmin, s.postSettings)))
 	mux.HandleFunc("POST /settings/test", s.requireAuth(s.requireRole(users.RoleAdmin, s.postSettingsTest)))
 
+	// Provisioner management (admin+): list, select active, create, delete
+	// (spec/0005). Create/delete sign an x5c admin token from the stored admin
+	// credential; delete refuses the currently selected provisioner.
+	mux.HandleFunc("GET /provisioners", s.requireAuth(s.requireRole(users.RoleAdmin, s.getProvisioners)))
+	mux.HandleFunc("POST /provisioners", s.requireAuth(s.requireRole(users.RoleAdmin, s.postProvisioners)))
+	mux.HandleFunc("POST /provisioners/select", s.requireAuth(s.requireRole(users.RoleAdmin, s.postProvisionerSelect)))
+	mux.HandleFunc("POST /provisioners/{name}", s.requireAuth(s.requireRole(users.RoleAdmin, s.postProvisioner)))
+
 	// Root → users (which itself enforces auth + first-run gating).
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/users", http.StatusSeeOther)

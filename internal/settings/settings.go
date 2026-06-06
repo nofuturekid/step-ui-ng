@@ -38,15 +38,22 @@ type Input struct {
 }
 
 // View is the read model returned to callers/templates. It deliberately omits
-// any secret value: HasAdminSecret only reports whether one is set (FR-5).
+// any secret value: the Has* bools only report whether a secret/key is set
+// (FR-5 of 0004; spec/0005). The admin certificate chain is public, so it is
+// carried verbatim; the admin private key is never exposed, only HasAdminKey.
 type View struct {
 	CAURL            string
 	RootFingerprint  string
 	AdminProvisioner string
 	AdminSubject     string
 	HasAdminSecret   bool
-	CreatedAt        int64
-	UpdatedAt        int64
+	// Provisioner management (spec/0005).
+	SelectedProvisioner string
+	HasSelectedSecret   bool
+	AdminCertPEM        string // the x5c chain (public)
+	HasAdminKey         bool   // an admin signing key is configured
+	CreatedAt           int64
+	UpdatedAt           int64
 }
 
 // Repo is the SQLite-backed CA-settings repository. It holds the crypto.Box so
@@ -67,16 +74,23 @@ var now = func() int64 { return time.Now().Unix() }
 // The admin secret is never decrypted: only HasAdminSecret is reported.
 func (r *Repo) Get(ctx context.Context) (View, bool, error) {
 	var (
-		v      View
-		sealed sql.NullString
-		prov   sql.NullString
-		subj   sql.NullString
+		v         View
+		sealed    sql.NullString
+		prov      sql.NullString
+		subj      sql.NullString
+		selProv   sql.NullString
+		selSecret sql.NullString
+		adminCert sql.NullString
+		adminKey  sql.NullString
 	)
 	err := r.db.QueryRowContext(ctx,
 		`SELECT ca_url, root_fingerprint, admin_provisioner, admin_subject,
-		        admin_secret_sealed, created_at, updated_at
+		        admin_secret_sealed, selected_provisioner,
+		        selected_provisioner_secret_sealed, admin_cert_pem, admin_key_sealed,
+		        created_at, updated_at
 		 FROM ca_settings WHERE id = 1`).
-		Scan(&v.CAURL, &v.RootFingerprint, &prov, &subj, &sealed, &v.CreatedAt, &v.UpdatedAt)
+		Scan(&v.CAURL, &v.RootFingerprint, &prov, &subj, &sealed,
+			&selProv, &selSecret, &adminCert, &adminKey, &v.CreatedAt, &v.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return View{}, false, nil
 	}
@@ -86,6 +100,10 @@ func (r *Repo) Get(ctx context.Context) (View, bool, error) {
 	v.AdminProvisioner = prov.String
 	v.AdminSubject = subj.String
 	v.HasAdminSecret = sealed.Valid && sealed.String != ""
+	v.SelectedProvisioner = selProv.String
+	v.HasSelectedSecret = selSecret.Valid && selSecret.String != ""
+	v.AdminCertPEM = adminCert.String
+	v.HasAdminKey = adminKey.Valid && adminKey.String != ""
 	return v, true, nil
 }
 
@@ -134,6 +152,119 @@ func (r *Repo) Save(ctx context.Context, in Input) error {
 		return fmt.Errorf("settings: save: %w", err)
 	}
 	return nil
+}
+
+// ErrNoSettings means an operation needs the CA settings row to exist first.
+var ErrNoSettings = errors.New("settings: no CA settings saved yet")
+
+// SelectProvisioner persists the active provisioner for issuance (FR-2): its
+// name and an optional sealed secret. An empty secret clears any stored secret
+// (the secret belongs to the provisioner, so it must not linger when switching).
+// The CA settings row must already exist.
+func (r *Repo) SelectProvisioner(ctx context.Context, name, secret string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("settings: select provisioner: empty name")
+	}
+
+	var sealed sql.NullString
+	if secret != "" {
+		s, err := r.box.Seal([]byte(secret))
+		if err != nil {
+			return fmt.Errorf("settings: seal provisioner secret: %w", err)
+		}
+		sealed = sql.NullString{String: s, Valid: true}
+	}
+
+	res, err := r.db.ExecContext(ctx,
+		`UPDATE ca_settings
+		    SET selected_provisioner = ?,
+		        selected_provisioner_secret_sealed = ?,
+		        updated_at = ?
+		  WHERE id = 1`,
+		name, sealed, now())
+	if err != nil {
+		return fmt.Errorf("settings: select provisioner: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNoSettings
+	}
+	return nil
+}
+
+// SaveAdminCredential stores the admin certificate chain (PEM, public) and seals
+// the admin private key (PEM) used to sign x5c admin tokens (FR-3/FR-4,
+// ADR-0012). The CA settings row must already exist. The private key is
+// write-only: it is sealed before storage and never returned toward the client.
+func (r *Repo) SaveAdminCredential(ctx context.Context, certPEM, keyPEM string) error {
+	if strings.TrimSpace(certPEM) == "" || strings.TrimSpace(keyPEM) == "" {
+		return fmt.Errorf("settings: admin credential: cert and key are required")
+	}
+	sealedKey, err := r.box.Seal([]byte(keyPEM))
+	if err != nil {
+		return fmt.Errorf("settings: seal admin key: %w", err)
+	}
+	res, err := r.db.ExecContext(ctx,
+		`UPDATE ca_settings
+		    SET admin_cert_pem = ?, admin_key_sealed = ?, updated_at = ?
+		  WHERE id = 1`,
+		certPEM, sealedKey, now())
+	if err != nil {
+		return fmt.Errorf("settings: save admin credential: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNoSettings
+	}
+	return nil
+}
+
+// AdminCredential returns the stored admin certificate chain and the decrypted
+// private key for use by the CA admin operations. ok is false when no admin
+// credential is configured. The plaintext key is returned ONLY here, for
+// internal signing use — never toward the client (callers must not render it).
+func (r *Repo) AdminCredential(ctx context.Context) (certPEM, keyPEM string, ok bool, err error) {
+	var cert, sealedKey sql.NullString
+	qErr := r.db.QueryRowContext(ctx,
+		`SELECT admin_cert_pem, admin_key_sealed FROM ca_settings WHERE id = 1`).
+		Scan(&cert, &sealedKey)
+	if errors.Is(qErr, sql.ErrNoRows) {
+		return "", "", false, nil
+	}
+	if qErr != nil {
+		return "", "", false, fmt.Errorf("settings: admin credential: %w", qErr)
+	}
+	if !cert.Valid || cert.String == "" || !sealedKey.Valid || sealedKey.String == "" {
+		return "", "", false, nil
+	}
+	plain, oErr := r.box.Open(sealedKey.String)
+	if oErr != nil {
+		return "", "", false, fmt.Errorf("settings: open admin key: %w", oErr)
+	}
+	return cert.String, string(plain), true, nil
+}
+
+// SelectedSecret returns the decrypted secret of the selected provisioner for
+// internal issuance use. ok is false when no secret is stored. Never expose the
+// returned value toward the client.
+func (r *Repo) SelectedSecret(ctx context.Context) (secret string, ok bool, err error) {
+	var sealed sql.NullString
+	qErr := r.db.QueryRowContext(ctx,
+		`SELECT selected_provisioner_secret_sealed FROM ca_settings WHERE id = 1`).
+		Scan(&sealed)
+	if errors.Is(qErr, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if qErr != nil {
+		return "", false, fmt.Errorf("settings: selected secret: %w", qErr)
+	}
+	if !sealed.Valid || sealed.String == "" {
+		return "", false, nil
+	}
+	plain, oErr := r.box.Open(sealed.String)
+	if oErr != nil {
+		return "", false, fmt.Errorf("settings: open selected secret: %w", oErr)
+	}
+	return string(plain), true, nil
 }
 
 // validateURL enforces the http(s) scheme rule (FR-4) and normalises trailing
