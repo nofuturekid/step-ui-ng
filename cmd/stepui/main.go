@@ -15,6 +15,7 @@ import (
 	"github.com/nofuturekid/step-ui-ng/internal/config"
 	"github.com/nofuturekid/step-ui-ng/internal/crypto"
 	"github.com/nofuturekid/step-ui-ng/internal/store"
+	"github.com/nofuturekid/step-ui-ng/internal/users"
 )
 
 func main() {
@@ -42,9 +43,17 @@ func main() {
 	}
 	slog.Info("secrets encryption ready")
 
+	userRepo := users.NewRepo(st.DB())
+	sessions := app.NewSessionManager(st.DB(), cfg.SecureCookies)
+
 	srv := &http.Server{
-		Addr:              cfg.Addr,
-		Handler:           app.NewHandler(),
+		Addr: cfg.Addr,
+		Handler: app.NewHandler(app.Deps{
+			DB:       st.DB(),
+			Users:    userRepo,
+			Sessions: sessions,
+			Config:   cfg,
+		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
