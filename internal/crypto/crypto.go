@@ -116,35 +116,49 @@ func loadKey(path string) ([]byte, error) {
 	return key, nil
 }
 
-// createKey generates a fresh key and writes it atomically. O_EXCL makes the
-// create-if-absent race-safe: if a concurrent start already created the key, we
-// adopt that one instead of silently overwriting it. The explicit Chmod forces
-// 0600 regardless of the process umask, and Sync flushes before we rely on it.
+// createKey generates a fresh key and publishes it atomically: it is written to
+// a temp file first, then hard-linked into place. link(2) fails with EEXIST if
+// the key already exists, so concurrent first-starts converge on a single key
+// (the losers adopt the winner's), and the final path only ever appears as a
+// fully-written file — a reader can never observe a partial key. The explicit
+// Chmod forces 0600 regardless of the process umask, and Sync flushes before the
+// key is linked into place.
 func createKey(path string) ([]byte, error) {
 	key := make([]byte, keySize)
 	if _, err := rand.Read(key); err != nil {
 		return nil, fmt.Errorf("crypto: generate key: %w", err)
 	}
 
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
-	switch {
-	case errors.Is(err, fs.ErrExist):
-		return loadKey(path)
-	case err != nil:
-		return nil, fmt.Errorf("crypto: create key: %w", err)
+	tmp, err := os.CreateTemp(filepath.Dir(path), KeyFileName+".tmp-*")
+	if err != nil {
+		return nil, fmt.Errorf("crypto: create temp key: %w", err)
 	}
-	defer func() { _ = f.Close() }()
+	defer func() { _ = os.Remove(tmp.Name()) }()
 
-	if _, err := f.Write(key); err != nil {
-		return nil, fmt.Errorf("crypto: write key: %w", err)
+	if _, err := tmp.Write(key); err != nil {
+		_ = tmp.Close()
+		return nil, fmt.Errorf("crypto: write temp key: %w", err)
 	}
-	if err := f.Chmod(0o600); err != nil {
-		return nil, fmt.Errorf("crypto: chmod key: %w", err)
+	if err := tmp.Chmod(0o600); err != nil {
+		_ = tmp.Close()
+		return nil, fmt.Errorf("crypto: chmod temp key: %w", err)
 	}
-	if err := f.Sync(); err != nil {
-		return nil, fmt.Errorf("crypto: sync key: %w", err)
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return nil, fmt.Errorf("crypto: sync temp key: %w", err)
 	}
-	return key, nil
+	if err := tmp.Close(); err != nil {
+		return nil, fmt.Errorf("crypto: close temp key: %w", err)
+	}
+
+	switch err := os.Link(tmp.Name(), path); {
+	case err == nil:
+		return key, nil
+	case errors.Is(err, fs.ErrExist):
+		return loadKey(path) // lost the race; adopt the winner's complete key
+	default:
+		return nil, fmt.Errorf("crypto: link key: %w", err)
+	}
 }
 
 // ensureKeyPerm tightens the key file back to 0600 if its mode grants any group
