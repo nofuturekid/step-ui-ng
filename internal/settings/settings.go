@@ -157,32 +157,47 @@ func (r *Repo) Save(ctx context.Context, in Input) error {
 // ErrNoSettings means an operation needs the CA settings row to exist first.
 var ErrNoSettings = errors.New("settings: no CA settings saved yet")
 
-// SelectProvisioner persists the active provisioner for issuance (FR-2): its
-// name and an optional sealed secret. An empty secret clears any stored secret
-// (the secret belongs to the provisioner, so it must not linger when switching).
-// The CA settings row must already exist.
+// SelectProvisioner persists the active provisioner for issuance (FR-2): its name
+// and an optional sealed secret. A non-empty secret replaces the stored one. An
+// empty secret KEEPS the stored secret when the provisioner name is unchanged
+// (mirrors the admin secret's "leave blank to keep"), and CLEARS it when switching
+// to a different provisioner (the secret belongs to the previous one). The CA
+// settings row must already exist.
 func (r *Repo) SelectProvisioner(ctx context.Context, name, secret string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return fmt.Errorf("settings: select provisioner: empty name")
 	}
 
-	var sealed sql.NullString
+	var (
+		res sql.Result
+		err error
+	)
 	if secret != "" {
-		s, err := r.box.Seal([]byte(secret))
-		if err != nil {
-			return fmt.Errorf("settings: seal provisioner secret: %w", err)
+		sealed, sErr := r.box.Seal([]byte(secret))
+		if sErr != nil {
+			return fmt.Errorf("settings: seal provisioner secret: %w", sErr)
 		}
-		sealed = sql.NullString{String: s, Valid: true}
+		res, err = r.db.ExecContext(ctx,
+			`UPDATE ca_settings
+			    SET selected_provisioner = ?,
+			        selected_provisioner_secret_sealed = ?,
+			        updated_at = ?
+			  WHERE id = 1`,
+			name, sealed, now())
+	} else {
+		// Blank secret: keep it iff the provisioner is unchanged, else clear it.
+		// The CASE reads the pre-update selected_provisioner value.
+		res, err = r.db.ExecContext(ctx,
+			`UPDATE ca_settings
+			    SET selected_provisioner_secret_sealed =
+			            CASE WHEN selected_provisioner = ?
+			                 THEN selected_provisioner_secret_sealed ELSE NULL END,
+			        selected_provisioner = ?,
+			        updated_at = ?
+			  WHERE id = 1`,
+			name, name, now())
 	}
-
-	res, err := r.db.ExecContext(ctx,
-		`UPDATE ca_settings
-		    SET selected_provisioner = ?,
-		        selected_provisioner_secret_sealed = ?,
-		        updated_at = ?
-		  WHERE id = 1`,
-		name, sealed, now())
 	if err != nil {
 		return fmt.Errorf("settings: select provisioner: %w", err)
 	}

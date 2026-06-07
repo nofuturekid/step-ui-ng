@@ -270,7 +270,11 @@ templ settingsPage(d pageData, v settings.View) {
 					}
 				</label>
 				<input id="admin_secret" name="admin_secret" type="password" autocomplete="new-password" placeholder="leave blank to keep the current secret"/>
-				<p class="muted">Leave the secret blank to keep the stored value unchanged.</p>
+				if v.HasAdminSecret {
+					<p class="muted">A secret is stored — leave blank to keep it, or type a new one to replace it.</p>
+				} else {
+					<p class="muted">No secret stored yet.</p>
+				}
 				<button type="submit">Save</button>
 			</form>
 		</div>
@@ -345,9 +349,20 @@ templ provisionersPage(d pageData, v provisionersView) {
 					<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
 					<label for="select-name">Provisioner name</label>
 					<input id="select-name" name="name" type="text" required value={ v.Selected } placeholder="provisioner name"/>
-					<label for="select-secret">Provisioner secret (optional)</label>
-					<input id="select-secret" name="secret" type="password" autocomplete="new-password" placeholder="leave blank for none"/>
-					<p></p>
+					<label for="select-secret">
+						Provisioner secret
+						if v.HasSelectedSecret {
+							<span class="badge">set</span>
+						} else {
+							<span class="badge">none</span>
+						}
+					</label>
+					<input id="select-secret" name="secret" type="password" autocomplete="new-password" placeholder="leave blank to keep the current secret"/>
+					if v.HasSelectedSecret {
+						<p class="muted">A secret is stored for this provisioner. Leave blank to keep it, or type a new one to replace it. Switching to a different provisioner with a blank secret clears it.</p>
+					} else {
+						<p class="muted">No secret stored. Leave blank if this provisioner needs none.</p>
+					}
 					<button type="submit">Set active</button>
 				</form>
 			</div>

@@ -14,11 +14,12 @@ import (
 // whether an admin credential is configured (gates the create/delete controls).
 // listErr carries a non-fatal message when the CA could not be listed.
 type provisionersView struct {
-	Provisioners []provisionerRow
-	Selected     string
-	HasAdminCred bool
-	CASettings   bool
-	ListError    string
+	Provisioners      []provisionerRow
+	Selected          string
+	HasSelectedSecret bool // a secret is stored for the active provisioner
+	HasAdminCred      bool
+	CASettings        bool
+	ListError         string
 }
 
 type provisionerRow struct {
@@ -42,9 +43,10 @@ func (s *server) getProvisioners(w http.ResponseWriter, r *http.Request) {
 	d.Error = s.sessions.PopString(r.Context(), errorKey)
 
 	pv := provisionersView{
-		Selected:     view.SelectedProvisioner,
-		HasAdminCred: view.HasAdminKey,
-		CASettings:   ok,
+		Selected:          view.SelectedProvisioner,
+		HasSelectedSecret: view.HasSelectedSecret,
+		HasAdminCred:      view.HasAdminKey,
+		CASettings:        ok,
 	}
 	if !ok {
 		pv.ListError = "Configure the CA connection first (CA settings)."

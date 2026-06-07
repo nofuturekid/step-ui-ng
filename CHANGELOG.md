@@ -8,6 +8,15 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+### Fixed
+
+- The CA-settings **Admin secret** and the **Provisioner secret** are write-only (never
+  echoed), but it was unclear whether one was stored. Both now show a **set/none**
+  status badge and a clear hint. The provisioner secret is also **preserved when you
+  re-select the same provisioner with a blank field** (it used to be cleared on every
+  save) — matching the admin secret's "leave blank to keep"; switching to a _different_
+  provisioner with a blank secret still clears it.
+
 ### Changed
 
 - CI: `main.yml` also runs on `release: published`, so `:main` is rebuilt at the tagged

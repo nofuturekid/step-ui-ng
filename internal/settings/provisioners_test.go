@@ -100,6 +100,31 @@ func TestSelectProvisionerReplacesSecret(t *testing.T) {
 	}
 }
 
+// Re-selecting the SAME provisioner with a blank secret keeps the stored secret
+// (mirrors the admin-secret "leave blank to keep" semantics). Only switching to a
+// different provisioner clears it (TestSelectProvisionerReplacesSecret).
+func TestSelectProvisionerKeepsSecretOnSameName(t *testing.T) {
+	repo, _, _ := newRepo(t)
+	ctx := context.Background()
+	if err := repo.Save(ctx, settings.Input{CAURL: "https://ca.example", RootFingerprint: validFP}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	if err := repo.SelectProvisioner(ctx, "p1", "keep-me-secret-aaaa"); err != nil {
+		t.Fatalf("select p1 with secret: %v", err)
+	}
+	// Re-select the same provisioner, leaving the secret blank.
+	if err := repo.SelectProvisioner(ctx, "p1", ""); err != nil {
+		t.Fatalf("re-select p1 blank: %v", err)
+	}
+	got, _, _ := repo.Get(ctx)
+	if got.SelectedProvisioner != "p1" {
+		t.Fatalf("SelectedProvisioner = %q, want p1", got.SelectedProvisioner)
+	}
+	if !got.HasSelectedSecret {
+		t.Fatal("blank secret on the same provisioner must keep the stored secret")
+	}
+}
+
 // SelectProvisioner requires an existing CA settings row (it extends it).
 func TestSelectProvisionerRequiresSettings(t *testing.T) {
 	repo, _, _ := newRepo(t)
