@@ -10,6 +10,9 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- Password confirmation on the setup and create-user forms: both `/setup` and
+  `POST /users` now require a matching `password_confirm` field, rejecting
+  mismatched submissions with a clear error before any user is created.
 - A **Users** link in the admin topbar (`internal/app`). The user-management page
   (`GET /users`, admin+) already existed and worked but was unreachable from the
   navigation — only the logo pointed at `/users`.

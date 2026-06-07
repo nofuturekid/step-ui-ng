@@ -141,9 +141,10 @@ func (e *testEnv) completeSetup(t *testing.T, username string) {
 	t.Helper()
 	token := e.csrfToken(t, "/setup")
 	resp := e.post(t, "/setup", url.Values{
-		"csrf_token": {token},
-		"username":   {username},
-		"password":   {testPassword},
+		"csrf_token":       {token},
+		"username":         {username},
+		"password":         {testPassword},
+		"password_confirm": {testPassword},
 	})
 	if resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("setup status = %d, want 303", resp.StatusCode)
@@ -562,10 +563,11 @@ func TestViewerMutatingActionForbidden(t *testing.T) {
 	e.completeSetup(t, "root")
 	createToken := e.csrfToken(t, "/users")
 	if resp := e.post(t, "/users", url.Values{
-		"csrf_token": {createToken},
-		"username":   {"viewer1"},
-		"password":   {testPassword},
-		"role":       {"viewer"},
+		"csrf_token":       {createToken},
+		"username":         {"viewer1"},
+		"password":         {testPassword},
+		"password_confirm": {testPassword},
+		"role":             {"viewer"},
 	}); resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("create viewer status = %d", resp.StatusCode)
 	}
@@ -630,10 +632,11 @@ func TestAdminCreateUserThroughHandler(t *testing.T) {
 
 	token := e.csrfToken(t, "/users")
 	resp := e.post(t, "/users", url.Values{
-		"csrf_token": {token},
-		"username":   {"bob"},
-		"password":   {testPassword},
-		"role":       {"admin"},
+		"csrf_token":       {token},
+		"username":         {"bob"},
+		"password":         {testPassword},
+		"password_confirm": {testPassword},
+		"role":             {"admin"},
 	})
 	if resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("create status = %d, want 303", resp.StatusCode)
@@ -689,7 +692,7 @@ func TestRoleCeilingAndSuperadminProtection(t *testing.T) {
 			build: func(token string, _, _, _ int64) step {
 				return step{"/users", url.Values{
 					"csrf_token": {token}, "username": {"newroot"},
-					"password": {testPassword}, "role": {"superadmin"},
+					"password": {testPassword}, "password_confirm": {testPassword}, "role": {"superadmin"},
 				}, http.StatusForbidden}
 			},
 		},
@@ -744,7 +747,7 @@ func TestRoleCeilingAndSuperadminProtection(t *testing.T) {
 			build: func(token string, _, _, _ int64) step {
 				return step{"/users", url.Values{
 					"csrf_token": {token}, "username": {"newadmin"},
-					"password": {testPassword}, "role": {"admin"},
+					"password": {testPassword}, "password_confirm": {testPassword}, "role": {"admin"},
 				}, http.StatusSeeOther}
 			},
 		},
@@ -764,7 +767,7 @@ func TestRoleCeilingAndSuperadminProtection(t *testing.T) {
 			build: func(token string, _, _, _ int64) step {
 				return step{"/users", url.Values{
 					"csrf_token": {token}, "username": {"newroot"},
-					"password": {testPassword}, "role": {"superadmin"},
+					"password": {testPassword}, "password_confirm": {testPassword}, "role": {"superadmin"},
 				}, http.StatusSeeOther}
 			},
 		},
@@ -934,6 +937,73 @@ func TestAdminLoginRedirectsToInventoryAndCanReachUsers(t *testing.T) {
 	usersResp, _ := e.get(t, "/users")
 	if usersResp.StatusCode != http.StatusOK {
 		t.Fatalf("admin GET /users = %d, want 200", usersResp.StatusCode)
+	}
+}
+
+// --- Password confirmation (regression) ----------------------------------------
+
+// TestSetupMismatchedPasswordConfirm verifies that a first-run setup POST with a
+// mismatched password_confirm is rejected: no user is created and the error is
+// surfaced. This test MUST fail if the match check is removed from postSetup.
+func TestSetupMismatchedPasswordConfirm(t *testing.T) {
+	e := newTestEnv(t)
+	token := e.csrfToken(t, "/setup")
+	resp := e.post(t, "/setup", url.Values{
+		"csrf_token":       {token},
+		"username":         {"root"},
+		"password":         {testPassword},
+		"password_confirm": {testPassword + "-wrong"},
+	})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("mismatch setup status = %d, want 400", resp.StatusCode)
+	}
+	// No user must have been created.
+	n, err := e.repo.Count(context.Background())
+	if err != nil {
+		t.Fatalf("Count: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("user count = %d after mismatch setup, want 0 (match check did not block create)", n)
+	}
+	// Setup must still be available (no user was created, so /setup renders again).
+	resp2, _ := e.get(t, "/setup")
+	if resp2.StatusCode != http.StatusOK {
+		t.Fatalf("/setup after failed attempt = %d, want 200", resp2.StatusCode)
+	}
+}
+
+// TestCreateUserMismatchedPasswordConfirm verifies that a create-user POST with a
+// mismatched password_confirm is rejected: the user is NOT created and the error
+// is surfaced as a flash. This test MUST fail if the match check is removed from
+// postUsers.
+func TestCreateUserMismatchedPasswordConfirm(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	token := e.csrfToken(t, "/users")
+	resp := e.post(t, "/users", url.Values{
+		"csrf_token":       {token},
+		"username":         {"bob"},
+		"password":         {testPassword},
+		"password_confirm": {testPassword + "-wrong"},
+		"role":             {"admin"},
+	})
+	// The handler redirects back to /users (flash error pattern).
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("mismatch create status = %d, want 303", resp.StatusCode)
+	}
+	// Only the original superadmin must exist; bob must not have been created.
+	n, err := e.repo.Count(context.Background())
+	if err != nil {
+		t.Fatalf("Count: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("user count = %d after mismatch create, want 1 (match check did not block create)", n)
+	}
+	// The error flash must appear on the next /users render.
+	_, body := e.get(t, "/users")
+	if !strings.Contains(body, "Passwords do not match") {
+		t.Fatalf("expected password mismatch error flash on /users; body:\n%s", body)
 	}
 }
 
