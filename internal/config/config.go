@@ -6,6 +6,7 @@
 package config
 
 import (
+	"flag"
 	"os"
 	"strconv"
 	"strings"
@@ -40,6 +41,48 @@ func Load() Config {
 		SecureCookies:    boolEnv("COOKIE_SECURE"),
 		RenewDefaultDays: intEnv("RENEW_DEFAULT_DAYS", DefaultRenewDays),
 	}
+}
+
+// LoadWithFlags layers command-line flags over the environment: it starts from
+// Load() (the env-derived defaults) and lets explicitly-set flags override them.
+// A LOCAL flag.FlagSet is used (no global state) so this is testable and never
+// touches the process-wide CommandLine. Only flags the caller actually set take
+// effect (via fs.Visit) — an unset flag leaves the env-derived value untouched,
+// so the precedence is: flag > env > built-in default.
+//
+// Flags: -addr, -data-dir, -cookie-secure, -renew-default-days, and -version
+// (which sets the returned showVersion=true so the caller can print and exit
+// before opening any store). A parse error (including -h/-help) is returned.
+func LoadWithFlags(args []string) (cfg Config, showVersion bool, err error) {
+	cfg = Load()
+
+	fs := flag.NewFlagSet("stepui", flag.ContinueOnError)
+	addr := fs.String("addr", cfg.Addr, "listen address, e.g. :8080 (overrides PORT)")
+	dataDir := fs.String("data-dir", cfg.DataDir, "data directory for the SQLite DB and master key (overrides DATA_DIR)")
+	cookieSecure := fs.Bool("cookie-secure", cfg.SecureCookies, "set the Secure attribute on cookies; enable behind HTTPS (overrides COOKIE_SECURE)")
+	renewDays := fs.Int("renew-default-days", cfg.RenewDefaultDays, "default renew validity in days (overrides RENEW_DEFAULT_DAYS)")
+	version := fs.Bool("version", false, "print version and exit")
+
+	if err = fs.Parse(args); err != nil {
+		return Config{}, false, err
+	}
+
+	// Only override fields whose flag was explicitly set, so the env-derived
+	// defaults survive when a flag is absent (flag > env precedence).
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "addr":
+			cfg.Addr = *addr
+		case "data-dir":
+			cfg.DataDir = *dataDir
+		case "cookie-secure":
+			cfg.SecureCookies = *cookieSecure
+		case "renew-default-days":
+			cfg.RenewDefaultDays = *renewDays
+		}
+	})
+
+	return cfg, *version, nil
 }
 
 // intEnv reads key as a positive integer, falling back to def when unset,

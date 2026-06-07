@@ -8,6 +8,50 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+### Added
+
+- A **Users** link in the admin topbar (`internal/app`). The user-management page
+  (`GET /users`, admin+) already existed and worked but was unreachable from the
+  navigation — only the logo pointed at `/users`.
+- Command-line flags that override the environment (`internal/config`
+  `LoadWithFlags`): `-addr`, `-data-dir`, `-cookie-secure`, `-renew-default-days`,
+  and `-version`. Precedence is flag > env > built-in default; env-only operation
+  (`Load()`) is unchanged. `-version` prints the build version and exits before
+  opening the store.
+
+### Changed
+
+- The application version is stamped from the git tag at build time via
+  `-ldflags "-X …/internal/app.Version=<tag>"` instead of a hand-edited constant
+  (ADR-0013, supersedes the constant-bump mechanics of ADR-0011). `Version` is now
+  a `var` whose literal is only the development fallback; new `app.BuildInfo()`
+  returns the stamped tag verbatim, or enriches the fallback with the VCS revision
+  (`<commit>`, plus `-dirty`) for development builds. The startup log and
+  `-version` use `BuildInfo()`; `/healthz` still returns the bare `Version`.
+- The published container image now reuses the prebuilt, ldflags-stamped binary
+  from the `binaries` CI job instead of recompiling inside the Docker build
+  (ADR-0014). A new `Dockerfile.release` accepts the binary via
+  `COPY dist/stepui_linux_${TARGETARCH}` (no Go toolchain required). The
+  `release.yml` job graph is `binaries` → `image`: `binaries` produces the
+  version-stamped archives and uploads the raw linux amd64/arm64 binaries as an
+  Actions artifact; `image` downloads them and builds the multi-arch image. The
+  base image is minimal Alpine (`alpine:3`, pinned by digest) with
+  `ca-certificates`, a nonroot user (uid/gid 65532), and a writable `/data`
+  volume. The local `Dockerfile` is reworked to the same Alpine runtime (2-stage:
+  Go toolchain builds, Alpine runs) so `make docker` and `make docker-release`
+  produce compatible images; `make build` now also stamps the version via ldflags.
+
+### Fixed
+
+- Auditable actions no longer crash with a recovered HTTP 500. `cmd/stepui`
+  built `app.Deps` without `Audit`, leaving the server's audit recorder nil so
+  every audit `Record`/`List` panicked. The recorder is now wired into the
+  handler; `internal/audit` `Record`/`List` degrade to a no-op on a nil recorder
+  (defence in depth); and `app.NewHandler` now fails fast at startup with a clear
+  message if any required dependency (`DB`, `Users`, `Settings`, `Certs`,
+  `Audit`, `Sessions`) is missing, so a future wiring omission cannot regress to
+  a per-request panic.
+
 ## [0.1.1] - 2026-06-07
 
 ### Added

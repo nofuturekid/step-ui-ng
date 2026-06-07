@@ -1,0 +1,21 @@
+# syntax=docker/dockerfile:1
+# CI runtime image — consumes the prebuilt, ldflags-stamped binary.
+# No Go toolchain inside the image; the binary is built by the `binaries` CI
+# job and injected via `dist/stepui_linux_${TARGETARCH}`.
+#
+# Pin alpine:3 by digest (alpine:3.22 / edge of 3.x as of 2026-06-07).
+# To update: docker pull alpine:3 && docker inspect alpine:3 --format '{{index .RepoDigests 0}}'
+FROM alpine@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
+RUN apk add --no-cache ca-certificates \
+ && addgroup -S -g 65532 nonroot && adduser -S -u 65532 -G nonroot nonroot \
+ && mkdir -p /data && chown nonroot:nonroot /data
+# TARGETARCH is set by buildx per --platform (amd64|arm64) and selects the
+# matching prebuilt binary from dist/.
+ARG TARGETARCH
+WORKDIR /app
+COPY dist/stepui_linux_${TARGETARCH} /app/stepui
+USER nonroot:nonroot
+VOLUME ["/data"]
+ENV DATA_DIR=/data PORT=8080
+EXPOSE 8080
+ENTRYPOINT ["/app/stepui"]

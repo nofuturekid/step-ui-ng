@@ -37,6 +37,9 @@ var now = func() int64 { return time.Now().Unix() }
 // resource (e.g. the CN or serial); details carries extra free-form context.
 // The table is append-only — there is no update or delete path.
 func (r *Recorder) Record(ctx context.Context, who, action, target, details string) error {
+	if r == nil || r.db == nil {
+		return nil
+	}
 	if who == "" {
 		return ErrNoActor
 	}
@@ -77,6 +80,9 @@ const defaultLimit = 50
 // always bound (no string interpolation) — parameterized SQL only (spec/0009
 // FR-3). An empty filter returns all rows up to limit.
 func (r *Recorder) List(ctx context.Context, f Filter) ([]Event, error) {
+	if r == nil || r.db == nil {
+		return nil, nil
+	}
 	limit := f.Limit
 	if limit <= 0 {
 		limit = defaultLimit

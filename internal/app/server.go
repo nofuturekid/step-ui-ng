@@ -21,8 +21,11 @@ import (
 	"github.com/nofuturekid/step-ui-ng/internal/users"
 )
 
-// Version is the application version (kept in sync with CHANGELOG.md).
-const Version = "0.1.1"
+// Version is the application version. The literal here is the development
+// fallback; releases stamp the git tag via ldflags
+// (-X github.com/nofuturekid/step-ui-ng/internal/app.Version=<tag>). See
+// BuildInfo (version.go) and ADR-0013.
+var Version = "0.1.1"
 
 // ctxKey is the unexported request-context key type for this package.
 type ctxKey int
@@ -54,6 +57,25 @@ type server struct {
 // handler is the full middleware stack: nosurf (CSRF) → session LoadAndSave →
 // loadUser → first-run gating → router.
 func NewHandler(deps Deps) http.Handler {
+	// Fail fast at construction if a required dependency is missing, so a wiring
+	// omission (e.g. forgetting Audit, which made every auditable action panic)
+	// surfaces at startup with a clear message instead of as a recovered 500 per
+	// request.
+	switch {
+	case deps.DB == nil:
+		panic("app.NewHandler: missing required dependency DB")
+	case deps.Users == nil:
+		panic("app.NewHandler: missing required dependency Users")
+	case deps.Settings == nil:
+		panic("app.NewHandler: missing required dependency Settings")
+	case deps.Certs == nil:
+		panic("app.NewHandler: missing required dependency Certs")
+	case deps.Audit == nil:
+		panic("app.NewHandler: missing required dependency Audit")
+	case deps.Sessions == nil:
+		panic("app.NewHandler: missing required dependency Sessions")
+	}
+
 	s := &server{users: deps.Users, settings: deps.Settings, certs: deps.Certs, audit: deps.Audit, sessions: deps.Sessions, cfg: deps.Config}
 
 	mux := http.NewServeMux()
