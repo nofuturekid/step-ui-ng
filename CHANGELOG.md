@@ -13,11 +13,12 @@ Versions are bumped only when a release is cut; in-progress work lives under
 - **Dark mode** — the UI follows the OS `prefers-color-scheme`. Colors are tokenized
   in `:root`, so a single dark token set flips the whole UI (no per-component rules).
 - **Responsive topbar** — on narrow screens the nav collapses behind a JS-free
-  hamburger (`<details>`-based) that drops a dropdown panel; the Settings group becomes
-  an inline accordion. In the hamburger the certificate actions sit under a
-  **Certificates** section heading (List / Issue / Sign CSR), indented consistently
-  with the Settings items; the Settings summary now aligns with the other top-level
-  items. Desktop layout is unchanged.
+  hamburger (`<details>`-based) that drops a panel. In the panel the actions are
+  organised under two section headings — **Certificates** (List / Issue / Sign CSR)
+  and **Settings** (Users / CA settings / Provisioners / ACME) — with their items
+  always listed and indented consistently; **Audit log** sits between them. On desktop
+  the nav is a flat row and Settings stays a click-to-open dropdown. Desktop layout is
+  unchanged.
 
 ### Changed
 

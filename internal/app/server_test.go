@@ -942,70 +942,56 @@ func TestAdminTopbarHasSettingsMenu(t *testing.T) {
 }
 
 // TestAdminTopbarGrouping: operational/observation links are top-level (before the
-// <details> menu); configuration links are inside it (after <details>).
+// Settings group); configuration links live inside the Settings group (.navsettings).
 func TestAdminTopbarGrouping(t *testing.T) {
 	e := newTestEnv(t)
 	e.completeSetup(t, "root")
 
 	_, body := e.get(t, "/inventory")
 
-	// The Settings menu specifically — note there is also a <details class="navmenu">
-	// hamburger wrapper (responsive nav) that appears first on every page.
-	menu := strings.Index(body, `<details class="menu"`)
-	if menu < 0 {
-		t.Fatalf("admin topbar has no <details class=\"menu\"> Settings menu; body:\n%s", body)
+	// The Settings config items (.menu-items) are a sibling of the <details class="menu">
+	// summary, both wrapped in .navsettings — so bound the group by that wrapper.
+	grp := strings.Index(body, `class="navsettings"`)
+	if grp < 0 {
+		t.Fatalf("admin topbar has no .navsettings Settings group; body:\n%s", body)
 	}
-	rel := strings.Index(body[menu:], "</details>")
-	if rel < 0 {
-		t.Fatalf("admin topbar Settings <details> is not closed; body:\n%s", body)
-	}
-	menuEnd := menu + rel
-	// Top-level: operational actions + observation (must appear before the menu).
+	// Top-level: operational actions + observation (must appear before the group).
 	for _, href := range []string{`href="/audit"`, `href="/issue"`, `href="/sign-csr"`} {
 		i := strings.Index(body, href)
-		if i < 0 || i >= menu {
-			t.Fatalf("expected %s top-level (before <details> at %d), got index %d; body:\n%s", href, menu, i, body)
+		if i < 0 || i >= grp {
+			t.Fatalf("expected %s top-level (before .navsettings at %d), got index %d; body:\n%s", href, grp, i, body)
 		}
 	}
-	// Configuration: must appear strictly INSIDE the dropdown (between <details> and
-	// </details>) — not merely somewhere after the menu opens.
+	// Configuration: must appear inside the Settings group.
 	for _, href := range []string{`href="/settings"`, `href="/provisioners"`, `href="/acme"`} {
 		i := strings.Index(body, href)
-		if i <= menu || i >= menuEnd {
-			t.Fatalf("expected %s inside the Settings menu (between %d and %d), got index %d; body:\n%s", href, menu, menuEnd, i, body)
+		if i <= grp {
+			t.Fatalf("expected %s inside the Settings group (after .navsettings at %d), got index %d; body:\n%s", href, grp, i, body)
 		}
 	}
 }
 
-// TestSettingsMenuOrder: inside the menu the items follow the logical setup order
-// Users -> CA settings -> Provisioners -> ACME.
+// TestSettingsMenuOrder: inside the Settings group the items follow the logical setup
+// order Users -> CA settings -> Provisioners -> ACME.
 func TestSettingsMenuOrder(t *testing.T) {
 	e := newTestEnv(t)
 	e.completeSetup(t, "root")
 
 	_, body := e.get(t, "/inventory")
 
-	// The Settings menu specifically — note there is also a <details class="navmenu">
-	// hamburger wrapper (responsive nav) that appears first on every page.
-	menu := strings.Index(body, `<details class="menu"`)
-	if menu < 0 {
-		t.Fatalf("admin topbar has no <details class=\"menu\"> Settings menu; body:\n%s", body)
+	grp := strings.Index(body, `class="navsettings"`)
+	if grp < 0 {
+		t.Fatalf("admin topbar has no .navsettings Settings group; body:\n%s", body)
 	}
-	rel := strings.Index(body[menu:], "</details>")
-	if rel < 0 {
-		t.Fatalf("admin topbar Settings <details> is not closed; body:\n%s", body)
-	}
-	menuEnd := menu + rel
-	// Bound the search to the menu's contents so order is asserted INSIDE the dropdown.
-	tail := body[menu:menuEnd]
+	tail := body[grp:]
 	prev := -1
 	for _, href := range []string{`href="/users"`, `href="/settings"`, `href="/provisioners"`, `href="/acme"`} {
 		i := strings.Index(tail, href)
 		if i < 0 {
-			t.Fatalf("Settings menu missing %s; body:\n%s", href, body)
+			t.Fatalf("Settings group missing %s; body:\n%s", href, body)
 		}
 		if i <= prev {
-			t.Fatalf("Settings menu order wrong at %s (index %d not after previous %d); want Users, CA settings, Provisioners, ACME; body:\n%s", href, i, prev, body)
+			t.Fatalf("Settings order wrong at %s (index %d not after previous %d); want Users, CA settings, Provisioners, ACME; body:\n%s", href, i, prev, body)
 		}
 		prev = i
 	}
