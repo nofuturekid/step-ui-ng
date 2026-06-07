@@ -8,6 +8,8 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-06-07
+
 ### Fixed
 
 - **CA "Test connection" rejected every real Step-CA** with "The CA's root
