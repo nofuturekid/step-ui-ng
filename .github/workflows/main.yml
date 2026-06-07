@@ -1,11 +1,27 @@
 name: Main - dev artifacts and :main image
 
-# On-demand build of the current ref (default: main). Produces downloadable binary
-# artifacts and pushes the moving :main container tag (+ :main-<sha>). Creates NO git
-# tag and NO GitHub release — so there is zero release/beta inflation. The version is
-# derived from `git describe` (e.g. v0.3.0-beta.1-3-g<sha>). See ADR-0015.
+# Builds the current ref and produces downloadable binary artifacts + pushes the
+# moving :main container tag (+ :main-<sha>). Creates NO git tag and NO GitHub release
+# — zero release/beta inflation. Version derived from `git describe` (e.g.
+# v0.3.0-3-g<sha>). See ADR-0015.
+#
+# Runs automatically on every push to main (so :main always reflects main), except for
+# docs-only changes (paths-ignore), and on demand via workflow_dispatch.
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "spec/**"
+      - "deploy/**"
+      - "LICENSE"
+
+# Only the newest main build matters; cancel an in-progress one when a newer push lands.
+concurrency:
+  group: main-build
+  cancel-in-progress: true
 
 env:
   IMAGE: ghcr.io/nofuturekid/step-ui-ng
