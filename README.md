@@ -62,6 +62,12 @@ Key settings:
 - **Data path** — map `/data` to an appdata location (e.g. `/mnt/user/appdata/step-ui-ng`).
   This directory holds the SQLite database **and** the master encryption key (`secret.key`).
   Back it up and restrict access.
+- **Runs as `99:100`** — the image's default user is `nonroot` (uid 65532), which cannot
+  write Unraid's appdata (owned `nobody:users` = 99:100). The template sets
+  `--user 99:100` (Extra Parameters) so the bind mount is writable **without** `chmod 777`.
+  For a plain `docker run`, either use a named volume (works out of the box) or, for a
+  bind mount, make the host dir writable by the container user (own it as the uid you run
+  as, or pass `--user <uid>:<gid>` matching the dir's owner).
 - **COOKIE_SECURE** — set to `true` when the UI is behind a TLS reverse proxy (Nginx, Caddy, etc.).
 - **RENEW_DEFAULT_DAYS** — default validity (days) pre-filled in the renewal form (default: 90).
 

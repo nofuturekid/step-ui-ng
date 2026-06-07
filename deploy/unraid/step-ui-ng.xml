@@ -22,7 +22,11 @@
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/nofuturekid/step-ui-ng/main/deploy/unraid/step-ui-ng.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/nofuturekid/step-ui-ng/main/internal/app/static/icon-256.png</Icon>
-  <ExtraParams/>
+  <!-- Run as Unraid's nobody:users (99:100) so the /data bind mount (appdata,
+       owned 99:100) is writable. The image's default user is nonroot (65532),
+       which cannot write a 99:100-owned host dir — without this the container
+       fails to create the database (no chmod 777 needed with this set). -->
+  <ExtraParams>--user 99:100</ExtraParams>
   <PostArgs/>
   <CPUset/>
   <DateInstalled/>
@@ -48,7 +52,7 @@
     Target="/data"
     Default="/mnt/user/appdata/step-ui-ng"
     Mode="rw"
-    Description="Persistent data directory. Contains the SQLite database and the master encryption key (secret.key). BACK THIS UP and restrict access — anyone with the contents can decrypt all stored secrets."
+    Description="Persistent data directory (bind mount). Contains the SQLite database and the master encryption key (secret.key). BACK THIS UP and restrict access — anyone with the contents can decrypt all stored secrets. The container runs as nobody:users (99:100, via Extra Parameters) to match Unraid's appdata ownership, so no chmod is required."
     Type="Path"
     Display="always"
     Required="true"
