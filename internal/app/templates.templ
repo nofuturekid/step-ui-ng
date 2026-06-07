@@ -20,6 +20,7 @@ type pageData struct {
 	User      *users.User
 	Flash     string // non-fatal info message
 	Error     string // error message
+	Wide      bool   // render <main> at the wider content width (data-heavy pages)
 }
 
 // layout is the shared HTML shell. htmx is configured to attach the CSRF token
@@ -57,34 +58,39 @@ templ layout(d pageData) {
 				<header class="topbar">
 					<div class="topbar-inner">
 						<a href="/inventory" class="brand"><img src="/static/logo.svg" alt="" width="28" height="28" class="brand-logo"/>step-ui-ng</a>
-						<nav class="mainnav">
-							<a href="/inventory">Certificates</a>
-							if d.User.Role.AtLeast(users.RoleAdmin) {
-								<a href="/issue">Issue</a>
-								<a href="/sign-csr">Sign CSR</a>
-								<a href="/audit">Audit log</a>
-								<details class="menu">
-									<summary aria-label="Settings">Settings</summary>
-									<div class="menu-items">
-										<a href="/users">Users</a>
-										<a href="/settings">CA settings</a>
-										<a href="/provisioners">Provisioners</a>
-										<a href="/acme">ACME</a>
-									</div>
-								</details>
-							}
-						</nav>
-						<span class="who">
-							{ d.User.Username } <span class="badge">{ string(d.User.Role) }</span>
-							<form method="post" action="/logout" style="display:inline">
-								<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-								<button class="secondary" type="submit">Log out</button>
-							</form>
-						</span>
+						<details class="navmenu">
+							<summary class="navtoggle" aria-label="Toggle navigation"></summary>
+						</details>
+						<div class="navwrap popover">
+							<nav class="mainnav">
+								<a href="/inventory">Certificates</a>
+								if d.User.Role.AtLeast(users.RoleAdmin) {
+									<a href="/issue">Issue</a>
+									<a href="/sign-csr">Sign CSR</a>
+									<a href="/audit">Audit log</a>
+									<details class="menu">
+										<summary aria-label="Settings">Settings</summary>
+										<div class="menu-items popover">
+											<a href="/users">Users</a>
+											<a href="/settings">CA settings</a>
+											<a href="/provisioners">Provisioners</a>
+											<a href="/acme">ACME</a>
+										</div>
+									</details>
+								}
+							</nav>
+							<span class="who">
+								{ d.User.Username } <span class="badge">{ string(d.User.Role) }</span>
+								<form method="post" action="/logout" style="display:inline">
+									<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+									<button class="secondary" type="submit">Log out</button>
+								</form>
+							</span>
+						</div>
 					</div>
 				</header>
 			}
-			<main>
+			<main class={ templ.KV("wide", d.Wide) }>
 				if d.Error != "" {
 					<div class="flash error" role="alert">{ d.Error }</div>
 				}
