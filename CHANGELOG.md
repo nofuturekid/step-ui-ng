@@ -8,6 +8,8 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-07
+
 ### Added
 
 - Topbar logo badge and favicon: `internal/app/static/logo.svg` (SVG shield/checkmark
