@@ -10,10 +10,20 @@ env:
 
 jobs:
   binaries:
-    name: Build and attach release binaries
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64, image: true }
+          - { goos: linux, goarch: arm64, image: true }
+          - { goos: linux, goarch: arm }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: darwin, goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -26,50 +36,49 @@ jobs:
       - name: Generate templ
         run: go tool templ generate
 
-      - name: Build binaries (CGO-free, cross-compiled, version-stamped)
+      - name: Build, package, checksum, upload
         env:
-          VERSION: ${{ github.event.release.tag_name }}
+          TAG: ${{ github.event.release.tag_name }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+          GOFLAGS: -trimpath
+          GH_TOKEN: ${{ github.token }}
+          IS_IMAGE: ${{ matrix.image }}
         run: |
           set -euo pipefail
-          [ -n "${VERSION:-}" ] || VERSION="dev-${GITHUB_SHA::7}"
+          VERSION="${TAG:-dev-${GITHUB_SHA::7}}"
           mkdir -p dist
-          for t in linux/amd64 linux/arm64 linux/arm darwin/amd64 darwin/arm64 windows/amd64; do
-            os="${t%/*}"; arch="${t#*/}"
-            bin="stepui"; [ "$os" = "windows" ] && bin="stepui.exe"
-            echo "==> building ${os}/${arch}"
-            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" GOFLAGS=-trimpath \
-              go build \
-              -ldflags="-s -w -X github.com/nofuturekid/step-ui-ng/internal/app.Version=${VERSION}" \
-              -o "dist/${bin}" ./cmd/stepui
-            # For linux amd64/arm64: keep a stable raw copy for the image job
-            # before creating the archive (archives remove the raw binary).
-            if [ "$os" = "linux" ] && { [ "$arch" = "amd64" ] || [ "$arch" = "arm64" ]; }; then
-              cp "dist/${bin}" "dist/stepui_linux_${arch}"
-            fi
-            name="stepui_${VERSION}_${os}_${arch}"
-            if [ "$os" = "windows" ]; then
-              (cd dist && zip -q "${name}.zip" "$bin" && rm "$bin")
+          bin="stepui"
+          if [ "$GOOS" = "windows" ]; then bin="stepui.exe"; fi
+          go build \
+            -ldflags "-s -w -X github.com/nofuturekid/step-ui-ng/internal/app.Version=${VERSION}" \
+            -o "dist/${bin}" ./cmd/stepui
+          name="stepui_${VERSION}_${GOOS}_${GOARCH}"
+          ( cd dist
+            if [ "$GOOS" = "windows" ]; then
+              zip -q "${name}.zip" "$bin"
+              archive="${name}.zip"
             else
-              (cd dist && tar -czf "${name}.tar.gz" "$bin" && rm "$bin")
+              tar -czf "${name}.tar.gz" "$bin"
+              archive="${name}.tar.gz"
             fi
-          done
-          (cd dist && sha256sum * | tee SHA256SUMS.txt)
-          ls -la dist
+            sha256sum "$archive" > "${archive}.sha256"
+            if [ -n "${TAG:-}" ]; then
+              gh release upload "$TAG" "$archive" "${archive}.sha256" --clobber
+            fi
+            if [ "${IS_IMAGE:-}" = "true" ]; then
+              cp "$bin" "stepui_linux_${GOARCH}"
+            fi
+          )
 
-      - name: Attach archives to the release
-        if: github.event_name == 'release'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$TAG" dist/*.tar.gz dist/*.zip dist/SHA256SUMS.txt --clobber
-
-      - name: Upload raw linux binaries for the image job
+      - name: Upload raw linux binary for the image job
+        if: ${{ matrix.image }}
         uses: actions/upload-artifact@v4
         with:
-          name: linux-binaries
-          path: |
-            dist/stepui_linux_amd64
-            dist/stepui_linux_arm64
+          name: rawbin-linux-${{ matrix.goarch }}
+          path: dist/stepui_linux_${{ matrix.goarch }}
+          if-no-files-found: error
           retention-days: 1
 
   image:
@@ -86,8 +95,9 @@ jobs:
       - name: Download prebuilt linux binaries
         uses: actions/download-artifact@v4
         with:
-          name: linux-binaries
-          path: dist/
+          pattern: rawbin-linux-*
+          path: dist
+          merge-multiple: true
 
       - name: Restore executable bit (upload-artifact drops it)
         run: chmod +x dist/stepui_linux_*
@@ -110,7 +120,7 @@ jobs:
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: |
-          if [ -n "$TAG" ]; then
+          if [ -n "${TAG:-}" ]; then
             echo "tags=${IMAGE}:latest,${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
           else
             echo "tags=${IMAGE}:manual-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
