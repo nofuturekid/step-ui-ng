@@ -28,8 +28,9 @@ Versions are bumped only when a release is cut; in-progress work lives under
 ### Changed
 
 - **CI: image channel `:edge` renamed to `:beta`** (consistent with `:latest` / `:main`).
-  A stable release no longer advances the prerelease channel — `:beta` tracks betas
-  only; use `:main` to test newer-than-stable changes (ADR-0015).
+  `:beta` is the release edge: moved by every prerelease **and** every stable, so it is
+  **never older than `:latest`** (`:beta` ⊇ `:latest`). Freshness `:latest` ⊆ `:beta` ⊆
+  `:main` (ADR-0015).
 - The inventory nav item is renamed **List** (the page heading stays "Certificates").
 - UI foundation (ADR-0016): design tokens for shape/elevation/surfaces
   (`--radius`, `--radius-sm`, `--shadow`, `--input-bg`, `--surface-2`, flash tints),
