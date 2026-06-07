@@ -123,8 +123,10 @@ jobs:
         run: |
           if [ -n "$TAG" ]; then
             if [ "$PRERELEASE" = "true" ]; then
-              echo "tags=${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
+              # Prerelease → moving :edge channel (bleeding edge) + the exact tag.
+              echo "tags=${IMAGE}:edge,${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
             else
+              # Stable → :latest (default pull) + the exact tag.
               echo "tags=${IMAGE}:latest,${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
             fi
           else
