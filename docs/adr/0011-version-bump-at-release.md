@@ -44,3 +44,8 @@ tags the commit and triggers the image build).
 
 Supersedes the versioning cadence of ADR-0008 (SDD/TDD, Conventional Commits and
 SemVer itself are unchanged). See `AGENTS.md` for the revised per-spec loop.
+
+> Note: ADR-0013 supersedes the _mechanics_ of the version bump described here —
+> the version is now stamped from the git tag via ldflags rather than by editing
+> the `Version` constant. The `[Unreleased]` → dated-heading changelog policy
+> above is unchanged.

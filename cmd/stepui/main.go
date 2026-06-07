@@ -21,11 +21,37 @@ import (
 	"github.com/nofuturekid/step-ui-ng/internal/users"
 )
 
+// buildDeps constructs the production app.Deps from an open store, crypto box,
+// and config. Extracted so that tests can verify every required field is wired
+// without starting a full HTTP server.
+func buildDeps(st *store.Store, box *crypto.Box, cfg config.Config) app.Deps {
+	auditRec := audit.NewRecorder(st.DB())
+	return app.Deps{
+		DB:       st.DB(),
+		Users:    users.NewRepo(st.DB()),
+		Settings: settings.NewRepo(st.DB(), box),
+		Certs:    certs.NewService(st.DB(), box, auditRec, certs.LiveSigner(), certs.LiveRevoker()),
+		Audit:    auditRec,
+		Sessions: app.NewSessionManager(st.DB(), cfg.SecureCookies),
+		Config:   cfg,
+	}
+}
+
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
-	cfg := config.Load()
+	cfg, showVersion, err := config.LoadWithFlags(os.Args[1:])
+	if err != nil {
+		slog.Error("parse flags", "err", err)
+		os.Exit(2)
+	}
+	if showVersion {
+		// Print the build version and exit before opening the store or creating
+		// the master key, so `stepui -version` is a pure, side-effect-free query.
+		os.Stdout.WriteString(app.BuildInfo() + "\n")
+		os.Exit(0)
+	}
 
 	st, err := store.Open(cfg.DataDir)
 	if err != nil {
@@ -47,26 +73,16 @@ func main() {
 	}
 	slog.Info("secrets encryption ready")
 
-	userRepo := users.NewRepo(st.DB())
-	settingsRepo := settings.NewRepo(st.DB(), box)
-	certsSvc := certs.NewService(st.DB(), box, audit.NewRecorder(st.DB()), certs.LiveSigner(), certs.LiveRevoker())
-	sessions := app.NewSessionManager(st.DB(), cfg.SecureCookies)
+	deps := buildDeps(st, box, cfg)
 
 	srv := &http.Server{
-		Addr: cfg.Addr,
-		Handler: app.NewHandler(app.Deps{
-			DB:       st.DB(),
-			Users:    userRepo,
-			Settings: settingsRepo,
-			Certs:    certsSvc,
-			Sessions: sessions,
-			Config:   cfg,
-		}),
+		Addr:              cfg.Addr,
+		Handler:           app.NewHandler(deps),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {
-		slog.Info("starting server", "addr", cfg.Addr, "version", app.Version, "data_dir", cfg.DataDir)
+		slog.Info("starting server", "addr", cfg.Addr, "version", app.BuildInfo(), "data_dir", cfg.DataDir)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("server error", "err", err)
 			os.Exit(1)

@@ -9,48 +9,6 @@ env:
   IMAGE: ghcr.io/nofuturekid/step-ui-ng
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Compute image tags
-        id: tags
-        run: |
-          if [ -n "${{ github.event.release.tag_name }}" ]; then
-            echo "tags=${IMAGE}:latest,${IMAGE}:${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tags=${IMAGE}:manual-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build and push (multi-arch)
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.tags.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
   binaries:
     name: Build and attach release binaries
     runs-on: ubuntu-latest
@@ -68,7 +26,7 @@ jobs:
       - name: Generate templ
         run: go tool templ generate
 
-      - name: Build binaries (CGO-free, cross-compiled)
+      - name: Build binaries (CGO-free, cross-compiled, version-stamped)
         env:
           VERSION: ${{ github.event.release.tag_name }}
         run: |
@@ -80,7 +38,14 @@ jobs:
             bin="stepui"; [ "$os" = "windows" ] && bin="stepui.exe"
             echo "==> building ${os}/${arch}"
             CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" GOFLAGS=-trimpath \
-              go build -ldflags="-s -w" -o "dist/${bin}" ./cmd/stepui
+              go build \
+              -ldflags="-s -w -X github.com/nofuturekid/step-ui-ng/internal/app.Version=${VERSION}" \
+              -o "dist/${bin}" ./cmd/stepui
+            # For linux amd64/arm64: keep a stable raw copy for the image job
+            # before creating the archive (archives remove the raw binary).
+            if [ "$os" = "linux" ] && { [ "$arch" = "amd64" ] || [ "$arch" = "arm64" ]; }; then
+              cp "dist/${bin}" "dist/stepui_linux_${arch}"
+            fi
             name="stepui_${VERSION}_${os}_${arch}"
             if [ "$os" = "windows" ]; then
               (cd dist && zip -q "${name}.zip" "$bin" && rm "$bin")
@@ -91,9 +56,71 @@ jobs:
           (cd dist && sha256sum * | tee SHA256SUMS.txt)
           ls -la dist
 
-      - name: Attach binaries to the release
+      - name: Attach archives to the release
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$TAG" dist/* --clobber
+        run: gh release upload "$TAG" dist/*.tar.gz dist/*.zip dist/SHA256SUMS.txt --clobber
+
+      - name: Upload raw linux binaries for the image job
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-binaries
+          path: |
+            dist/stepui_linux_amd64
+            dist/stepui_linux_arm64
+          retention-days: 1
+
+  image:
+    name: Build and push container image
+    runs-on: ubuntu-latest
+    needs: binaries
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download prebuilt linux binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-binaries
+          path: dist/
+
+      - name: Restore executable bit (upload-artifact drops it)
+        run: chmod +x dist/stepui_linux_*
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tags
+        id: tags
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [ -n "$TAG" ]; then
+            echo "tags=${IMAGE}:latest,${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tags=${IMAGE}:manual-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push (multi-arch, from prebuilt binary)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile.release
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}

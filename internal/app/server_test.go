@@ -208,6 +208,79 @@ func TestHealthz(t *testing.T) {
 	}
 }
 
+// --- Audit wiring (regression: production crash) ----------------------------
+
+// NewHandler must fail fast at construction when a required dependency is
+// missing. The production bug was app.Deps built WITHOUT Audit, leaving
+// server.audit nil so every auditable action panicked (recovered 500). This
+// asserts the omission now panics at startup, not per request.
+func TestNewHandlerPanicsWithoutAudit(t *testing.T) {
+	dir := t.TempDir()
+	st, err := store.Open(dir)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	box, err := crypto.NewBox(dir)
+	if err != nil {
+		t.Fatalf("crypto.NewBox: %v", err)
+	}
+	rec := audit.NewRecorder(st.DB())
+	deps := app.Deps{
+		DB:       st.DB(),
+		Users:    users.NewRepo(st.DB()),
+		Settings: settings.NewRepo(st.DB(), box),
+		Certs:    certs.NewService(st.DB(), box, rec, certs.LiveSigner(), certs.LiveRevoker()),
+		// Audit deliberately omitted — this is the production wiring bug.
+		Sessions: app.NewSessionManager(st.DB(), false),
+		Config:   config.Config{RenewDefaultDays: config.DefaultRenewDays},
+	}
+	defer func() {
+		if recover() == nil {
+			t.Fatal("NewHandler did not panic when Audit was omitted; the fail-fast guard is missing")
+		}
+	}()
+	app.NewHandler(deps)
+}
+
+// TestLoginWritesAuditEventEndToEnd proves that the POST /login handler writes an
+// audit_events row when given fully-wired Deps (the test-harness Deps, which
+// hardcode Audit). It verifies the emit-point in the handler itself — not
+// production Deps completeness. Production Deps completeness (e.g. that Audit is
+// never accidentally omitted from main.go) is guarded by
+// cmd/stepui.TestBuildDepsAllFieldsNonNil and TestNewHandlerPanicsWithoutAudit.
+func TestLoginWritesAuditEventEndToEnd(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+	// completeSetup runs /setup (not /login); log out and back in to exercise the
+	// POST /login path explicitly and prove it emits an audit event.
+	logoutToken := e.csrfToken(t, "/users")
+	e.post(t, "/logout", url.Values{"csrf_token": {logoutToken}})
+	e.loginAs(t, "root")
+
+	var n int
+	if err := e.db.QueryRowContext(context.Background(),
+		`SELECT COUNT(*) FROM audit_events WHERE action = 'login' AND who = 'root'`).Scan(&n); err != nil {
+		t.Fatalf("count login audit rows: %v", err)
+	}
+	if n == 0 {
+		t.Fatal("no login audit_events row written; production audit wiring is broken")
+	}
+}
+
+// --- Users admin nav link ---------------------------------------------------
+
+// An admin must see a Users link in the topbar routing to /users (the handler +
+// page exist and are admin-gated, but were previously unreachable from the nav).
+func TestAdminTopbarHasUsersLink(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root") // superadmin (AtLeast admin) is left logged in
+	_, body := e.get(t, "/users")
+	if !strings.Contains(body, `<a href="/users">Users</a>`) {
+		t.Fatalf("admin topbar missing the Users nav link; body:\n%s", body)
+	}
+}
+
 // --- Acceptance: first-run gating (FR-1) ------------------------------------
 
 // Given no users, any page redirects to /setup.

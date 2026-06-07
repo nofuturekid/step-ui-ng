@@ -1,7 +1,8 @@
 BINARY := stepui
 PKG := ./...
+VERSION ?= $(shell git describe --tags --always --dirty)
 
-.PHONY: all tools generate build run test check lint fmt vet docker
+.PHONY: all tools generate build run test check lint fmt vet docker docker-release
 
 all: check build
 
@@ -13,7 +14,9 @@ generate:
 	go tool templ generate
 
 build: generate
-	CGO_ENABLED=0 go build -o bin/$(BINARY) ./cmd/stepui
+	CGO_ENABLED=0 go build \
+		-ldflags "-X github.com/nofuturekid/step-ui-ng/internal/app.Version=$(VERSION)" \
+		-o bin/$(BINARY) ./cmd/stepui
 
 run: generate
 	go run ./cmd/stepui
@@ -36,5 +39,20 @@ check: vet test
 	@go tool templ generate; git diff --exit-code -- '*_templ.go' || (echo "run 'go tool templ generate'"; exit 1)
 	@command -v golangci-lint >/dev/null 2>&1 && golangci-lint run || echo "golangci-lint not installed, skipping"
 
+# Local dev: 2-stage build (Go toolchain → Alpine runtime). Same Alpine base as
+# Dockerfile.release, compiled locally with ldflags.
 docker:
-	docker build -t ghcr.io/nofuturekid/step-ui-ng:dev .
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		-t ghcr.io/nofuturekid/step-ui-ng:dev .
+
+# Simulate the CI release path locally: cross-build the linux binary for the
+# host arch into dist/, then build the runtime image from that prebuilt binary.
+docker-release:
+	mkdir -p dist
+	CGO_ENABLED=0 GOOS=linux GOARCH=$(shell go env GOARCH) \
+		go build -trimpath \
+		-ldflags "-s -w -X github.com/nofuturekid/step-ui-ng/internal/app.Version=$(VERSION)" \
+		-o dist/stepui_linux_$(shell go env GOARCH) ./cmd/stepui
+	docker build -f Dockerfile.release \
+		-t ghcr.io/nofuturekid/step-ui-ng:dev-release .

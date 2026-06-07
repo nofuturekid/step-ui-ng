@@ -65,6 +65,108 @@ func TestLoadFromEnv(t *testing.T) {
 	}
 }
 
+// --- LoadWithFlags: flags layer over env ------------------------------------
+
+// Flags must override the env-derived defaults: precedence is flag > env.
+func TestLoadWithFlagsOverridesEnv(t *testing.T) {
+	t.Setenv("PORT", "9000")
+	t.Setenv("DATA_DIR", "/env-data")
+	t.Setenv("COOKIE_SECURE", "true")
+	t.Setenv("RENEW_DEFAULT_DAYS", "30")
+
+	cfg, showVersion, err := LoadWithFlags([]string{
+		"-addr", ":7777",
+		"-data-dir", "/flag-data",
+		"-cookie-secure=false",
+		"-renew-default-days", "120",
+	})
+	if err != nil {
+		t.Fatalf("LoadWithFlags: %v", err)
+	}
+	if showVersion {
+		t.Fatal("showVersion = true, want false (no -version)")
+	}
+	if cfg.Addr != ":7777" {
+		t.Fatalf("Addr = %q, want :7777 (flag overrides PORT)", cfg.Addr)
+	}
+	if cfg.DataDir != "/flag-data" {
+		t.Fatalf("DataDir = %q, want /flag-data (flag overrides DATA_DIR)", cfg.DataDir)
+	}
+	if cfg.SecureCookies {
+		t.Fatal("SecureCookies = true, want false (-cookie-secure=false overrides COOKIE_SECURE=true)")
+	}
+	if cfg.RenewDefaultDays != 120 {
+		t.Fatalf("RenewDefaultDays = %d, want 120 (flag overrides RENEW_DEFAULT_DAYS)", cfg.RenewDefaultDays)
+	}
+}
+
+// When a flag is absent, the env-derived value must be used (the flag default is
+// the env value, and fs.Visit only fires for explicitly-set flags).
+func TestLoadWithFlagsFallsBackToEnv(t *testing.T) {
+	t.Setenv("PORT", "9000")
+	t.Setenv("DATA_DIR", "/env-data")
+	t.Setenv("COOKIE_SECURE", "true")
+	t.Setenv("RENEW_DEFAULT_DAYS", "30")
+
+	// Only -addr is set; the rest must come from the environment.
+	cfg, _, err := LoadWithFlags([]string{"-addr", ":7777"})
+	if err != nil {
+		t.Fatalf("LoadWithFlags: %v", err)
+	}
+	if cfg.Addr != ":7777" {
+		t.Fatalf("Addr = %q, want :7777 (set via flag)", cfg.Addr)
+	}
+	if cfg.DataDir != "/env-data" {
+		t.Fatalf("DataDir = %q, want /env-data (from env, flag absent)", cfg.DataDir)
+	}
+	if !cfg.SecureCookies {
+		t.Fatal("SecureCookies = false, want true (from env, flag absent)")
+	}
+	if cfg.RenewDefaultDays != 30 {
+		t.Fatalf("RenewDefaultDays = %d, want 30 (from env, flag absent)", cfg.RenewDefaultDays)
+	}
+}
+
+// With neither flag nor env, the built-in defaults apply (mirrors Load()).
+func TestLoadWithFlagsDefaults(t *testing.T) {
+	t.Setenv("PORT", "")
+	t.Setenv("DATA_DIR", "")
+	t.Setenv("COOKIE_SECURE", "")
+	t.Setenv("RENEW_DEFAULT_DAYS", "")
+
+	cfg, showVersion, err := LoadWithFlags(nil)
+	if err != nil {
+		t.Fatalf("LoadWithFlags: %v", err)
+	}
+	if showVersion {
+		t.Fatal("showVersion = true, want false")
+	}
+	if cfg.Addr != ":8080" {
+		t.Fatalf("Addr = %q, want :8080", cfg.Addr)
+	}
+	if cfg.DataDir != "./data" {
+		t.Fatalf("DataDir = %q, want ./data", cfg.DataDir)
+	}
+	if cfg.SecureCookies {
+		t.Fatal("SecureCookies = true, want false by default")
+	}
+	if cfg.RenewDefaultDays != DefaultRenewDays {
+		t.Fatalf("RenewDefaultDays = %d, want %d", cfg.RenewDefaultDays, DefaultRenewDays)
+	}
+}
+
+// -version sets the returned showVersion so the caller can print and exit before
+// any side effects (opening the store / creating the master key).
+func TestLoadWithFlagsVersion(t *testing.T) {
+	_, showVersion, err := LoadWithFlags([]string{"-version"})
+	if err != nil {
+		t.Fatalf("LoadWithFlags: %v", err)
+	}
+	if !showVersion {
+		t.Fatal("showVersion = false, want true for -version")
+	}
+}
+
 func TestSecureCookiesOverrides(t *testing.T) {
 	for _, tc := range []struct {
 		val  string

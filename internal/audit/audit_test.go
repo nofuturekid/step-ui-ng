@@ -92,6 +92,39 @@ func TestRecordRejectsEmptyActor(t *testing.T) {
 	}
 }
 
+// A nil *Recorder (the production bug: app.Deps built without Audit) must degrade
+// to "no row", never panic. Record returns nil and List returns no events — the
+// primary action is never crashed by a missing audit recorder.
+func TestNilRecorderDegradesGracefully(t *testing.T) {
+	var rec *audit.Recorder // nil pointer
+	if err := rec.Record(context.Background(), "alice", "issue", "t", "d"); err != nil {
+		t.Fatalf("nil Recorder.Record = %v, want nil", err)
+	}
+	events, err := rec.List(context.Background(), audit.Filter{})
+	if err != nil {
+		t.Fatalf("nil Recorder.List err = %v, want nil", err)
+	}
+	if events != nil {
+		t.Fatalf("nil Recorder.List events = %v, want nil", events)
+	}
+}
+
+// A Recorder with a nil db (NewRecorder(nil)) must likewise degrade rather than
+// dereference the nil *sql.DB.
+func TestRecorderNilDBDegradesGracefully(t *testing.T) {
+	rec := audit.NewRecorder(nil)
+	if err := rec.Record(context.Background(), "alice", "issue", "t", "d"); err != nil {
+		t.Fatalf("Recorder{db:nil}.Record = %v, want nil", err)
+	}
+	events, err := rec.List(context.Background(), audit.Filter{})
+	if err != nil {
+		t.Fatalf("Recorder{db:nil}.List err = %v, want nil", err)
+	}
+	if events != nil {
+		t.Fatalf("Recorder{db:nil}.List events = %v, want nil", events)
+	}
+}
+
 // --- FR-3: query / filter / pagination --------------------------------------
 
 // List returns all events when no filter is set, newest first.
