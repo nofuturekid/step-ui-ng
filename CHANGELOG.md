@@ -8,6 +8,8 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-07
+
 ### Added
 
 - **CI: `:main` on-demand dev builds** (`main.yml`, `workflow_dispatch`) — build the
