@@ -27,6 +27,11 @@ Versions are bumped only when a release is cut; in-progress work lives under
   `:latest` and `:<tag>`. This enables a beta lane without overwriting the stable
   image that users pull by default.
 
+- CI: bump the release workflow's GitHub Actions to their current Node 24 majors
+  (`actions/upload-artifact` v4→v7, `actions/download-artifact` v4→v8,
+  `docker/setup-qemu-action` v3→v4), clearing the Node.js 20 deprecation warnings.
+  `ci.yml` was already on Node 24 majors.
+
 - CI: release binaries now build in parallel via a 6-entry job matrix (one
   runner per target: `linux/amd64`, `linux/arm64`, `linux/arm`, `darwin/amd64`,
   `darwin/arm64`, `windows/amd64`). Each job emits a dedicated
