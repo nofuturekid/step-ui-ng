@@ -31,8 +31,11 @@ Chosen option: "SemVer prerelease tags". Cut prereleases as `vX.Y.Z-beta.N`
 Rules:
 
 - A prerelease attaches the prebuilt binaries (+ per-file `.sha256`) and pushes a
-  container image tagged **only** `:vX.Y.Z-beta.N` — it does **not** move `:latest`
-  (enforced in `release.yml` via `github.event.release.prerelease`).
+  container image tagged `:vX.Y.Z-beta.N` plus the moving **`:edge`** channel
+  (bleeding edge). It does **not** move `:latest` (enforced in `release.yml` via
+  `github.event.release.prerelease`). A stable release pushes `:vX.Y.Z` + `:latest`.
+  Channels: `:latest` = newest stable (the default `docker pull`), `:edge` = newest
+  build including prereleases.
 - The version is stamped from the tag via ldflags (ADR-0013), so a beta build
   reports `vX.Y.Z-beta.N`.
 - `CHANGELOG.md` stays under `[Unreleased]` for a prerelease; it is promoted to the

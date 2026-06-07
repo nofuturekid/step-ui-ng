@@ -21,11 +21,10 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Changed
 
-- CI: prereleases no longer move the `:latest` container image tag. The "Compute
-  image tags" step in `release.yml` now checks the `prerelease` flag: a prerelease
-  publishes only `:<tag>`, while a stable release continues to publish both
-  `:latest` and `:<tag>`. This enables a beta lane without overwriting the stable
-  image that users pull by default.
+- CI: image tag channels — a stable release publishes `:latest` + `:<tag>`; a
+  prerelease publishes the moving `:edge` channel + `:<tag>` and never moves
+  `:latest`. So `:latest` = newest stable (the default `docker pull`), `:edge` =
+  newest build including betas (ADR-0015).
 
 - CI: bump the release workflow's GitHub Actions to their current Node 24 majors
   (`actions/upload-artifact` v4→v7, `actions/download-artifact` v4→v8,
