@@ -856,6 +856,56 @@ func TestViewerLoginRedirectsToInventory(t *testing.T) {
 	}
 }
 
+// TestViewerLogoLinkPointsToInventory verifies that the top-left logo link in the
+// layout renders as href="/inventory" — not "/users" — for a logged-in viewer.
+//
+// A viewer cannot access /users (403), so an unconditional href="/users" on the
+// logo would send them to a forbidden page on every click. The test also asserts
+// that NO href="/users" appears anywhere in a viewer's rendered page: the admin
+// Users link is inside an AtLeast(RoleAdmin) guard and must be absent for viewers.
+//
+// Failure mode: if the logo is reverted to href="/users", the body will contain
+// `href="/users"` and the second assertion fires; the first (logo href) also fires.
+func TestViewerLogoLinkPointsToInventory(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+	e.seedUser(t, "viewer1", users.RoleViewer)
+
+	// Switch to the viewer session.
+	e.switchTo(t, "viewer1")
+
+	_, body := e.get(t, "/inventory")
+
+	// Logo must link to /inventory.
+	if !strings.Contains(body, `<a href="/inventory">step-ui-ng</a>`) {
+		t.Fatalf("viewer page: logo link is not href=\"/inventory\"; body:\n%s", body)
+	}
+	// No /users link of any kind must appear for a viewer.
+	if strings.Contains(body, `href="/users"`) {
+		t.Fatalf("viewer page: contains href=\"/users\" (admin-only link leaked to viewer); body:\n%s", body)
+	}
+}
+
+// TestAdminLogoLinkPointsToInventoryAndUsersLinkPresent verifies that the logo
+// still links to /inventory for an admin, and that the admin Users link is present.
+// This guards the other side of the fix: we must not have accidentally removed the
+// admin nav link in closing the logo-link viewer bug.
+func TestAdminLogoLinkPointsToInventoryAndUsersLinkPresent(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root") // superadmin, left logged in
+
+	_, body := e.get(t, "/inventory")
+
+	// Logo must link to /inventory for admins too.
+	if !strings.Contains(body, `<a href="/inventory">step-ui-ng</a>`) {
+		t.Fatalf("admin page: logo link is not href=\"/inventory\"; body:\n%s", body)
+	}
+	// Admin Users nav link must still be present.
+	if !strings.Contains(body, `<a href="/users">Users</a>`) {
+		t.Fatalf("admin page: missing href=\"/users\" Users link; body:\n%s", body)
+	}
+}
+
 // TestAdminLoginRedirectsToInventoryAndCanReachUsers verifies that an admin is also
 // sent to /inventory after login and can then navigate to /users (admin-only page).
 func TestAdminLoginRedirectsToInventoryAndCanReachUsers(t *testing.T) {
