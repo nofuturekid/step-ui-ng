@@ -1,0 +1,80 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>step-ui-ng</Name>
+  <Repository>ghcr.io/nofuturekid/step-ui-ng:latest</Repository>
+  <Registry>https://github.com/nofuturekid/step-ui-ng/pkgs/container/step-ui-ng</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/nofuturekid/step-ui-ng/issues</Support>
+  <Project>https://github.com/nofuturekid/step-ui-ng</Project>
+  <Overview>
+    Self-contained web UI for Smallstep Step-CA. Provides a modern server-rendered
+    interface (Templ + htmx, no Node/React) to manage certificates, provisioners,
+    users, and ACME. Built-in authentication with first-run super-admin setup; no
+    external dependencies. Data (SQLite database + master encryption key) persists
+    in the mapped /data volume — back it up and protect it. Talks to Step-CA via
+    its HTTP/admin API (no step CLI required). Image tags: :latest (stable releases),
+    :edge (latest beta builds).
+  </Overview>
+  <Category>Network:Management Security:</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/nofuturekid/step-ui-ng/main/deploy/unraid/step-ui-ng.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/nofuturekid/step-ui-ng/main/internal/app/static/icon-256.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+
+  <!-- WebUI port -->
+  <Config
+    Name="WebUI Port"
+    Target="8080"
+    Default="8080"
+    Mode="tcp"
+    Description="Port the web UI listens on."
+    Type="Port"
+    Display="always"
+    Required="true"
+    Mask="false">8080</Config>
+
+  <!-- Data volume: SQLite DB + master encryption key -->
+  <Config
+    Name="Data (DB + secret.key)"
+    Target="/data"
+    Default="/mnt/user/appdata/step-ui-ng"
+    Mode="rw"
+    Description="Persistent data directory. Contains the SQLite database and the master encryption key (secret.key). BACK THIS UP and restrict access — anyone with the contents can decrypt all stored secrets."
+    Type="Path"
+    Display="always"
+    Required="true"
+    Mask="false">/mnt/user/appdata/step-ui-ng</Config>
+
+  <!-- COOKIE_SECURE: set true when behind a TLS reverse proxy -->
+  <Config
+    Name="COOKIE_SECURE"
+    Target="COOKIE_SECURE"
+    Default="false"
+    Mode=""
+    Description="Set to true when the UI is served over HTTPS (e.g. behind an Nginx/Caddy reverse proxy with TLS). Marks session and CSRF cookies as Secure so browsers only send them over encrypted connections."
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="false">false</Config>
+
+  <!-- RENEW_DEFAULT_DAYS: default certificate renewal validity -->
+  <Config
+    Name="RENEW_DEFAULT_DAYS"
+    Target="RENEW_DEFAULT_DAYS"
+    Default="90"
+    Mode=""
+    Description="Default validity (in days) pre-filled in the certificate renewal form. Users can override this per renewal. The CA's provisioner maximum always takes precedence."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false">90</Config>
+</Container>
