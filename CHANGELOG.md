@@ -21,6 +21,12 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Changed
 
+- CI: release binaries now build in parallel via a 6-entry job matrix (one
+  runner per target: `linux/amd64`, `linux/arm64`, `linux/arm`, `darwin/amd64`,
+  `darwin/arm64`, `windows/amd64`). Each job emits a dedicated
+  `<archive>.sha256` file (e.g. `stepui_v1.0.0_linux_amd64.tar.gz.sha256`)
+  uploadable with `sha256sum -c`; the combined `SHA256SUMS.txt` is removed.
+
 - The application version is stamped from the git tag at build time via
   `-ldflags "-X …/internal/app.Version=<tag>"` instead of a hand-edited constant
   (ADR-0013, supersedes the constant-bump mechanics of ADR-0011). `Version` is now
