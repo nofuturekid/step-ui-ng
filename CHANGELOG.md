@@ -8,6 +8,16 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-07
+
+### Added
+
+- Prebuilt, CGO-free binaries attached to every GitHub release (with a
+  `SHA256SUMS.txt`): `linux/amd64`, `linux/arm64`, `linux/arm`, `darwin/amd64`,
+  `darwin/arm64`, `windows/amd64` — packaged as `.tar.gz` (`.zip` for Windows).
+  The `release.yml` workflow now builds and uploads them alongside the container
+  image.
+
 ## [0.1.0] - 2026-06-07
 
 ### Added

@@ -50,3 +50,50 @@ jobs:
           tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  binaries:
+    name: Build and attach release binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Generate templ
+        run: go tool templ generate
+
+      - name: Build binaries (CGO-free, cross-compiled)
+        env:
+          VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          [ -n "${VERSION:-}" ] || VERSION="dev-${GITHUB_SHA::7}"
+          mkdir -p dist
+          for t in linux/amd64 linux/arm64 linux/arm darwin/amd64 darwin/arm64 windows/amd64; do
+            os="${t%/*}"; arch="${t#*/}"
+            bin="stepui"; [ "$os" = "windows" ] && bin="stepui.exe"
+            echo "==> building ${os}/${arch}"
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" GOFLAGS=-trimpath \
+              go build -ldflags="-s -w" -o "dist/${bin}" ./cmd/stepui
+            name="stepui_${VERSION}_${os}_${arch}"
+            if [ "$os" = "windows" ]; then
+              (cd dist && zip -q "${name}.zip" "$bin" && rm "$bin")
+            else
+              (cd dist && tar -czf "${name}.tar.gz" "$bin" && rm "$bin")
+            fi
+          done
+          (cd dist && sha256sum * | tee SHA256SUMS.txt)
+          ls -la dist
+
+      - name: Attach binaries to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" dist/* --clobber
