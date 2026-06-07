@@ -8,6 +8,18 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+### Fixed
+
+- **CA "Test connection" rejected every real Step-CA** with "The CA's root
+  certificate does not match the configured fingerprint", even with the correct root
+  fingerprint. The Phase-1 bootstrap required the configured fingerprint to appear in
+  the **presented TLS chain**, but a real Step-CA presents only its leaf +
+  intermediate (never the root). The root fingerprint is now matched against the
+  `/roots` body (as intended); Phase-2 verification against the pinned root remains
+  the authoritative MITM/anchor gate. The same Phase-1 client backs all CA operations
+  (provisioners, ACME, sign/revoke), so those were affected too. Added a regression
+  test that models a real root→intermediate→leaf topology (root only in `/roots`).
+
 ### Added
 
 - The build version (`BuildInfo()`) is shown in a subtle fixed badge in the

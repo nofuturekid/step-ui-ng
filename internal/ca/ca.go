@@ -7,22 +7,21 @@
 // We never blanket-trust the CA's TLS certificate. Trust is anchored to the
 // operator-supplied root fingerprint in two phases:
 //
-//  1. Pinned bootstrap fetch. On first contact we do not yet hold the root
-//     certificate, so we cannot use a normal RootCAs pool. We connect with a
-//     tls.Config whose VerifyConnection callback enforces the pin: it computes
-//     SHA-256 over each presented peer certificate's DER and fails unless one
-//     equals the configured fingerprint. InsecureSkipVerify is set only to
-//     suppress the default chain check (we have no anchor yet) — the callback
-//     never returns nil unconditionally, so an attacker-presented certificate
-//     whose fingerprint differs is rejected. We then GET /roots and locate the
-//     root whose SHA-256(DER) matches the fingerprint.
+//  1. Bootstrap fetch. On first contact we do not yet hold the root certificate,
+//     so we cannot use a normal RootCAs pool. We GET /roots with
+//     InsecureSkipVerify and NO TLS-layer pin — deliberately: a real Step-CA
+//     presents only its leaf + intermediate in the handshake, never the root, so
+//     a "presented cert must match the fingerprint" check rejects every real CA.
+//     Instead we locate the published root whose SHA-256(DER) equals the
+//     configured fingerprint; that match is the pin.
 //
 //  2. Steady-state verification. Using the now-verified root we build a real
 //     RootCAs pool and re-establish the TLS connection with
 //     InsecureSkipVerify:false, so the CA's TLS chain is validated against the
 //     pinned root by Go's standard verifier. Only if that succeeds do we report
-//     the connection good. This proves the CA actually serves a chain anchored
-//     in the pinned root, not merely that some presented cert matched the pin.
+//     the connection good. This is the authoritative gate: it proves the CA
+//     actually serves a chain anchored in the pinned root, not merely that /roots
+//     advertised that root (which any MITM could echo back).
 package ca
 
 import (
@@ -91,8 +90,9 @@ func TestConnection(ctx context.Context, caURL, fingerprint string) ([]*x509.Cer
 		return nil, err
 	}
 
-	// Phase 1: pinned bootstrap fetch (no trust anchor yet).
-	body, err := fetch(ctx, rootsURL, pinnedClient(want))
+	// Phase 1: bootstrap fetch of /roots (no trust anchor yet; the pin is the
+	// matchFingerprint check below, and Phase 2 is the anchor gate).
+	body, err := fetch(ctx, rootsURL, bootstrapClient())
 	if err != nil {
 		return nil, err
 	}
@@ -112,8 +112,9 @@ func TestConnection(ctx context.Context, caURL, fingerprint string) ([]*x509.Cer
 	pool := x509.NewCertPool()
 	pool.AddCert(pinned)
 	if _, err := fetch(ctx, rootsURL, pooledClient(pool)); err != nil {
-		// A failure here means the CA's TLS chain does not actually anchor in the
-		// pinned root even though a presented cert matched the fingerprint.
+		// A failure here means the CA's live TLS chain does not actually anchor in
+		// the pinned root — the authoritative MITM gate (the root appearing in
+		// /roots is not enough; any MITM could echo it back).
 		return nil, fmt.Errorf("%w: %v", ErrBadTLS, err)
 	}
 
@@ -148,8 +149,9 @@ func pinnedClientFor(ctx context.Context, caURL, fingerprint string) (*http.Clie
 		return nil, err
 	}
 
-	// Phase 1: pinned bootstrap fetch of /roots (no trust anchor yet).
-	body, err := fetch(ctx, rootsURL, pinnedClient(want))
+	// Phase 1: bootstrap fetch of /roots (no trust anchor yet; pinned via
+	// matchFingerprint below + the Phase-2 anchor check).
+	body, err := fetch(ctx, rootsURL, bootstrapClient())
 	if err != nil {
 		return nil, err
 	}
@@ -234,16 +236,10 @@ func fetch(ctx context.Context, url string, client *http.Client) ([]byte, error)
 	return body, nil
 }
 
-// classifyDoError maps an http.Client.Do error to a typed sentinel. A TLS
-// verification failure (wrong pin in phase 1, or chain failure in phase 2) is
-// ErrFingerprintMismatch/ErrBadTLS; everything else (dial, timeout, DNS) is
-// ErrUnreachable.
+// classifyDoError maps an http.Client.Do error to a typed sentinel. A Phase-2 TLS
+// chain-verification failure (the live chain does not anchor in the pinned root) is
+// ErrBadTLS; everything else (dial, timeout, DNS) is ErrUnreachable.
 func classifyDoError(err error) error {
-	// The pinned bootstrap client returns ErrFingerprintMismatch from its
-	// VerifyConnection callback; preserve it through the url.Error wrapper.
-	if errors.Is(err, ErrFingerprintMismatch) {
-		return ErrFingerprintMismatch
-	}
 	var certErr x509.UnknownAuthorityError
 	var hostErr x509.HostnameError
 	var certInvalid x509.CertificateInvalidError
@@ -253,31 +249,23 @@ func classifyDoError(err error) error {
 	return fmt.Errorf("%w: %v", ErrUnreachable, err)
 }
 
-// pinnedClient builds the phase-1 client: it suppresses the default chain check
-// (we hold no anchor yet) but enforces the fingerprint pin in VerifyConnection,
-// which NEVER returns nil unconditionally.
-func pinnedClient(wantFP string) *http.Client {
-	tlsCfg := &tls.Config{
+// bootstrapClient builds the phase-1 client: an InsecureSkipVerify fetch of /roots
+// to discover the CA's published roots. It deliberately does NOT pin at the TLS
+// layer — a real Step-CA presents only its leaf + intermediate in the handshake,
+// never the root, so the configured ROOT fingerprint can never be matched against
+// the presented chain (doing so rejected every real CA; see
+// TestConnectionRealStepCATopology). The pin is enforced instead by
+// matchFingerprint over the /roots body, and Phase 2 (pooledClient,
+// InsecureSkipVerify:false) is the authoritative MITM/anchor gate that proves the
+// live chain anchors in the pinned root — DO NOT DELETE the Phase-2 blocks. See
+// TestConnectionPhase2ChainNotAnchored.
+func bootstrapClient() *http.Client {
+	return newClient(&tls.Config{
 		MinVersion: tls.VersionTLS12,
-		// We have no trust anchor on the very first contact, so the default
-		// verifier cannot run; the VerifyConnection pin below is the real check.
-		InsecureSkipVerify: true, //nolint:gosec // pin enforced in VerifyConnection
-		// This callback is only a cheap pre-check: it proves *some* presented
-		// cert matches the pinned fingerprint, not that the live chain anchors in
-		// it. Phase 2 (pooledClient, InsecureSkipVerify:false) is the
-		// authoritative MITM/anchor gate — DO NOT DELETE the Phase-2 block in
-		// TestConnection in favour of this. See TestConnectionPhase2ChainNotAnchored.
-		VerifyConnection: func(cs tls.ConnectionState) error {
-			for _, cert := range cs.PeerCertificates {
-				sum := sha256.Sum256(cert.Raw)
-				if hex.EncodeToString(sum[:]) == wantFP {
-					return nil
-				}
-			}
-			return ErrFingerprintMismatch
-		},
-	}
-	return newClient(tlsCfg)
+		// No trust anchor on first contact; matchFingerprint(/roots) + Phase 2 are
+		// the real checks.
+		InsecureSkipVerify: true, //nolint:gosec // pin enforced via /roots + Phase 2
+	})
 }
 
 // pooledClient builds the phase-2 client: standard verification against the
