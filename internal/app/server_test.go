@@ -879,9 +879,12 @@ func TestViewerLogoLinkPointsToInventory(t *testing.T) {
 
 	_, body := e.get(t, "/inventory")
 
-	// Logo must link to /inventory.
-	if !strings.Contains(body, `<a href="/inventory">step-ui-ng</a>`) {
-		t.Fatalf("viewer page: logo link is not href=\"/inventory\"; body:\n%s", body)
+	// Brand anchor must link to /inventory and include the logo image + text.
+	if !strings.Contains(body, `href="/inventory" class="brand"`) {
+		t.Fatalf("viewer page: brand anchor is not href=\"/inventory\"; body:\n%s", body)
+	}
+	if !strings.Contains(body, `src="/static/logo.svg"`) {
+		t.Fatalf("viewer page: brand anchor missing logo img; body:\n%s", body)
 	}
 	// No /users link of any kind must appear for a viewer.
 	if strings.Contains(body, `href="/users"`) {
@@ -899,9 +902,12 @@ func TestAdminLogoLinkPointsToInventoryAndUsersLinkPresent(t *testing.T) {
 
 	_, body := e.get(t, "/inventory")
 
-	// Logo must link to /inventory for admins too.
-	if !strings.Contains(body, `<a href="/inventory">step-ui-ng</a>`) {
-		t.Fatalf("admin page: logo link is not href=\"/inventory\"; body:\n%s", body)
+	// Brand anchor must link to /inventory for admins too.
+	if !strings.Contains(body, `href="/inventory" class="brand"`) {
+		t.Fatalf("admin page: brand anchor is not href=\"/inventory\"; body:\n%s", body)
+	}
+	if !strings.Contains(body, `src="/static/logo.svg"`) {
+		t.Fatalf("admin page: brand anchor missing logo img; body:\n%s", body)
 	}
 	// Admin Users nav link must still be present.
 	if !strings.Contains(body, `<a href="/users">Users</a>`) {

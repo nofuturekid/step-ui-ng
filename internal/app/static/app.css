@@ -193,3 +193,15 @@ fieldset legend {
 h1 {
   font-size: 1.4rem;
 }
+
+/* Brand logo badge in the topbar */
+a.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+img.brand-logo {
+  display: block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}

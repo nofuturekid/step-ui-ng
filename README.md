@@ -50,6 +50,26 @@ Read [`AGENTS.md`](AGENTS.md) first. Work the specs in order, test-first, one
 focused PR per spec, Conventional Commits, changelog under `[Unreleased]` (versions
 are bumped only at releases — ADR-0011).
 
+## Deployment
+
+### Unraid
+
+An Unraid Community-Applications template is provided at
+[`deploy/unraid/step-ui-ng.xml`](deploy/unraid/step-ui-ng.xml).
+
+Key settings:
+
+- **Data path** — map `/data` to an appdata location (e.g. `/mnt/user/appdata/step-ui-ng`).
+  This directory holds the SQLite database **and** the master encryption key (`secret.key`).
+  Back it up and restrict access.
+- **COOKIE_SECURE** — set to `true` when the UI is behind a TLS reverse proxy (Nginx, Caddy, etc.).
+- **RENEW_DEFAULT_DAYS** — default validity (days) pre-filled in the renewal form (default: 90).
+
+Image tags: `:latest` (stable releases) · `:edge` (latest beta / pre-release builds).
+
+App icon URL (resolves once merged to main):
+`https://raw.githubusercontent.com/nofuturekid/step-ui-ng/main/internal/app/static/icon-256.png`
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

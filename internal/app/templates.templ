@@ -32,6 +32,8 @@ templ layout(d pageData) {
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<title>{ d.Title } · step-ui-ng</title>
 			<link rel="stylesheet" href="/static/app.css"/>
+			<link rel="icon" type="image/png" href="/static/favicon-32.png"/>
+			<link rel="apple-touch-icon" href="/static/icon-256.png"/>
 			<script src="/static/htmx.min.js"></script>
 			<meta name="csrf-token" content={ d.CSRFToken }/>
 			<script>
@@ -53,7 +55,7 @@ templ layout(d pageData) {
 		<body>
 			if d.User != nil {
 				<header class="topbar">
-					<a href="/inventory">step-ui-ng</a>
+					<a href="/inventory" class="brand"><img src="/static/logo.svg" alt="" width="28" height="28" class="brand-logo"/>step-ui-ng</a>
 					<a href="/inventory">Certificates</a>
 					if d.User.Role.AtLeast(users.RoleAdmin) {
 						<a href="/users">Users</a>

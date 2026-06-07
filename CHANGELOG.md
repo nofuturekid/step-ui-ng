@@ -10,6 +10,17 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- Topbar logo badge and favicon: `internal/app/static/logo.svg` (SVG shield/checkmark
+  design) embedded and served at `/static/logo.svg`; rasterized `icon-256.png`,
+  `icon-512.png`, and `favicon-32.png` committed alongside. The topbar brand link now
+  shows the logo image (`<img class="brand-logo">`) before the "step-ui-ng" text;
+  the layout `<head>` includes `<link rel="icon">` (favicon-32) and
+  `<link rel="apple-touch-icon">` (icon-256). Minimal `.brand` / `.brand-logo` CSS
+  added to `app.css` for alignment.
+- Unraid Community-Applications template (`deploy/unraid/step-ui-ng.xml`): pulls
+  `ghcr.io/nofuturekid/step-ui-ng:latest`, maps `/data` to appdata, exposes port
+  8080, and configures `COOKIE_SECURE` and `RENEW_DEFAULT_DAYS` env vars.
+
 - Password confirmation on the setup and create-user forms: both `/setup` and
   `POST /users` now require a matching `password_confirm` field, rejecting
   mismatched submissions with a clear error before any user is created.
