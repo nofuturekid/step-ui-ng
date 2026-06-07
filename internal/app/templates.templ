@@ -53,7 +53,7 @@ templ layout(d pageData) {
 		<body>
 			if d.User != nil {
 				<header class="topbar">
-					<a href="/users">step-ui-ng</a>
+					<a href="/inventory">step-ui-ng</a>
 					<a href="/inventory">Certificates</a>
 					if d.User.Role.AtLeast(users.RoleAdmin) {
 						<a href="/users">Users</a>

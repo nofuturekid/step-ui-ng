@@ -65,7 +65,9 @@ Versions are bumped only when a release is cut; in-progress work lives under
   root `GET /` route) now send users to `/inventory` instead of `/users`.
   `/inventory` is accessible by all authenticated roles (`requireAuth`); `/users`
   is admin-only (`requireRole(RoleAdmin)`), so viewers previously got a 403
-  straight after a successful login.
+  straight after a successful login. The top-left logo link in the shared layout
+  (`internal/app/templates.templ`) is also corrected from `/users` to `/inventory`,
+  so viewers are never pointed at an admin-only route by the navigation.
 
 - Auditable actions no longer crash with a recovered HTTP 500. `cmd/stepui`
   built `app.Deps` without `Audit`, leaving the server's audit recorder nil so
