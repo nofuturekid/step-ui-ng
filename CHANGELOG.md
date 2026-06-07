@@ -73,6 +73,13 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Fixed
 
+- Unraid: the container no longer fails to start on a fresh appdata bind mount.
+  The image runs as `nonroot` (uid 65532), which cannot write Unraid's appdata
+  (owned `nobody:users` = 99:100), so SQLite/`secret.key` creation failed unless
+  the directory was `chmod 777`. The Unraid template now sets `--user 99:100`
+  (Extra Parameters) to match appdata ownership. Documented bind-mount permission
+  guidance for plain `docker run` too.
+
 - Viewer no longer hits a "forbidden" page immediately after login. The three
   landing redirects (`postLogin`, `getLogin` already-authenticated guard, and the
   root `GET /` route) now send users to `/inventory` instead of `/users`.
