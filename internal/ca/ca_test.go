@@ -272,6 +272,34 @@ func genLeaf(t *testing.T, root *keyPair, cn string) *keyPair {
 	return &keyPair{cert: cert, key: key, der: der}
 }
 
+// genIntermediate produces a CA intermediate (IsCA, KeyUsageCertSign) signed by
+// parent — used to model a real Step-CA topology (root -> intermediate -> leaf).
+func genIntermediate(t *testing.T, parent *keyPair, cn string) *keyPair {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("gen intermediate key: %v", err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber:          big.NewInt(time.Now().UnixNano() + 2),
+		Subject:               pkix.Name{CommonName: cn},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, parent.cert, &key.PublicKey, parent.key)
+	if err != nil {
+		t.Fatalf("create intermediate cert: %v", err)
+	}
+	cert, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatalf("parse intermediate cert: %v", err)
+	}
+	return &keyPair{cert: cert, key: key, der: der}
+}
+
 // tlsCertChain builds a tls.Certificate presenting leaf then the given chain
 // (intermediates/root), backed by the leaf's private key.
 func tlsCertChain(leaf *keyPair, chain ...*keyPair) tls.Certificate {
@@ -322,6 +350,33 @@ func TestConnectionTwoCertChainSuccess(t *testing.T) {
 	}
 	if !roots[0].Equal(root.cert) {
 		t.Fatal("returned root does not match the served root")
+	}
+}
+
+// TestConnectionRealStepCATopology reproduces a real Step-CA: root -> intermediate
+// -> leaf, where the TLS handshake presents ONLY leaf + intermediate (NOT the root,
+// as servers conventionally do), and /roots serves the root. The pin is the ROOT
+// fingerprint. This MUST succeed: the root is found via /roots (not the presented
+// chain), and Phase 2 verifies the live leaf->intermediate->root chain anchors in
+// the pinned root.
+//
+// Regression guard: this fails with ErrFingerprintMismatch if Phase 1 requires the
+// pinned cert to appear in the *presented* TLS chain — which real Step-CA never does
+// (it sends leaf + intermediate, never the root). See the 2026-06 prod report.
+func TestConnectionRealStepCATopology(t *testing.T) {
+	root := genRootCA(t, "Homelab Root CA")
+	inter := genIntermediate(t, root, "Homelab Intermediate CA")
+	leaf := genLeaf(t, inter, "ca.test") // signed by the intermediate
+
+	// Present leaf + intermediate only — the root is deliberately NOT in the chain.
+	url := startTLSServerWith(t, tlsCertChain(leaf, inter), rootsJSON(root.cert))
+
+	roots, err := ca.TestConnection(context.Background(), url, root.fp())
+	if err != nil {
+		t.Fatalf("TestConnection (leaf+intermediate presented, root only in /roots): %v", err)
+	}
+	if len(roots) == 0 || !roots[0].Equal(root.cert) {
+		t.Fatal("expected the served root to be returned")
 	}
 }
 
