@@ -16,6 +16,10 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Changed
 
+- CI: `ci.yml` (Go lint/vet/test) now **skips docs-only changes** (`paths-ignore`:
+  `**.md`, `docs/**`, `spec/**`, `deploy/**`, `LICENSE`) — safe because `main` has no
+  required status checks. `main.yml` additionally ignores `.github/**`, so `:main`
+  rebuilds only when the binary/image could change (not on docs or workflow edits).
 - CI: `main.yml` now runs **automatically on every push to `main`** (docs-only changes
   excluded via `paths-ignore`; `concurrency` cancels superseded runs) in addition to
   `workflow_dispatch`, so the `:main` image + binary artifacts always reflect `main`.

@@ -12,12 +12,15 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    # Rebuild :main only when the binary/image could change. Skip docs and workflow
+    # edits (.github) — change the build logic? trigger a build via workflow_dispatch.
     paths-ignore:
       - "**.md"
       - "docs/**"
       - "spec/**"
       - "deploy/**"
       - "LICENSE"
+      - ".github/**"
 
 # Only the newest main build matters; cancel an in-progress one when a newer push lands.
 concurrency:
