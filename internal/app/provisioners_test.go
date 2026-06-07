@@ -359,6 +359,33 @@ func TestProvisionersDeleteActiveRefused(t *testing.T) {
 	}
 }
 
+// TestProvisionerSecretIndicator: the page shows whether a secret is stored for the
+// active provisioner (set/none) so the operator can tell — without echoing the value.
+func TestProvisionerSecretIndicator(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+	f := startAppAdminCA(t, `{"provisioners":[{"type":"JWK","name":"p1"}]}`)
+	e.seedCA(t, f, true)
+
+	// No provisioner secret stored yet → "none".
+	_, body := e.getBody(t, "/provisioners")
+	if !strings.Contains(body, ">none<") {
+		t.Fatalf("expected a 'none' provisioner-secret badge; body:\n%s", body)
+	}
+
+	// Store a secret for the active provisioner → "set", and never echo the value.
+	if err := e.settingsRepo.SelectProvisioner(context.Background(), "p1", "prov-secret-aaaa"); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	_, body = e.getBody(t, "/provisioners")
+	if !strings.Contains(body, ">set<") {
+		t.Fatalf("expected a 'set' provisioner-secret badge; body:\n%s", body)
+	}
+	if strings.Contains(body, "prov-secret-aaaa") {
+		t.Fatal("provisioner secret value leaked into the rendered page")
+	}
+}
+
 // A non-active provisioner deletes fine.
 func TestProvisionersDeleteNonActive(t *testing.T) {
 	e := newTestEnv(t)
