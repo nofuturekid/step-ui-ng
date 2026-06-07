@@ -1094,6 +1094,25 @@ func TestPopoverClassesShared(t *testing.T) {
 	}
 }
 
+// TestNavListLabelAndCertificatesHeading: the inventory nav item is labelled "List"
+// (not "Certificates"), and the cert operations sit under a "Certificates" section
+// heading (shown in the hamburger; collapsed to a flat row on desktop via CSS).
+func TestNavListLabelAndCertificatesHeading(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	_, body := e.get(t, "/inventory")
+	if !strings.Contains(body, `<a href="/inventory">List</a>`) {
+		t.Fatalf("nav: missing the renamed \"List\" link; body:\n%s", body)
+	}
+	if strings.Contains(body, `<a href="/inventory">Certificates</a>`) {
+		t.Fatalf("nav: still contains the old \"Certificates\" nav link; body:\n%s", body)
+	}
+	if !strings.Contains(body, `<span class="navhead">Certificates</span>`) {
+		t.Fatalf("nav: missing the \"Certificates\" section heading; body:\n%s", body)
+	}
+}
+
 // TestAdminLoginRedirectsToInventoryAndCanReachUsers verifies that an admin is also
 // sent to /inventory after login and can then navigate to /users (admin-only page).
 func TestAdminLoginRedirectsToInventoryAndCanReachUsers(t *testing.T) {
