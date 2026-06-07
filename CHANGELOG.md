@@ -35,6 +35,13 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Changed
 
+- Topbar navigation restructured (`internal/app`): admin configuration links
+  (Users, CA settings, Provisioners, ACME) are grouped under a JS-free **Settings**
+  `<details>` menu, in that logical setup order; Certificates, Issue, Sign CSR and
+  Audit log stay top-level. Topbar content is now width-limited and centered (shared
+  `--content-width`, `.topbar-inner` wrapper) so it aligns with the page on ultrawide
+  displays while the bar background stays full-bleed. The menu is admin-only and
+  works without JavaScript.
 - CI: image tag channels — a stable release publishes `:latest` + `:<tag>`; a
   prerelease publishes the moving `:edge` channel + `:<tag>` and never moves
   `:latest`. So `:latest` = newest stable (the default `docker pull`), `:edge` =

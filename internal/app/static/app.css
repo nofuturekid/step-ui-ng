@@ -6,6 +6,7 @@
   --accent: #2d6cdf;
   --danger: #c0392b;
   --muted: #6b6b70;
+  --content-width: 56rem;
 }
 
 * {
@@ -25,13 +26,20 @@ body {
   line-height: 1.5;
 }
 
+/* Full-bleed bar; its content is constrained + centered to align with <main>
+   (same box model: max-width var(--content-width), auto margins, 1.25rem padding). */
 header.topbar {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
+  max-width: var(--content-width);
+  margin: 0 auto;
   padding: 0.75rem 1.25rem;
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
 }
 
 header.topbar a {
@@ -44,8 +52,58 @@ header.topbar .who {
   font-size: 0.9rem;
 }
 
+/* Top-level nav cluster */
+nav.mainnav {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+}
+
+/* JS-free "Settings" dropdown (admin config). Works without JS via <details>. */
+details.menu {
+  position: relative;
+}
+details.menu > summary {
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+  color: var(--fg);
+}
+details.menu > summary::-webkit-details-marker {
+  display: none;
+}
+details.menu > summary::after {
+  content: " ▾";
+}
+details.menu[open] > summary::after {
+  content: " ▴";
+}
+details.menu .menu-items {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 0.45rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 11rem;
+  padding: 0.3rem;
+  z-index: 20;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+details.menu .menu-items a {
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+}
+details.menu .menu-items a:hover {
+  background: var(--bg);
+}
+
 main {
-  max-width: 56rem;
+  max-width: var(--content-width);
   margin: 2rem auto;
   padding: 0 1.25rem;
 }

@@ -915,6 +915,114 @@ func TestAdminLogoLinkPointsToInventoryAndUsersLinkPresent(t *testing.T) {
 	}
 }
 
+// --- Topbar: Settings dropdown grouping (information architecture) ---------------
+//
+// Admin configuration links (Users, CA settings, Provisioners, ACME) live inside a
+// JS-free <details> "Settings" menu; operational + observation links (Certificates,
+// Issue, Sign CSR, Audit log) stay top-level. These tests encode that IA decision,
+// not just the markup: they fail if a config link escapes the menu, if an
+// operational/observation link is pulled into it, or if the menu items are reordered
+// away from the chosen logical setup order.
+
+// TestAdminTopbarHasSettingsMenu: the Settings summary and all four config links render.
+func TestAdminTopbarHasSettingsMenu(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	_, body := e.get(t, "/inventory")
+
+	if !strings.Contains(body, `>Settings<`) {
+		t.Fatalf("admin topbar missing the Settings menu summary; body:\n%s", body)
+	}
+	for _, href := range []string{`href="/users"`, `href="/settings"`, `href="/provisioners"`, `href="/acme"`} {
+		if !strings.Contains(body, href) {
+			t.Fatalf("admin topbar missing config link %s; body:\n%s", href, body)
+		}
+	}
+}
+
+// TestAdminTopbarGrouping: operational/observation links are top-level (before the
+// <details> menu); configuration links are inside it (after <details>).
+func TestAdminTopbarGrouping(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	_, body := e.get(t, "/inventory")
+
+	menu := strings.Index(body, "<details")
+	if menu < 0 {
+		t.Fatalf("admin topbar has no <details> Settings menu; body:\n%s", body)
+	}
+	menuEnd := strings.Index(body, "</details>")
+	if menuEnd <= menu {
+		t.Fatalf("admin topbar <details> menu is not closed (open=%d, close=%d); body:\n%s", menu, menuEnd, body)
+	}
+	// Top-level: operational actions + observation (must appear before the menu).
+	for _, href := range []string{`href="/audit"`, `href="/issue"`, `href="/sign-csr"`} {
+		i := strings.Index(body, href)
+		if i < 0 || i >= menu {
+			t.Fatalf("expected %s top-level (before <details> at %d), got index %d; body:\n%s", href, menu, i, body)
+		}
+	}
+	// Configuration: must appear strictly INSIDE the dropdown (between <details> and
+	// </details>) — not merely somewhere after the menu opens.
+	for _, href := range []string{`href="/settings"`, `href="/provisioners"`, `href="/acme"`} {
+		i := strings.Index(body, href)
+		if i <= menu || i >= menuEnd {
+			t.Fatalf("expected %s inside the Settings menu (between %d and %d), got index %d; body:\n%s", href, menu, menuEnd, i, body)
+		}
+	}
+}
+
+// TestSettingsMenuOrder: inside the menu the items follow the logical setup order
+// Users -> CA settings -> Provisioners -> ACME.
+func TestSettingsMenuOrder(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	_, body := e.get(t, "/inventory")
+
+	menu := strings.Index(body, "<details")
+	if menu < 0 {
+		t.Fatalf("admin topbar has no <details> Settings menu; body:\n%s", body)
+	}
+	menuEnd := strings.Index(body, "</details>")
+	if menuEnd <= menu {
+		t.Fatalf("admin topbar <details> menu is not closed (open=%d, close=%d); body:\n%s", menu, menuEnd, body)
+	}
+	// Bound the search to the menu's contents so order is asserted INSIDE the dropdown.
+	tail := body[menu:menuEnd]
+	prev := -1
+	for _, href := range []string{`href="/users"`, `href="/settings"`, `href="/provisioners"`, `href="/acme"`} {
+		i := strings.Index(tail, href)
+		if i < 0 {
+			t.Fatalf("Settings menu missing %s; body:\n%s", href, body)
+		}
+		if i <= prev {
+			t.Fatalf("Settings menu order wrong at %s (index %d not after previous %d); want Users, CA settings, Provisioners, ACME; body:\n%s", href, i, prev, body)
+		}
+		prev = i
+	}
+}
+
+// TestViewerHasNoSettingsMenu: the Settings menu is admin-only; a viewer must see
+// neither the <details> element nor the Settings summary (no 403-bait config links).
+func TestViewerHasNoSettingsMenu(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+	e.seedUser(t, "viewer1", users.RoleViewer)
+	e.switchTo(t, "viewer1")
+
+	_, body := e.get(t, "/inventory")
+
+	if strings.Contains(body, "<details") {
+		t.Fatalf("viewer page: contains a <details> Settings menu (admin-only leaked); body:\n%s", body)
+	}
+	if strings.Contains(body, `>Settings<`) {
+		t.Fatalf("viewer page: contains the Settings summary (admin-only leaked); body:\n%s", body)
+	}
+}
+
 // TestAdminLoginRedirectsToInventoryAndCanReachUsers verifies that an admin is also
 // sent to /inventory after login and can then navigate to /users (admin-only page).
 func TestAdminLoginRedirectsToInventoryAndCanReachUsers(t *testing.T) {
