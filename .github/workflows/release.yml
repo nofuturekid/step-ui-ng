@@ -126,8 +126,10 @@ jobs:
               # Prerelease → moving :edge channel (bleeding edge) + the exact tag.
               echo "tags=${IMAGE}:edge,${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
             else
-              # Stable → :latest (default pull) + the exact tag.
-              echo "tags=${IMAGE}:latest,${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
+              # Stable → :latest (default pull) + :edge + the exact tag. A stable
+              # build is also the newest build, so it advances :edge too — keeping
+              # the invariant :edge ⊇ :latest (ADR-0015).
+              echo "tags=${IMAGE}:latest,${IMAGE}:edge,${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
             fi
           else
             echo "tags=${IMAGE}:manual-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"

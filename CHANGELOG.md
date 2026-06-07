@@ -42,10 +42,12 @@ Versions are bumped only when a release is cut; in-progress work lives under
   `--content-width`, `.topbar-inner` wrapper) so it aligns with the page on ultrawide
   displays while the bar background stays full-bleed. The menu is admin-only and
   works without JavaScript.
-- CI: image tag channels — a stable release publishes `:latest` + `:<tag>`; a
-  prerelease publishes the moving `:edge` channel + `:<tag>` and never moves
+- CI: image tag channels — a stable release publishes `:latest` + `:edge` + `:<tag>`;
+  a prerelease publishes the moving `:edge` channel + `:<tag>` and never moves
   `:latest`. So `:latest` = newest stable (the default `docker pull`), `:edge` =
-  newest build including betas (ADR-0015).
+  newest build including betas. A stable release also advances `:edge` (a stable is
+  the newest build), keeping `:edge` ⊇ `:latest` so `:edge` never goes stale behind a
+  newer stable (ADR-0015).
 
 - CI: bump the release workflow's GitHub Actions to their current Node 24 majors
   (`actions/upload-artifact` v4→v7, `actions/download-artifact` v4→v8,

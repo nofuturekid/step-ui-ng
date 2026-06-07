@@ -33,7 +33,10 @@ Rules:
 - A prerelease attaches the prebuilt binaries (+ per-file `.sha256`) and pushes a
   container image tagged `:vX.Y.Z-beta.N` plus the moving **`:edge`** channel
   (bleeding edge). It does **not** move `:latest` (enforced in `release.yml` via
-  `github.event.release.prerelease`). A stable release pushes `:vX.Y.Z` + `:latest`.
+  `github.event.release.prerelease`). A stable release pushes `:vX.Y.Z` + `:latest`
+  **and also advances `:edge`** — a stable build is the newest build at that moment,
+  so moving `:edge` keeps the invariant `:edge` ⊇ `:latest` (otherwise `:edge` would
+  go stale, pointing at the last beta, whenever a stable ships newer code).
   Channels: `:latest` = newest stable (the default `docker pull`), `:edge` = newest
   build including prereleases.
 - The version is stamped from the tag via ldflags (ADR-0013), so a beta build
