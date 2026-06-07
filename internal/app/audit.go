@@ -98,5 +98,6 @@ func (s *server) getAudit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	d := s.page(r, "Audit log")
+	d.Wide = true // data-heavy table: render at the wider content width
 	s.render(w, r, http.StatusOK, auditPage(d, v))
 }

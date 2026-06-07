@@ -949,14 +949,17 @@ func TestAdminTopbarGrouping(t *testing.T) {
 
 	_, body := e.get(t, "/inventory")
 
-	menu := strings.Index(body, "<details")
+	// The Settings menu specifically — note there is also a <details class="navmenu">
+	// hamburger wrapper (responsive nav) that appears first on every page.
+	menu := strings.Index(body, `<details class="menu"`)
 	if menu < 0 {
-		t.Fatalf("admin topbar has no <details> Settings menu; body:\n%s", body)
+		t.Fatalf("admin topbar has no <details class=\"menu\"> Settings menu; body:\n%s", body)
 	}
-	menuEnd := strings.Index(body, "</details>")
-	if menuEnd <= menu {
-		t.Fatalf("admin topbar <details> menu is not closed (open=%d, close=%d); body:\n%s", menu, menuEnd, body)
+	rel := strings.Index(body[menu:], "</details>")
+	if rel < 0 {
+		t.Fatalf("admin topbar Settings <details> is not closed; body:\n%s", body)
 	}
+	menuEnd := menu + rel
 	// Top-level: operational actions + observation (must appear before the menu).
 	for _, href := range []string{`href="/audit"`, `href="/issue"`, `href="/sign-csr"`} {
 		i := strings.Index(body, href)
@@ -982,14 +985,17 @@ func TestSettingsMenuOrder(t *testing.T) {
 
 	_, body := e.get(t, "/inventory")
 
-	menu := strings.Index(body, "<details")
+	// The Settings menu specifically — note there is also a <details class="navmenu">
+	// hamburger wrapper (responsive nav) that appears first on every page.
+	menu := strings.Index(body, `<details class="menu"`)
 	if menu < 0 {
-		t.Fatalf("admin topbar has no <details> Settings menu; body:\n%s", body)
+		t.Fatalf("admin topbar has no <details class=\"menu\"> Settings menu; body:\n%s", body)
 	}
-	menuEnd := strings.Index(body, "</details>")
-	if menuEnd <= menu {
-		t.Fatalf("admin topbar <details> menu is not closed (open=%d, close=%d); body:\n%s", menu, menuEnd, body)
+	rel := strings.Index(body[menu:], "</details>")
+	if rel < 0 {
+		t.Fatalf("admin topbar Settings <details> is not closed; body:\n%s", body)
 	}
+	menuEnd := menu + rel
 	// Bound the search to the menu's contents so order is asserted INSIDE the dropdown.
 	tail := body[menu:menuEnd]
 	prev := -1
@@ -1006,7 +1012,9 @@ func TestSettingsMenuOrder(t *testing.T) {
 }
 
 // TestViewerHasNoSettingsMenu: the Settings menu is admin-only; a viewer must see
-// neither the <details> element nor the Settings summary (no 403-bait config links).
+// neither the <details class="menu"> Settings dropdown nor its summary (no 403-bait
+// config links). The <details class="navmenu"> hamburger wrapper IS present for every
+// role (responsive nav) and is therefore explicitly allowed here.
 func TestViewerHasNoSettingsMenu(t *testing.T) {
 	e := newTestEnv(t)
 	e.completeSetup(t, "root")
@@ -1015,11 +1023,74 @@ func TestViewerHasNoSettingsMenu(t *testing.T) {
 
 	_, body := e.get(t, "/inventory")
 
-	if strings.Contains(body, "<details") {
-		t.Fatalf("viewer page: contains a <details> Settings menu (admin-only leaked); body:\n%s", body)
+	if strings.Contains(body, `<details class="menu"`) {
+		t.Fatalf("viewer page: contains a <details class=\"menu\"> Settings menu (admin-only leaked); body:\n%s", body)
 	}
 	if strings.Contains(body, `>Settings<`) {
 		t.Fatalf("viewer page: contains the Settings summary (admin-only leaked); body:\n%s", body)
+	}
+}
+
+// TestTopbarHasNavToggle: the responsive hamburger toggle is present for every
+// logged-in role (the nav collapses behind it on narrow screens). It is a JS-free
+// <summary> inside the <details class="navmenu"> wrapper, with an accessible label.
+func TestTopbarHasNavToggle(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root") // admin, left logged in
+
+	assertToggle := func(t *testing.T, label, body string) {
+		t.Helper()
+		if !strings.Contains(body, `<details class="navmenu">`) {
+			t.Fatalf("%s: missing <details class=\"navmenu\"> hamburger wrapper; body:\n%s", label, body)
+		}
+		if !strings.Contains(body, `class="navtoggle"`) {
+			t.Fatalf("%s: missing the navtoggle hamburger summary; body:\n%s", label, body)
+		}
+		if !strings.Contains(body, `aria-label="Toggle navigation"`) {
+			t.Fatalf("%s: navtoggle missing its aria-label; body:\n%s", label, body)
+		}
+	}
+
+	_, adminBody := e.get(t, "/inventory")
+	assertToggle(t, "admin", adminBody)
+
+	e.seedUser(t, "viewer1", users.RoleViewer)
+	e.switchTo(t, "viewer1")
+	_, viewerBody := e.get(t, "/inventory")
+	assertToggle(t, "viewer", viewerBody)
+}
+
+// TestWideMainOnDataPages: data-heavy pages (inventory, audit) render <main> at the
+// wider content width via pageData.Wide; other pages stay at the default width.
+func TestWideMainOnDataPages(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	for _, path := range []string{"/inventory", "/audit"} {
+		_, body := e.get(t, path)
+		if !strings.Contains(body, `<main class="wide">`) {
+			t.Fatalf("%s: expected a wide <main>; body:\n%s", path, body)
+		}
+	}
+	// A non-data page must NOT be wide.
+	_, usersBody := e.get(t, "/users")
+	if strings.Contains(usersBody, `<main class="wide">`) {
+		t.Fatalf("/users: <main> must not be wide; body:\n%s", usersBody)
+	}
+}
+
+// TestPopoverClassesShared: the Settings dropdown and the mobile nav panel both carry
+// the shared .popover chrome class (single source of visual truth for floating panels).
+func TestPopoverClassesShared(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	_, body := e.get(t, "/inventory")
+	if !strings.Contains(body, `class="navwrap popover"`) {
+		t.Fatalf("nav panel missing the shared .popover class; body:\n%s", body)
+	}
+	if !strings.Contains(body, `class="menu-items popover"`) {
+		t.Fatalf("Settings dropdown missing the shared .popover class; body:\n%s", body)
 	}
 }
 

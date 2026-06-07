@@ -6,7 +6,50 @@
   --accent: #2d6cdf;
   --danger: #c0392b;
   --muted: #6b6b70;
+
+  /* Surfaces & semantic tints (tokenised so dark mode can override one place). */
+  --input-bg: #ffffff;
+  --surface-2: #eeeeee;
+  --on-accent: #ffffff; /* text on accent/danger fills (buttons) */
+  --error-bg: #fdecea;
+  --error-border: #f5c6c0;
+  --info-bg: #e8f0fe;
+  --info-border: #c6d8f7;
+  --info-fg: #1b50b8; /* info-flash text — darker than --accent for AA on --info-bg */
+
+  /* Shape & elevation. */
+  --radius: 8px;
+  --radius-sm: 6px;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  /* Layout widths. */
   --content-width: 56rem;
+  --content-width-wide: 72rem;
+}
+
+/* Dark theme: follows the OS setting. Only the tokens flip — every component reads
+   them, so no per-component dark rules are needed. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: #e6e6e6;
+    --bg: #0f1115;
+    --card: #171a21;
+    --border: #2a2f3a;
+    --accent: #4d8bf0;
+    --danger: #e06c63;
+    --muted: #9aa0aa;
+
+    --input-bg: #11141a;
+    --surface-2: #2a2f3a;
+    --on-accent: #0f1115; /* dark text reads on the lightened dark accent/danger fills */
+    --error-bg: #3a1f1d;
+    --error-border: #5a2f2b;
+    --info-bg: #16233a;
+    --info-border: #2a3f63;
+    --info-fg: #4d8bf0;
+
+    --shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
 }
 
 * {
@@ -40,6 +83,7 @@ header.topbar {
   max-width: var(--content-width);
   margin: 0 auto;
   padding: 0.75rem 1.25rem;
+  position: relative; /* anchor for the mobile nav panel */
 }
 
 header.topbar a {
@@ -57,6 +101,22 @@ nav.mainnav {
   display: flex;
   align-items: center;
   gap: 1.1rem;
+}
+
+/* Responsive nav. The nav lives in .navwrap, a SIBLING of the hamburger <details>
+   (not inside it) — so a collapsed <details> never hides it. On desktop the
+   hamburger is hidden and .navwrap collapses (display:contents) so brand · nav · who
+   stay direct flex children of .topbar-inner — identical to the non-responsive
+   layout. On narrow screens the hamburger toggles the panel via
+   `.navmenu[open] ~ .navwrap` (media query at the end). */
+.navtoggle {
+  display: none;
+}
+.navmenu {
+  display: none;
+}
+.navwrap {
+  display: contents;
 }
 
 /* JS-free "Settings" dropdown (admin config). Works without JS via <details>. */
@@ -78,6 +138,7 @@ details.menu > summary::after {
 details.menu[open] > summary::after {
   content: " ▴";
 }
+/* Layout/position only — visual chrome comes from the .popover class on the element. */
 details.menu .menu-items {
   position: absolute;
   right: 0;
@@ -89,17 +150,90 @@ details.menu .menu-items {
   min-width: 11rem;
   padding: 0.3rem;
   z-index: 20;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 details.menu .menu-items a {
   padding: 0.4rem 0.6rem;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 details.menu .menu-items a:hover {
   background: var(--bg);
+}
+
+/* Narrow screens: collapse the nav + user block behind a hamburger (☰). JS-free:
+   the surrounding <details class="navmenu"> toggles the panel. */
+@media (max-width: 47.99em) {
+  .navmenu {
+    display: block;
+  }
+  .navtoggle {
+    display: block;
+    cursor: pointer;
+    list-style: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--fg);
+    user-select: none;
+  }
+  .navtoggle::-webkit-details-marker {
+    display: none;
+  }
+  .navtoggle::after {
+    content: "\2630"; /* ☰ */
+  }
+  .navmenu[open] .navtoggle::after {
+    content: "\2715"; /* ✕ */
+  }
+  /* The nav (.navwrap) is a sibling of the hamburger <details>: hidden until the
+     <details> opens, then shown as a dropdown anchored to the bar's right edge.
+     Visual chrome comes from the .popover class on .navwrap. */
+  .navwrap {
+    display: none;
+  }
+  .navmenu[open] ~ .navwrap {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.4rem;
+    position: absolute;
+    right: 1.25rem;
+    top: calc(100% - 0.2rem);
+    min-width: 12rem;
+    max-width: calc(100vw - 2rem);
+    padding: 0.5rem;
+    z-index: 30;
+  }
+  /* Links stack vertically inside the panel. */
+  nav.mainnav {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.2rem;
+  }
+  nav.mainnav > a {
+    padding: 0.4rem 0.5rem;
+    border-radius: var(--radius-sm);
+  }
+  /* Settings becomes an inline accordion — drop the .popover chrome when nested. */
+  details.menu .menu-items {
+    position: static;
+    margin-top: 0.15rem;
+    margin-left: 0.6rem;
+    min-width: 0;
+    padding: 0.15rem 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  /* User + log-out drop below the links, visually separated. */
+  .who {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+  }
 }
 
 main {
@@ -107,13 +241,26 @@ main {
   margin: 2rem auto;
   padding: 0 1.25rem;
 }
+/* Data-heavy pages (inventory, audit) opt into a wider content column. */
+main.wide {
+  max-width: var(--content-width-wide);
+}
 
 .card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 1.5rem;
   margin-bottom: 1.5rem;
+}
+
+/* Floating surface shared by the Settings dropdown and the mobile nav panel.
+   Layout/positioning stays on each consumer; this only carries the chrome. */
+.popover {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .auth {
@@ -133,9 +280,10 @@ select {
   width: 100%;
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font: inherit;
-  background: #fff;
+  color: var(--fg);
+  background: var(--input-bg);
 }
 
 button {
@@ -143,13 +291,13 @@ button {
   padding: 0.45rem 0.9rem;
   border: 1px solid var(--accent);
   background: var(--accent);
-  color: #fff;
-  border-radius: 6px;
+  color: var(--on-accent);
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
 button.secondary {
-  background: #fff;
+  background: var(--card);
   color: var(--fg);
   border-color: var(--border);
 }
@@ -187,18 +335,18 @@ th {
 
 .flash {
   padding: 0.6rem 0.8rem;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   margin-bottom: 1rem;
 }
 .flash.error {
-  background: #fdecea;
+  background: var(--error-bg);
   color: var(--danger);
-  border: 1px solid #f5c6c0;
+  border: 1px solid var(--error-border);
 }
 .flash.info {
-  background: #e8f0fe;
-  color: var(--accent);
-  border: 1px solid #c6d8f7;
+  background: var(--info-bg);
+  color: var(--info-fg);
+  border: 1px solid var(--info-border);
 }
 
 .muted {
@@ -246,7 +394,7 @@ fieldset legend {
   font-size: 0.75rem;
   padding: 0.1rem 0.45rem;
   border-radius: 999px;
-  background: #eee;
+  background: var(--surface-2);
 }
 h1 {
   font-size: 1.4rem;

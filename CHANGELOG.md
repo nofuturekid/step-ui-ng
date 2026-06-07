@@ -8,6 +8,22 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+### Added
+
+- **Dark mode** — the UI follows the OS `prefers-color-scheme`. Colors are tokenized
+  in `:root`, so a single dark token set flips the whole UI (no per-component rules).
+- **Responsive topbar** — on narrow screens the nav collapses behind a JS-free
+  hamburger (`<details>`-based) that drops a dropdown panel; the Settings group becomes
+  an inline accordion. Desktop layout is unchanged.
+
+### Changed
+
+- UI foundation (ADR-0016): design tokens for shape/elevation/surfaces
+  (`--radius`, `--radius-sm`, `--shadow`, `--input-bg`, `--surface-2`, flash tints),
+  a shared `.popover` chrome class (Settings dropdown + mobile nav panel), and a
+  per-page content width — data-heavy pages (inventory, audit) now render wider
+  (`--content-width-wide`) while forms stay at the default width.
+
 ## [0.2.1] - 2026-06-07
 
 ### Added

@@ -141,7 +141,7 @@ These came out of the design discussion; recorded so they are not re-discovered 
 ## Notes
 
 - The architecture decision (CRL-only vs OCSP; display-overlay vs persisted status;
-  graceful degradation; pinned-transport reuse) is recorded as **ADR-0016** alongside
+  graceful degradation; pinned-transport reuse) is recorded as **ADR-0017** alongside
   the implementation.
 - CHANGELOG under `[Unreleased]`; no version bump until a release (ADR-0011).
 - Builds on 0007 (inventory), 0008 (revoke), 0004/0005 (CA connection + pinned client).
