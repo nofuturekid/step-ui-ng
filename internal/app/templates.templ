@@ -55,24 +55,33 @@ templ layout(d pageData) {
 		<body>
 			if d.User != nil {
 				<header class="topbar">
-					<a href="/inventory" class="brand"><img src="/static/logo.svg" alt="" width="28" height="28" class="brand-logo"/>step-ui-ng</a>
-					<a href="/inventory">Certificates</a>
-					if d.User.Role.AtLeast(users.RoleAdmin) {
-						<a href="/users">Users</a>
-						<a href="/issue">Issue</a>
-						<a href="/sign-csr">Sign CSR</a>
-						<a href="/provisioners">Provisioners</a>
-						<a href="/acme">ACME</a>
-						<a href="/settings">CA settings</a>
-						<a href="/audit">Audit log</a>
-					}
-					<span class="who">
-						{ d.User.Username } <span class="badge">{ string(d.User.Role) }</span>
-						<form method="post" action="/logout" style="display:inline">
-							<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-							<button class="secondary" type="submit">Log out</button>
-						</form>
-					</span>
+					<div class="topbar-inner">
+						<a href="/inventory" class="brand"><img src="/static/logo.svg" alt="" width="28" height="28" class="brand-logo"/>step-ui-ng</a>
+						<nav class="mainnav">
+							<a href="/inventory">Certificates</a>
+							if d.User.Role.AtLeast(users.RoleAdmin) {
+								<a href="/issue">Issue</a>
+								<a href="/sign-csr">Sign CSR</a>
+								<a href="/audit">Audit log</a>
+								<details class="menu">
+									<summary aria-label="Settings">Settings</summary>
+									<div class="menu-items">
+										<a href="/users">Users</a>
+										<a href="/settings">CA settings</a>
+										<a href="/provisioners">Provisioners</a>
+										<a href="/acme">ACME</a>
+									</div>
+								</details>
+							}
+						</nav>
+						<span class="who">
+							{ d.User.Username } <span class="badge">{ string(d.User.Role) }</span>
+							<form method="post" action="/logout" style="display:inline">
+								<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+								<button class="secondary" type="submit">Log out</button>
+							</form>
+						</span>
+					</div>
 				</header>
 			}
 			<main>
