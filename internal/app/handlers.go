@@ -89,7 +89,7 @@ func (s *server) setupDone(w http.ResponseWriter, r *http.Request) bool {
 // getLogin shows the login form (or sends an already-authenticated user home).
 func (s *server) getLogin(w http.ResponseWriter, r *http.Request) {
 	if userFromContext(r.Context()) != nil {
-		http.Redirect(w, r, "/users", http.StatusSeeOther)
+		http.Redirect(w, r, "/inventory", http.StatusSeeOther)
 		return
 	}
 	s.render(w, r, http.StatusOK, loginPage(s.page(r, "Log in")))
@@ -116,7 +116,7 @@ func (s *server) postLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	// Record after a successful login; the actor is the authenticated user.
 	_ = s.audit.Record(r.Context(), u.Username, "login", u.Username, "")
-	http.Redirect(w, r, "/users", http.StatusSeeOther)
+	http.Redirect(w, r, "/inventory", http.StatusSeeOther)
 }
 
 // login renews the session token (prevents fixation) and records the user id.

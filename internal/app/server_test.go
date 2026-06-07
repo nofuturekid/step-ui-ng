@@ -817,6 +817,76 @@ func TestRoleCeilingAndSuperadminProtection(t *testing.T) {
 	}
 }
 
+// --- Viewer login redirect (bug: viewer got 403 because redirect went to /users) ---
+
+// TestViewerLoginRedirectsToInventory verifies that a freshly-authenticated viewer
+// is sent to /inventory (not /users). The test intentionally fails when the redirect
+// target is reverted to /users: a viewer following /users gets 403 "forbidden"
+// rather than 200, which would fail the second assertion.
+func TestViewerLoginRedirectsToInventory(t *testing.T) {
+	e := newTestEnv(t)
+	// Seed a superadmin (satisfies first-run) and a viewer.
+	e.completeSetup(t, "root")
+	e.seedUser(t, "viewer1", users.RoleViewer)
+
+	// Log out of the superadmin session so we can log in as viewer.
+	logoutToken := e.csrfToken(t, "/users")
+	e.post(t, "/logout", url.Values{"csrf_token": {logoutToken}})
+
+	// POST /login as viewer: capture the redirect without following it.
+	token := e.csrfToken(t, "/login")
+	resp := e.post(t, "/login", url.Values{
+		"csrf_token": {token},
+		"username":   {"viewer1"},
+		"password":   {testPassword},
+	})
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("viewer login status = %d, want 303", resp.StatusCode)
+	}
+	loc := resp.Header.Get("Location")
+	if loc != "/inventory" {
+		t.Fatalf("viewer post-login Location = %q, want /inventory (a /users redirect gives the viewer a 403)", loc)
+	}
+
+	// Following /inventory must be 200 for a viewer — proves the landing page is
+	// accessible without admin privileges.
+	inventoryResp, _ := e.get(t, "/inventory")
+	if inventoryResp.StatusCode != http.StatusOK {
+		t.Fatalf("viewer GET /inventory = %d, want 200 (viewer must be able to view inventory)", inventoryResp.StatusCode)
+	}
+}
+
+// TestAdminLoginRedirectsToInventoryAndCanReachUsers verifies that an admin is also
+// sent to /inventory after login and can then navigate to /users (admin-only page).
+func TestAdminLoginRedirectsToInventoryAndCanReachUsers(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root") // superadmin; completeSetup leaves us logged in
+
+	// Log out and back in so we exercise the post-login redirect for an admin too.
+	logoutToken := e.csrfToken(t, "/users")
+	e.post(t, "/logout", url.Values{"csrf_token": {logoutToken}})
+
+	token := e.csrfToken(t, "/login")
+	resp := e.post(t, "/login", url.Values{
+		"csrf_token": {token},
+		"username":   {"root"},
+		"password":   {testPassword},
+	})
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("admin login status = %d, want 303", resp.StatusCode)
+	}
+	loc := resp.Header.Get("Location")
+	if loc != "/inventory" {
+		t.Fatalf("admin post-login Location = %q, want /inventory", loc)
+	}
+
+	// Admin can still reach /users (admin-only route).
+	usersResp, _ := e.get(t, "/users")
+	if usersResp.StatusCode != http.StatusOK {
+		t.Fatalf("admin GET /users = %d, want 200", usersResp.StatusCode)
+	}
+}
+
 // i64 formats an int64 path segment.
 func i64(n int64) string { return strconv.FormatInt(n, 10) }
 

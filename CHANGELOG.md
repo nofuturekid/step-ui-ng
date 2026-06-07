@@ -21,6 +21,12 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Changed
 
+- CI: prereleases no longer move the `:latest` container image tag. The "Compute
+  image tags" step in `release.yml` now checks the `prerelease` flag: a prerelease
+  publishes only `:<tag>`, while a stable release continues to publish both
+  `:latest` and `:<tag>`. This enables a beta lane without overwriting the stable
+  image that users pull by default.
+
 - CI: release binaries now build in parallel via a 6-entry job matrix (one
   runner per target: `linux/amd64`, `linux/arm64`, `linux/arm`, `darwin/amd64`,
   `darwin/arm64`, `windows/amd64`). Each job emits a dedicated
@@ -48,6 +54,13 @@ Versions are bumped only when a release is cut; in-progress work lives under
   produce compatible images; `make build` now also stamps the version via ldflags.
 
 ### Fixed
+
+- Viewer no longer hits a "forbidden" page immediately after login. The three
+  landing redirects (`postLogin`, `getLogin` already-authenticated guard, and the
+  root `GET /` route) now send users to `/inventory` instead of `/users`.
+  `/inventory` is accessible by all authenticated roles (`requireAuth`); `/users`
+  is admin-only (`requireRole(RoleAdmin)`), so viewers previously got a 403
+  straight after a successful login.
 
 - Auditable actions no longer crash with a recovered HTTP 500. `cmd/stepui`
   built `app.Deps` without `Audit`, leaving the server's audit recorder nil so

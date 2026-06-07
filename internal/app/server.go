@@ -137,9 +137,9 @@ func NewHandler(deps Deps) http.Handler {
 	// Audit log (spec/0009): query/filter view (admin+).
 	mux.HandleFunc("GET /audit", s.requireAuth(s.requireRole(users.RoleAdmin, s.getAudit)))
 
-	// Root → users (which itself enforces auth + first-run gating).
+	// Root → inventory (which itself enforces auth + first-run gating).
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/users", http.StatusSeeOther)
+		http.Redirect(w, r, "/inventory", http.StatusSeeOther)
 	})
 
 	// Inner stack (after CSRF + session load): resolve the user, then gate
