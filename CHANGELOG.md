@@ -10,6 +10,11 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- **CI: `:main` on-demand dev builds** (`main.yml`, `workflow_dispatch`) — build the
+  current `main` (or any ref) without cutting a tag/release: binaries are published as
+  workflow **artifacts** and the image is pushed as the moving **`:main`** tag (plus
+  immutable `:main-<shortsha>`), versioned via `git describe`. Lets you test between
+  betas with zero beta/tag inflation (ADR-0015).
 - **Dark mode** — the UI follows the OS `prefers-color-scheme`. Colors are tokenized
   in `:root`, so a single dark token set flips the whole UI (no per-component rules).
 - **Responsive topbar** — on narrow screens the nav collapses behind a JS-free
@@ -22,6 +27,9 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Changed
 
+- **CI: image channel `:edge` renamed to `:beta`** (consistent with `:latest` / `:main`).
+  A stable release no longer advances the prerelease channel — `:beta` tracks betas
+  only; use `:main` to test newer-than-stable changes (ADR-0015).
 - The inventory nav item is renamed **List** (the page heading stays "Certificates").
 - UI foundation (ADR-0016): design tokens for shape/elevation/surfaces
   (`--radius`, `--radius-sm`, `--shadow`, `--input-bg`, `--surface-2`, flash tints),

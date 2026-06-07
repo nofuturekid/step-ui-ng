@@ -31,16 +31,24 @@ Chosen option: "SemVer prerelease tags". Cut prereleases as `vX.Y.Z-beta.N`
 Rules:
 
 - A prerelease attaches the prebuilt binaries (+ per-file `.sha256`) and pushes a
-  container image tagged `:vX.Y.Z-beta.N` plus the moving **`:edge`** channel
-  (bleeding edge). It does **not** move `:latest` (enforced in `release.yml` via
-  `github.event.release.prerelease`). A stable release pushes `:vX.Y.Z` + `:latest`
-  **and also advances `:edge`** — a stable build is the newest build at that moment,
-  so moving `:edge` keeps the invariant `:edge` ⊇ `:latest` (otherwise `:edge` would
-  go stale, pointing at the last beta, whenever a stable ships newer code).
-  Channels: `:latest` = newest stable (the default `docker pull`), `:edge` = newest
-  build including prereleases.
-- The version is stamped from the tag via ldflags (ADR-0013), so a beta build
-  reports `vX.Y.Z-beta.N`.
+  container image tagged `:vX.Y.Z-beta.N` plus the moving **`:beta`** channel. It does
+  **not** move `:latest` (enforced in `release.yml` via
+  `github.event.release.prerelease`). A stable release pushes `:vX.Y.Z` + `:latest`.
+- **Container tag channels** (named to mirror each other):
+  - `:latest` — newest **stable** (the default `docker pull`).
+  - `:beta` — newest **prerelease** (beta/RC). Tracks the beta lane only, so after a
+    stable ships it may point at an older commit than `:latest` — that is intentional;
+    for newer-than-stable testing use `:main`.
+  - `:main` — newest **`main` build**, produced on demand by `main.yml`
+    (`workflow_dispatch`). Also pushes an immutable `:main-<shortsha>`. Creates **no
+    git tag and no GitHub release**, so testing between betas adds zero inflation. Its
+    binaries are published as **workflow artifacts** on the run (downloadable for
+    ~30 days), not as a release.
+  - Rough freshness order: `:latest` ⊆ `:beta`/`:main` over time, but the channels are
+    independent pointers, not enforced supersets.
+- The version is stamped via ldflags (ADR-0013): a tagged build reports its tag
+  (`vX.Y.Z` / `vX.Y.Z-beta.N`); a `main` build reports `git describe` output, e.g.
+  `vX.Y.Z-beta.N-<commits>-g<sha>`.
 - `CHANGELOG.md` stays under `[Unreleased]` for a prerelease; it is promoted to the
   dated `[vX.Y.Z]` heading only when the **stable** release is cut.
 - When validated, cut the stable `vX.Y.Z` (which moves `:latest` and promotes the
@@ -58,4 +66,5 @@ Rules:
 ## More Information
 
 Builds on ADR-0011 (release-only versioning) and ADR-0013 (version from the git
-tag). See `release.yml` for the prerelease `:latest` guard.
+tag). See `release.yml` for the prerelease `:latest` guard and `main.yml` for the
+on-demand `:main` dev build (artifacts + `:main`/`:main-<sha>`).
