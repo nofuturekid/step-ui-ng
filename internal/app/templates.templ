@@ -73,15 +73,17 @@ templ layout(d pageData) {
 								</div>
 								if d.User.Role.AtLeast(users.RoleAdmin) {
 									<a href="/audit">Audit log</a>
-									<details class="menu">
-										<summary aria-label="Settings">Settings</summary>
+									<div class="navsettings">
+										<details class="menu">
+											<summary aria-label="Settings">Settings</summary>
+										</details>
 										<div class="menu-items popover">
 											<a href="/users">Users</a>
 											<a href="/settings">CA settings</a>
 											<a href="/provisioners">Provisioners</a>
 											<a href="/acme">ACME</a>
 										</div>
-									</details>
+									</div>
 								}
 							</nav>
 							<span class="who">

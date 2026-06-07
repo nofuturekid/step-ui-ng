@@ -127,9 +127,12 @@ nav.mainnav {
   display: none;
 }
 
-/* JS-free "Settings" dropdown (admin config). Works without JS via <details>. */
-details.menu {
-  position: relative;
+/* JS-free "Settings" menu (admin config). The items (.menu-items) are a SIBLING of
+   the <details> (not inside it), so a closed <details> can't hide them. Desktop shows
+   them as a click dropdown under the summary (min-width block below); the hamburger
+   shows them always, as an inline list under a "Settings" heading (max-width block). */
+.navsettings {
+  position: relative; /* anchor for the desktop dropdown */
 }
 details.menu > summary {
   cursor: pointer;
@@ -146,25 +149,32 @@ details.menu > summary::after {
 details.menu[open] > summary::after {
   content: " ▴";
 }
-/* Layout/position only — visual chrome comes from the .popover class on the element. */
-details.menu .menu-items {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  margin-top: 0.45rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  min-width: 11rem;
-  padding: 0.3rem;
-  z-index: 20;
+.menu-items {
+  display: none; /* shown via the dropdown rule (desktop) or the hamburger rule (mobile) */
 }
-details.menu .menu-items a {
+.menu-items a {
   padding: 0.4rem 0.6rem;
   border-radius: var(--radius-sm);
 }
-details.menu .menu-items a:hover {
+.menu-items a:hover {
   background: var(--bg);
+}
+
+/* Desktop only: the Settings items drop down under the summary when open. Visual
+   chrome comes from the .popover class on .menu-items. */
+@media (min-width: 48em) {
+  details.menu[open] ~ .menu-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 0.45rem;
+    min-width: 11rem;
+    padding: 0.3rem;
+    z-index: 20;
+  }
 }
 
 /* Narrow screens: collapse the nav + user block behind a hamburger (☰). JS-free:
@@ -217,15 +227,15 @@ details.menu .menu-items a:hover {
     align-items: stretch;
     gap: 0.2rem;
   }
-  /* Level 0: "Audit log" and the "Settings" summary (summary gets the same left
-     padding so it lines up with the other top-level items). */
-  nav.mainnav > a,
-  details.menu > summary {
+  /* Level 0: "Audit log" is a standalone link. */
+  nav.mainnav > a {
     padding: 0.4rem 0.5rem;
     border-radius: var(--radius-sm);
   }
-  /* Level 0: the "Certificates" section heading. */
-  .navhead {
+  /* Level 0 headings: "Certificates", and "Settings" — whose summary becomes a
+     non-collapsing heading here (caret removed, items always shown below). */
+  .navhead,
+  details.menu > summary {
     display: block;
     padding: 0.4rem 0.5rem 0.15rem;
     font-size: 0.75rem;
@@ -234,15 +244,23 @@ details.menu .menu-items a:hover {
     letter-spacing: 0.04em;
     color: var(--muted);
   }
-  .navgroup {
+  details.menu > summary {
+    cursor: default;
+  }
+  details.menu > summary::after,
+  details.menu[open] > summary::after {
+    content: "";
+  }
+  /* Both groups stack their children vertically. */
+  .navgroup,
+  .navsettings .menu-items {
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
   }
-  /* Settings becomes an inline accordion — drop the .popover chrome when nested. */
-  details.menu .menu-items {
-    position: static;
-    margin-top: 0.1rem;
+  /* Settings items are always shown inline here (no .popover chrome). */
+  .navsettings .menu-items {
+    margin-top: 0;
     min-width: 0;
     padding: 0;
     background: transparent;
@@ -252,7 +270,7 @@ details.menu .menu-items a:hover {
   }
   /* Level 1: children of the Certificates group and of Settings, indented equally. */
   .navgroup a,
-  details.menu .menu-items a {
+  .menu-items a {
     margin-left: 0.7rem;
     padding: 0.4rem 0.5rem;
     border-radius: var(--radius-sm);
