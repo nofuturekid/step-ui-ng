@@ -14,10 +14,14 @@ Versions are bumped only when a release is cut; in-progress work lives under
   in `:root`, so a single dark token set flips the whole UI (no per-component rules).
 - **Responsive topbar** — on narrow screens the nav collapses behind a JS-free
   hamburger (`<details>`-based) that drops a dropdown panel; the Settings group becomes
-  an inline accordion. Desktop layout is unchanged.
+  an inline accordion. In the hamburger the certificate actions sit under a
+  **Certificates** section heading (List / Issue / Sign CSR), indented consistently
+  with the Settings items; the Settings summary now aligns with the other top-level
+  items. Desktop layout is unchanged.
 
 ### Changed
 
+- The inventory nav item is renamed **List** (the page heading stays "Certificates").
 - UI foundation (ADR-0016): design tokens for shape/elevation/surfaces
   (`--radius`, `--radius-sm`, `--shadow`, `--input-bg`, `--surface-2`, flash tints),
   a shared `.popover` chrome class (Settings dropdown + mobile nav panel), and a

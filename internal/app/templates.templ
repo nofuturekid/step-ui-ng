@@ -63,10 +63,15 @@ templ layout(d pageData) {
 						</details>
 						<div class="navwrap popover">
 							<nav class="mainnav">
-								<a href="/inventory">Certificates</a>
+								<div class="navgroup">
+									<span class="navhead">Certificates</span>
+									<a href="/inventory">List</a>
+									if d.User.Role.AtLeast(users.RoleAdmin) {
+										<a href="/issue">Issue</a>
+										<a href="/sign-csr">Sign CSR</a>
+									}
+								</div>
 								if d.User.Role.AtLeast(users.RoleAdmin) {
-									<a href="/issue">Issue</a>
-									<a href="/sign-csr">Sign CSR</a>
 									<a href="/audit">Audit log</a>
 									<details class="menu">
 										<summary aria-label="Settings">Settings</summary>

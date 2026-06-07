@@ -118,6 +118,14 @@ nav.mainnav {
 .navwrap {
   display: contents;
 }
+/* The "Certificates" group flattens on desktop (its links join the flat nav row);
+   the section heading shows only inside the hamburger. */
+.navgroup {
+  display: contents;
+}
+.navhead {
+  display: none;
+}
 
 /* JS-free "Settings" dropdown (admin config). Works without JS via <details>. */
 details.menu {
@@ -202,27 +210,52 @@ details.menu .menu-items a:hover {
     padding: 0.5rem;
     z-index: 30;
   }
-  /* Links stack vertically inside the panel. */
+  /* Inside the panel everything stacks in two consistent indent levels: section
+     headings / standalone items at level 0, grouped children at level 1. */
   nav.mainnav {
     flex-direction: column;
     align-items: stretch;
     gap: 0.2rem;
   }
-  nav.mainnav > a {
+  /* Level 0: "Audit log" and the "Settings" summary (summary gets the same left
+     padding so it lines up with the other top-level items). */
+  nav.mainnav > a,
+  details.menu > summary {
     padding: 0.4rem 0.5rem;
     border-radius: var(--radius-sm);
+  }
+  /* Level 0: the "Certificates" section heading. */
+  .navhead {
+    display: block;
+    padding: 0.4rem 0.5rem 0.15rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  .navgroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
   }
   /* Settings becomes an inline accordion — drop the .popover chrome when nested. */
   details.menu .menu-items {
     position: static;
-    margin-top: 0.15rem;
-    margin-left: 0.6rem;
+    margin-top: 0.1rem;
     min-width: 0;
-    padding: 0.15rem 0;
+    padding: 0;
     background: transparent;
     border: none;
     border-radius: 0;
     box-shadow: none;
+  }
+  /* Level 1: children of the Certificates group and of Settings, indented equally. */
+  .navgroup a,
+  details.menu .menu-items a {
+    margin-left: 0.7rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: var(--radius-sm);
   }
   /* User + log-out drop below the links, visually separated. */
   .who {
