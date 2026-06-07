@@ -8,6 +8,13 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+### Changed
+
+- CI: `main.yml` also runs on `release: published`, so `:main` is rebuilt at the tagged
+  commit after a release and reports the release version (a new tag changes
+  `git describe` without a file change, so the push trigger alone left `:main` on the
+  pre-tag describe).
+
 ## [0.3.1] - 2026-06-07
 
 ### Fixed
