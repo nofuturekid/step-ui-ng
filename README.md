@@ -71,7 +71,10 @@ Key settings:
 - **COOKIE_SECURE** — set to `true` when the UI is behind a TLS reverse proxy (Nginx, Caddy, etc.).
 - **RENEW_DEFAULT_DAYS** — default validity (days) pre-filled in the renewal form (default: 90).
 
-Image tags: `:latest` (stable releases) · `:edge` (latest beta / pre-release builds).
+Image tags: `:latest` (newest stable) · `:beta` (newest beta / pre-release) · `:main`
+(newest `main` build — on-demand dev builds via the `main.yml` workflow; also
+`:main-<shortsha>` for pinning). Use `:latest` for production, `:beta` to test
+releases, `:main` to test unreleased changes between betas. See ADR-0015.
 
 App icon URL (resolves once merged to main):
 `https://raw.githubusercontent.com/nofuturekid/step-ui-ng/main/internal/app/static/icon-256.png`
