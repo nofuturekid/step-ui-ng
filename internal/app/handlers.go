@@ -48,6 +48,14 @@ func (s *server) postSetup(w http.ResponseWriter, r *http.Request) {
 
 	username := r.PostFormValue("username")
 	password := r.PostFormValue("password")
+	passwordConfirm := r.PostFormValue("password_confirm")
+
+	if password != passwordConfirm {
+		d := s.page(r, "Setup")
+		d.Error = "Passwords do not match."
+		s.render(w, r, http.StatusBadRequest, setupPage(d))
+		return
+	}
 
 	// CreateFirst is atomic: a concurrent setup that wins the race makes this one
 	// return ErrSetupComplete, which we treat as "setup is done" and redirect to
@@ -164,6 +172,7 @@ func (s *server) postUsers(w http.ResponseWriter, r *http.Request) {
 	actor := userFromContext(r.Context())
 	username := r.PostFormValue("username")
 	password := r.PostFormValue("password")
+	passwordConfirm := r.PostFormValue("password_confirm")
 	role := users.Role(r.PostFormValue("role"))
 
 	// Authorize before doing any work. Unknown roles fall through to Create's
@@ -171,6 +180,12 @@ func (s *server) postUsers(w http.ResponseWriter, r *http.Request) {
 	// only gates assigning a *valid* role above the actor's own.
 	if role.Valid() && !actor.Role.CanAssign(role) {
 		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	if password != passwordConfirm {
+		s.sessions.Put(r.Context(), errorKey, "Passwords do not match.")
+		http.Redirect(w, r, "/users", http.StatusSeeOther)
 		return
 	}
 

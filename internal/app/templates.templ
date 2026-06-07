@@ -98,6 +98,8 @@ templ setupPage(d pageData) {
 				<input id="username" name="username" type="text" autocomplete="username" required minlength="3" maxlength="64"/>
 				<label for="password">Password (min 12 characters)</label>
 				<input id="password" name="password" type="password" autocomplete="new-password" required minlength="12"/>
+				<label for="password_confirm">Confirm password</label>
+				<input id="password_confirm" name="password_confirm" type="password" autocomplete="new-password" required/>
 				<p></p>
 				<button type="submit">Create superadmin</button>
 			</form>
@@ -149,6 +151,8 @@ templ usersPage(d pageData, list []users.User) {
 				<input id="new-username" name="username" type="text" required minlength="3" maxlength="64"/>
 				<label for="new-password">Password (min 12 characters)</label>
 				<input id="new-password" name="password" type="password" required minlength="12"/>
+				<label for="new-password-confirm">Confirm password</label>
+				<input id="new-password-confirm" name="password_confirm" type="password" required/>
 				<label for="new-role">Role</label>
 				<select id="new-role" name="role">
 					<option value="viewer">viewer</option>

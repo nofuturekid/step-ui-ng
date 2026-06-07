@@ -124,10 +124,11 @@ func TestAuditEventEmission(t *testing.T) {
 			run: func(t *testing.T, e *testEnv) {
 				token := e.csrfToken(t, "/users")
 				resp := e.post(t, "/users", url.Values{
-					"csrf_token": {token},
-					"username":   {"newuser"},
-					"password":   {testPassword},
-					"role":       {"viewer"},
+					"csrf_token":       {token},
+					"username":         {"newuser"},
+					"password":         {testPassword},
+					"password_confirm": {testPassword},
+					"role":             {"viewer"},
 				})
 				if resp.StatusCode != http.StatusSeeOther {
 					t.Fatalf("create user = %d", resp.StatusCode)
