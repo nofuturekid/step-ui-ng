@@ -41,11 +41,12 @@ Rules:
   - `:beta` — newest **release of either kind**: moved by every prerelease _and_ every
     stable, so it is **never older than `:latest`** (`:beta` ⊇ `:latest`). Use it to
     track the release edge (betas, but never behind stable).
-  - `:main` — newest **`main` build**, produced on demand by `main.yml`
+  - `:main` — newest **`main` build**, produced by `main.yml` automatically on every
+    push to `main` (docs-only changes excluded via `paths-ignore`) and on demand
     (`workflow_dispatch`). Also pushes an immutable `:main-<shortsha>`. Creates **no
     git tag and no GitHub release**, so testing between betas adds zero inflation. Its
     binaries are published as **workflow artifacts** on the run (downloadable for
-    ~30 days), not as a release.
+    ~30 days, login required), not as a release.
   - Freshness: `:latest` ⊆ `:beta` ⊆ `:main` (latest stable ⊆ release edge ⊆ newest
     main commit).
 - The version is stamped via ldflags (ADR-0013): a tagged build reports its tag
