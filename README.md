@@ -73,10 +73,10 @@ Key settings:
 
 Image tags: `:latest` (newest stable) · `:beta` (release edge — newest pre-release,
 moved by stables too, so **never older than `:latest`**) · `:main` (newest `main`
-build — on-demand dev builds via the `main.yml` workflow; also `:main-<shortsha>` for
-pinning). Freshness `:latest` ⊆ `:beta` ⊆ `:main`. Use `:latest` for production,
-`:beta` to track the release edge, `:main` to test unreleased changes between betas.
-See ADR-0015.
+build — built on every push to `main` and on demand via the `main.yml` workflow; a
+moving tag, no per-commit pins). Freshness `:latest` ⊆ `:beta` ⊆ `:main`. Use
+`:latest` for production, `:beta` to track the release edge, `:main` to test unreleased
+changes between betas. See ADR-0015.
 
 App icon URL (resolves once merged to main):
 `https://raw.githubusercontent.com/nofuturekid/step-ui-ng/main/internal/app/static/icon-256.png`

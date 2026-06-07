@@ -43,10 +43,12 @@ Rules:
     track the release edge (betas, but never behind stable).
   - `:main` — newest **`main` build**, produced by `main.yml` automatically on every
     push to `main` (docs-only changes excluded via `paths-ignore`) and on demand
-    (`workflow_dispatch`). Also pushes an immutable `:main-<shortsha>`. Creates **no
-    git tag and no GitHub release**, so testing between betas adds zero inflation. Its
-    binaries are published as **workflow artifacts** on the run (downloadable for
-    ~30 days, login required), not as a release.
+    (`workflow_dispatch`). Only the **moving `:main`** tag is pushed — no immutable
+    per-commit tag (so it doesn't accumulate); the exact commit is still identifiable
+    from the binary's `git describe` version. Creates **no git tag and no GitHub
+    release**, so testing between betas adds zero inflation. Its binaries are published
+    as **workflow artifacts** on the run (downloadable for ~30 days, login required),
+    not as a release.
   - Freshness: `:latest` ⊆ `:beta` ⊆ `:main` (latest stable ⊆ release edge ⊆ newest
     main commit).
 - The version is stamped via ldflags (ADR-0013): a tagged build reports its tag

@@ -1,9 +1,10 @@
 name: Main - dev artifacts and :main image
 
 # Builds the current ref and produces downloadable binary artifacts + pushes the
-# moving :main container tag (+ :main-<sha>). Creates NO git tag and NO GitHub release
-# — zero release/beta inflation. Version derived from `git describe` (e.g.
-# v0.3.0-3-g<sha>). See ADR-0015.
+# moving :main container tag. Creates NO git tag, NO GitHub release, and NO immutable
+# per-commit tag — zero inflation; the :main tag just moves. Version derived from
+# `git describe` (e.g. v0.3.0-3-g<sha>) so the exact commit is still identifiable from
+# the running binary. See ADR-0015.
 #
 # Runs automatically on every push to main (so :main always reflects main), except for
 # docs-only changes (paths-ignore), and on demand via workflow_dispatch.
@@ -143,8 +144,7 @@ jobs:
       - name: Compute image tags
         id: tags
         run: |
-          SHA="${GITHUB_SHA::7}"
-          echo "tags=${IMAGE}:main,${IMAGE}:main-${SHA}" >> "$GITHUB_OUTPUT"
+          echo "tags=${IMAGE}:main" >> "$GITHUB_OUTPUT"
 
       - name: Build and push (multi-arch, from prebuilt binary)
         uses: docker/build-push-action@v7
