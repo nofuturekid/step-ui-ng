@@ -1099,6 +1099,22 @@ func TestNavListLabelAndCertificatesHeading(t *testing.T) {
 	}
 }
 
+// TestVersionInFooter: every rendered page shows the build version in the fixed
+// bottom-right badge (.appver). The displayed string is BuildInfo(), which always
+// contains Version, so asserting on Version is robust regardless of VCS enrichment.
+func TestVersionInFooter(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	_, body := e.get(t, "/inventory")
+	if !strings.Contains(body, `class="appver"`) {
+		t.Fatalf("page missing the .appver version badge; body:\n%s", body)
+	}
+	if !strings.Contains(body, app.Version) {
+		t.Fatalf("version badge does not contain Version %q; body:\n%s", app.Version, body)
+	}
+}
+
 // TestAdminLoginRedirectsToInventoryAndCanReachUsers verifies that an admin is also
 // sent to /inventory after login and can then navigate to /users (admin-only page).
 func TestAdminLoginRedirectsToInventoryAndCanReachUsers(t *testing.T) {

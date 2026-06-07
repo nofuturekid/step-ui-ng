@@ -297,6 +297,21 @@ main.wide {
   max-width: var(--content-width-wide);
 }
 
+/* Subtle build-version badge, fixed in the bottom-right corner. Non-interactive and
+   below the dropdowns so it never blocks clicks or overlaps menus. */
+.appver {
+  position: fixed;
+  right: 0.6rem;
+  bottom: 0.45rem;
+  z-index: 5;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  opacity: 0.6;
+  pointer-events: none;
+  user-select: none;
+}
+
 .card {
   background: var(--card);
   border: 1px solid var(--border);

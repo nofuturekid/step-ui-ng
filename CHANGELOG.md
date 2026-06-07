@@ -8,6 +8,12 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+### Added
+
+- The build version (`BuildInfo()`) is shown in a subtle fixed badge in the
+  bottom-right corner of every page (`.appver`), so the running version is visible in
+  the UI.
+
 ### Changed
 
 - CI: `main.yml` now runs **automatically on every push to `main`** (docs-only changes
