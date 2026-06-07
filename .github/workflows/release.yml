@@ -123,12 +123,13 @@ jobs:
         run: |
           if [ -n "$TAG" ]; then
             if [ "$PRERELEASE" = "true" ]; then
-              # Prerelease → moving :beta channel + the exact tag.
+              # Prerelease → moving :beta channel + the exact tag (never :latest).
               echo "tags=${IMAGE}:beta,${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
             else
-              # Stable → :latest (default pull) + the exact tag. The :beta channel
-              # tracks betas only; for newer-than-stable testing use :main (ADR-0015).
-              echo "tags=${IMAGE}:latest,${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
+              # Stable → :latest + the exact tag, AND :beta — a stable is the newest
+              # release, so it advances the beta channel too, keeping :beta ⊇ :latest
+              # (the beta channel is never older than stable). See ADR-0015.
+              echo "tags=${IMAGE}:latest,${IMAGE}:beta,${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
             fi
           else
             echo "tags=${IMAGE}:manual-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"

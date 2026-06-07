@@ -33,19 +33,21 @@ Rules:
 - A prerelease attaches the prebuilt binaries (+ per-file `.sha256`) and pushes a
   container image tagged `:vX.Y.Z-beta.N` plus the moving **`:beta`** channel. It does
   **not** move `:latest` (enforced in `release.yml` via
-  `github.event.release.prerelease`). A stable release pushes `:vX.Y.Z` + `:latest`.
+  `github.event.release.prerelease`). A stable release pushes `:vX.Y.Z` + `:latest`
+  **and also `:beta`** — a stable is the newest release, so it advances the beta
+  channel too (keeping `:beta` never older than `:latest`).
 - **Container tag channels** (named to mirror each other):
   - `:latest` — newest **stable** (the default `docker pull`).
-  - `:beta` — newest **prerelease** (beta/RC). Tracks the beta lane only, so after a
-    stable ships it may point at an older commit than `:latest` — that is intentional;
-    for newer-than-stable testing use `:main`.
+  - `:beta` — newest **release of either kind**: moved by every prerelease _and_ every
+    stable, so it is **never older than `:latest`** (`:beta` ⊇ `:latest`). Use it to
+    track the release edge (betas, but never behind stable).
   - `:main` — newest **`main` build**, produced on demand by `main.yml`
     (`workflow_dispatch`). Also pushes an immutable `:main-<shortsha>`. Creates **no
     git tag and no GitHub release**, so testing between betas adds zero inflation. Its
     binaries are published as **workflow artifacts** on the run (downloadable for
     ~30 days), not as a release.
-  - Rough freshness order: `:latest` ⊆ `:beta`/`:main` over time, but the channels are
-    independent pointers, not enforced supersets.
+  - Freshness: `:latest` ⊆ `:beta` ⊆ `:main` (latest stable ⊆ release edge ⊆ newest
+    main commit).
 - The version is stamped via ldflags (ADR-0013): a tagged build reports its tag
   (`vX.Y.Z` / `vX.Y.Z-beta.N`); a `main` build reports `git describe` output, e.g.
   `vX.Y.Z-beta.N-<commits>-g<sha>`.
