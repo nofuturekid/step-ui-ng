@@ -1415,77 +1415,134 @@ templ auditActionOption(val, current string) {
 	}
 }
 
-// acmePage lists the CA's ACME provisioners with their directory URLs (+ copy
-// button) and offers create/edit/delete controls when an admin credential is
+// acmePage lists the CA's ACME provisioners with their directory URLs and EAB
+// status, and offers create/edit/delete controls when an admin credential is
 // configured (spec/0010, admin+). It never renders any secret.
+// Layout follows docs/design/acme.html.
 templ acmePage(d pageData, v acmeView) {
 	@layout(d) {
-		<div class="card">
-			<h1>ACME provisioners</h1>
-			<p class="muted">Manage ACME provisioners on the CA. Each has a directory URL clients point at; use the EAB page to issue per-client credentials when required.</p>
-			if v.ListError != "" {
-				<div class="flash error" role="alert">{ v.ListError }</div>
-			}
-			if v.CASettings {
-				if len(v.Provisioners) == 0 && v.ListError == "" {
-					<p class="muted">No ACME provisioners yet. Create one below.</p>
-				} else {
-					<table>
-						<thead>
-							<tr><th>Name</th><th>Directory URL</th><th>Actions</th></tr>
-						</thead>
-						<tbody>
-							for _, p := range v.Provisioners {
-								@acmeProvRowTempl(d, p, v.HasAdminCred, v.Challenges)
-							}
-						</tbody>
-					</table>
+		<div class="content--narrow">
+			<!-- Page header -->
+			<div class="page-head">
+				<div class="breadcrumb"><a href="#">Settings</a><span class="sep">/</span><span>ACME</span></div>
+				<h1 class="page-title">ACME</h1>
+				<p class="page-sub">ACME provisioners let clients (certbot, acme.sh, lego, Caddy) request certificates automatically. External Account Binding ties each client to a key you issue here.</p>
+			</div>
+			<div class="stack">
+				if v.ListError != "" {
+					<div class="flash flash--error" role="alert">
+						<div class="flash__body">{ v.ListError }</div>
+					</div>
 				}
-			}
-		</div>
-		if v.CASettings {
-			<div class="card">
-				<h1>Create ACME provisioner</h1>
-				if !v.HasAdminCred {
-					<p class="muted">Managing ACME provisioners requires an admin credential. Configure it on the CA settings page (x5c certificate or JWK provisioner password), or use the Step CLI directly.</p>
-				} else {
-					<form method="post" action="/acme/provisioners">
-						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-						<label for="acme-name">Name</label>
-						<input id="acme-name" name="name" type="text" required pattern="[a-zA-Z0-9._-]+" placeholder="my-acme"/>
-						<fieldset>
-							<legend>Allowed challenges</legend>
-							for _, c := range v.Challenges {
+				if !v.CASettings {
+					<div class="flash--warn">
+						<svg class="ico"><use href="/static/icons.svg#i-info"></use></svg>
+						<div class="flash__body">
+							<strong>CA not configured.</strong>
+							<p>Configure the CA connection first (<a href="/settings">CA settings</a>).</p>
+						</div>
+					</div>
+				}
+				if v.CASettings {
+					<!-- ACME provisioners table (live from CA) -->
+					<div>
+						<h2 class="section-title">ACME provisioners <span class="badge badge--neutral" style="vertical-align:middle">{ strconv.Itoa(len(v.Provisioners)) } from CA</span></h2>
+						<div class="table-wrap table-scroll">
+							<table class="table">
+								<thead>
+									<tr>
+										<th scope="col">Name</th>
+										<th scope="col">EAB</th>
+										<th scope="col">Challenges</th>
+										<th scope="col"><span class="visually-hidden">Actions</span></th>
+									</tr>
+								</thead>
+								<tbody>
+									for _, p := range v.Provisioners {
+										@acmeProvRowTempl(d, p, v.HasAdminCred, v.Challenges)
+									}
+								</tbody>
+							</table>
+						</div>
+						if len(v.Provisioners) == 0 && v.ListError == "" {
+							<p class="muted">No ACME provisioners yet.</p>
+						}
+					</div>
+					<!-- Create provisioner form — gated on admin auth -->
+					if v.HasAdminCred {
+						<div class="card">
+							<div class="card__header">
+								<div>
+									<h2 class="card__title">Create ACME provisioner</h2>
+									<p class="card__desc">Add a new ACME provisioner via the CA admin API.</p>
+								</div>
+							</div>
+							<form class="card__body stack-4" method="post" action="/acme/provisioners">
+								<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+								<div class="form-grid">
+									<div class="field">
+										<label for="acme-name">Name <span class="req" aria-hidden="true">*</span></label>
+										<input class="input" id="acme-name" name="name" type="text" required pattern="[a-zA-Z0-9._-]+" placeholder="my-acme"/>
+									</div>
+								</div>
+								<fieldset>
+									<legend class="label">Allowed challenges</legend>
+									<div class="btn-row" style="margin-top:var(--space-2)">
+										for _, c := range v.Challenges {
+											<label class="inline">
+												<input type="checkbox" name="challenge" value={ c }/> { c }
+											</label>
+										}
+									</div>
+									<span class="field__hint">Leave all unchecked to allow the CA's defaults.</span>
+								</fieldset>
 								<label class="inline">
-									<input type="checkbox" name="challenge" value={ c }/> { c }
+									<input type="checkbox" name="require_eab"/> Require External Account Binding (EAB)
 								</label>
-							}
-							<p class="muted">Leave all unchecked to allow the CA's defaults.</p>
-						</fieldset>
-						<label class="inline">
-							<input type="checkbox" name="require_eab"/> Require External Account Binding (EAB)
-						</label>
-						<p></p>
-						<button type="submit">Create</button>
-					</form>
+								<div class="form-actions" style="margin-top:var(--space-5)">
+									<button type="submit" class="btn btn--primary"><svg class="ico"><use href="/static/icons.svg#i-plus"></use></svg> Create provisioner</button>
+								</div>
+							</form>
+						</div>
+					} else {
+						<div class="locked">
+							<svg class="ico"><use href="/static/icons.svg#i-lock"></use></svg>
+							<div class="locked__body">
+								<strong>Creating and managing ACME provisioners requires an admin credential.</strong>
+								<p>Configure an <span class="mono">x5c</span> or <span class="mono">jwk</span> admin method on the CA settings page.</p>
+								<div class="btn-row">
+									<a class="btn btn--sm" href="/settings"><svg class="ico"><use href="/static/icons.svg#i-settings"></use></svg> Configure admin authentication</a>
+								</div>
+							</div>
+						</div>
+					}
 				}
 			</div>
-		}
+		</div>
 	}
 }
 
-// acmeProvRowTempl renders one ACME provisioner: name, copyable directory URL,
-// a link to its EAB page, and (with an admin credential) edit/delete controls.
+// acmeProvRowTempl renders one ACME provisioner row in the design-system table.
+// Columns: Name, EAB (Required/Off badge), Challenges, Actions (Manage EAB /
+// edit options / delete). The Manage EAB link and edit/delete forms are only
+// shown when admin auth is present. The inline edit form with checkboxes is
+// kept so the handler can merge the current state correctly (spec/0010).
 templ acmeProvRowTempl(d pageData, p acmeProvRow, hasAdminCred bool, challenges []string) {
 	<tr>
-		<td>{ p.Name }</td>
+		<td class="mono">{ p.Name }</td>
 		<td>
-			@copyField(p.DirectoryURL)
+			if p.RequireEAB {
+				<span class="badge badge--ok"><span class="dot"></span>Required</span>
+			} else {
+				<span class="badge badge--neutral"><span class="dot"></span>Off</span>
+			}
 		</td>
-		<td>
-			<div class="actions">
-				<a class="button secondary" href={ templ.SafeURL("/acme/eab/" + p.Name) }>EAB &amp; snippets</a>
+		<td class="muted">{ acmeChallengesDisplay(p.Challenges) }</td>
+		<td class="col-actions">
+			<div class="rowact">
 				if hasAdminCred {
+					<a class="btn btn--sm" href={ templ.SafeURL("/acme/eab/" + p.Name) }>Manage EAB</a>
+					<!-- Inline edit form (pre-filled from real CA state for merge correctness) -->
 					<form method="post" action={ templ.SafeURL("/acme/provisioners/" + p.Name) }>
 						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
 						<input type="hidden" name="action" value="edit"/>
@@ -1499,12 +1556,12 @@ templ acmeProvRowTempl(d pageData, p acmeProvRow, hasAdminCred bool, challenges 
 							</label>
 						}
 						<label class="inline"><input type="checkbox" name="require_eab" checked?={ p.RequireEAB }/> EAB</label>
-						<button class="secondary" type="submit">Save options</button>
+						<button class="btn btn--sm" type="submit">Save</button>
 					</form>
-					<form method="post" action={ templ.SafeURL("/acme/provisioners/" + p.Name) } onsubmit="return confirm('Delete this ACME provisioner at the CA?');">
+					<form method="post" action={ templ.SafeURL("/acme/provisioners/" + p.Name) } onsubmit="return confirm('Delete this ACME provisioner at the CA?');" style="display:contents">
 						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
 						<input type="hidden" name="action" value="delete"/>
-						<button class="danger" type="submit">Delete</button>
+						<button class="iconbtn iconbtn--danger" type="submit" title="Delete ACME provisioner"><svg class="ico"><use href="/static/icons.svg#i-trash"></use></svg></button>
 					</form>
 				}
 			</div>
@@ -1512,88 +1569,195 @@ templ acmeProvRowTempl(d pageData, p acmeProvRow, hasAdminCred bool, challenges 
 	</tr>
 }
 
-// eabPage manages EAB keys for one ACME provisioner (spec/0010, admin+). It shows
-// the directory URL, the existing keys (keyID + status, NEVER the HMAC), a create
-// form, the one-time keyID + HMAC display after a create, and the client snippets.
+// eabPage manages EAB keys for one ACME provisioner (spec/0010, admin+). It
+// shows the page-head, the one-time created HMAC panel (if just created), the
+// create form, existing keys, and client snippets. The HMAC is NEVER rendered
+// on a normal GET — only in the immediate POST response (spec/0010 FR-2).
+// Layout follows docs/design/acme.html (EAB sub-page state).
 templ eabPage(d pageData, v eabView) {
 	@layout(d) {
-		<div class="card">
-			<h1>EAB — { v.Provisioner }</h1>
-			<p class="muted">External Account Binding keys for the ACME provisioner <strong>{ v.Provisioner }</strong>.</p>
-			<label>ACME directory URL</label>
-			@copyField(v.DirectoryURL)
-			<p><a href="/acme">← Back to ACME provisioners</a></p>
-		</div>
-		if v.Created != nil {
-			<div class="card">
-				<h2>New EAB key — shown once</h2>
-				<p class="error"><strong>Save the HMAC now — it is shown only this once and is NOT retrievable later.</strong></p>
-				<label>Key ID</label>
-				@copyField(v.Created.KeyID)
-				<label>HMAC (base64)</label>
-				@copyField(v.Created.HMAC)
+		<div class="content--narrow">
+			<!-- Page header -->
+			<div class="page-head">
+				<div class="breadcrumb"><a href="/acme">ACME</a><span class="sep">/</span><span>EAB</span></div>
+				<h1 class="page-title">External Account Binding — <span class="mono">{ v.Provisioner }</span></h1>
+				<p class="page-sub">Each EAB key authorises one ACME client to bind a new account. The HMAC secret is shown once at creation and stored only as a hash.</p>
 			</div>
-		}
-		if v.ListError != "" {
-			<div class="card"><div class="flash error" role="alert">{ v.ListError }</div></div>
-		}
-		<div class="card">
-			<h2>Existing keys</h2>
-			if len(v.Keys) == 0 {
-				<p class="muted">No EAB keys yet.</p>
-			} else {
-				<table>
-					<thead>
-						<tr><th>Key ID</th><th>Reference</th><th>Status</th><th>Actions</th></tr>
-					</thead>
-					<tbody>
-						for _, k := range v.Keys {
-							<tr>
-								<td class="mono">{ k.KeyID }</td>
-								<td>{ k.Reference }</td>
-								<td>
-									if k.Bound() {
-										<span class="badge ok">bound</span>
-									} else {
-										<span class="badge">unbound</span>
+			<div class="stack">
+				if v.ListError != "" {
+					<div class="flash flash--error" role="alert">
+						<div class="flash__body">{ v.ListError }</div>
+					</div>
+				}
+				<!-- One-time HMAC reveal — rendered ONLY in the POST (create) response,
+				     never on a normal GET. The invariant is: v.Created is nil on GET. -->
+				if v.Created != nil {
+					<div class="card">
+						<div class="card__header">
+							<div>
+								<h2 class="card__title">EAB key created</h2>
+								<p class="card__desc">The HMAC secret is shown exactly once. Store it now.</p>
+							</div>
+						</div>
+						<div class="card__body stack-4">
+							<div class="onetime">
+								<div class="onetime__head">
+									<svg class="ico"><use href="/static/icons.svg#i-alert-triangle"></use></svg>
+									<div><strong>Copy this HMAC key now</strong> <span>— step-ui-ng stores only its hash and will never show it again.</span></div>
+								</div>
+								<div class="onetime__body stack-4">
+									<div class="field">
+										<span class="label">EAB Key ID</span>
+										<div class="copyline">
+											<span class="mono" id="eab-kid">{ v.Created.KeyID }</span>
+											<button type="button" class="copy-btn" data-copy-target="#eab-kid" aria-label="Copy key ID">
+												<svg class="ico"><use href="/static/icons.svg#i-copy"></use></svg>
+												<span class="label">Copy</span>
+											</button>
+										</div>
+									</div>
+									<div class="field">
+										<span class="label">HMAC key <span class="opt">(base64url)</span></span>
+										<div class="copyline">
+											<span class="mono" id="eab-hmac">{ v.Created.HMAC }</span>
+											<button type="button" class="copy-btn" data-copy-target="#eab-hmac" aria-label="Copy HMAC key">
+												<svg class="ico"><use href="/static/icons.svg#i-copy"></use></svg>
+												<span class="label">Copy</span>
+											</button>
+										</div>
+									</div>
+									<!-- Client snippets with real kid+HMAC values (one-time) -->
+									for _, s := range v.Snippets {
+										<div class="codeblock codeblock--cmd">
+											<div class="codeblock__bar">
+												<svg class="ico"><use href="/static/icons.svg#i-terminal"></use></svg>
+												<span class="label">{ s.Client }</span>
+												<span class="spacer"></span>
+												<button type="button" class="copy-btn" data-copy={ s.Code }>
+													<svg class="ico"><use href="/static/icons.svg#i-copy"></use></svg>
+													<span class="label">Copy</span>
+												</button>
+											</div>
+											<pre>{ s.Code }</pre>
+										</div>
 									}
-								</td>
-								<td>
-									if v.HasAdminCred {
-										<form method="post" action={ templ.SafeURL("/acme/eab/" + v.Provisioner) } onsubmit="return confirm('Revoke this EAB key?');">
-											<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-											<input type="hidden" name="action" value="delete"/>
-											<input type="hidden" name="key_id" value={ k.KeyID }/>
-											<button class="danger" type="submit">Revoke</button>
-										</form>
-									}
-								</td>
-							</tr>
+								</div>
+							</div>
+						</div>
+					</div>
+				}
+				<!-- Card: EAB management (create form + existing keys) -->
+				<div class="card">
+					<div class="card__header">
+						<div>
+							<h2 class="card__title">EAB keys</h2>
+							<p class="card__desc">Directory URL for ACME clients:</p>
+						</div>
+					</div>
+					<div class="card__body stack-4">
+						<!-- Directory URL copyable -->
+						<div class="field">
+							<span class="label">ACME directory URL</span>
+							<div class="copyline">
+								<span class="mono" id="eab-dir">{ v.DirectoryURL }</span>
+								<button type="button" class="copy-btn" data-copy-target="#eab-dir" aria-label="Copy directory URL">
+									<svg class="ico"><use href="/static/icons.svg#i-copy"></use></svg>
+									<span class="label">Copy</span>
+								</button>
+							</div>
+						</div>
+						<!-- Create EAB key form (admin only) -->
+						if v.HasAdminCred {
+							<form class="grid-2" method="post" action={ templ.SafeURL("/acme/eab/" + v.Provisioner) } style="align-items:end">
+								<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+								<div class="field">
+									<label for="eab-ref">Reference <span class="opt">(your label for this key)</span></label>
+									<input class="input mono" id="eab-ref" name="reference" type="text" maxlength="256" placeholder="caddy@edge-01"/>
+								</div>
+								<div class="form-actions" style="margin:0">
+									<button type="submit" class="btn btn--primary"><svg class="ico"><use href="/static/icons.svg#i-plus"></use></svg> Generate key</button>
+								</div>
+							</form>
 						}
-					</tbody>
-				</table>
-			}
-		</div>
-		if v.HasAdminCred {
-			<div class="card">
-				<h2>Create EAB key</h2>
-				<p class="muted">The HMAC is shown exactly once on creation. Store it securely; it cannot be retrieved later.</p>
-				<form method="post" action={ templ.SafeURL("/acme/eab/" + v.Provisioner) }>
-					<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-					<label for="eab-ref">Reference (optional label)</label>
-					<input id="eab-ref" name="reference" type="text" maxlength="256" placeholder="e.g. laptop-01"/>
-					<p></p>
-					<button type="submit">Create EAB key</button>
-				</form>
+						<!-- Existing EAB keys -->
+						<div>
+							<h3 class="section-title" style="font-size:var(--fs-md)">Existing EAB keys</h3>
+							if len(v.Keys) == 0 {
+								<p class="muted">No EAB keys yet.</p>
+							} else {
+								<div class="table-wrap table-scroll">
+									<table class="table">
+										<thead>
+											<tr>
+												<th scope="col">Key ID</th>
+												<th scope="col">Reference</th>
+												<th scope="col">Created</th>
+												<th scope="col">Status</th>
+												<th scope="col"><span class="visually-hidden">Actions</span></th>
+											</tr>
+										</thead>
+										<tbody>
+											for _, k := range v.Keys {
+												<tr>
+													<td><span class="mono subtle">{ eabKeyIDShort(k.KeyID) }</span></td>
+													<td class="mono">{ k.Reference }</td>
+													<td class="nowrap muted">{ fmtEABCreatedAt(k.CreatedAt) }</td>
+													<td>
+														if k.Bound() {
+															<span class="badge badge--ok"><span class="dot"></span>Bound</span>
+														} else {
+															<span class="badge badge--warn"><svg class="ico"><use href="/static/icons.svg#i-clock"></use></svg>Pending</span>
+														}
+													</td>
+													<td class="col-actions">
+														<div class="rowact">
+															if v.HasAdminCred {
+																<form method="post" action={ templ.SafeURL("/acme/eab/" + v.Provisioner) } onsubmit="return confirm('Revoke this EAB key?');" style="display:contents">
+																	<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+																	<input type="hidden" name="action" value="delete"/>
+																	<input type="hidden" name="key_id" value={ k.KeyID }/>
+																	<button class="iconbtn iconbtn--danger" type="submit" title={ "Revoke EAB key " + k.KeyID } aria-label={ "Revoke EAB key " + k.KeyID }><svg class="ico"><use href="/static/icons.svg#i-ban"></use></svg></button>
+																</form>
+															}
+														</div>
+													</td>
+												</tr>
+											}
+										</tbody>
+									</table>
+								</div>
+							}
+						</div>
+					</div>
+				</div>
+				<!-- Client snippets card (without EAB values — use one-time panel above for real values) -->
+				if v.Created == nil {
+					<div class="card">
+						<div class="card__header">
+							<div>
+								<h2 class="card__title">Client snippets</h2>
+								<p class="card__desc">Copy-paste onboarding for common ACME clients, parameterized with this directory URL{ eabSnippetNote(v.RequireEAB) }.</p>
+							</div>
+						</div>
+						<div class="card__body stack-4">
+							for _, s := range v.Snippets {
+								<div class="codeblock codeblock--cmd">
+									<div class="codeblock__bar">
+										<svg class="ico"><use href="/static/icons.svg#i-terminal"></use></svg>
+										<span class="label">{ s.Client }</span>
+										<span class="spacer"></span>
+										<button type="button" class="copy-btn" data-copy={ s.Code }>
+											<svg class="ico"><use href="/static/icons.svg#i-copy"></use></svg>
+											<span class="label">Copy</span>
+										</button>
+									</div>
+									<pre>{ s.Code }</pre>
+								</div>
+							}
+						</div>
+					</div>
+				}
 			</div>
-		}
-		<div class="card">
-			<h2>Client snippets</h2>
-			<p class="muted">Copy-paste onboarding for common ACME clients, parameterized with this directory URL{ eabSnippetNote(v.RequireEAB) }.</p>
-			for _, s := range v.Snippets {
-				<label>{ s.Client }</label>
-				@copyBlock(s.Code)
-			}
 		</div>
 	}
 }
@@ -1620,6 +1784,38 @@ func eabSnippetNote(requireEAB bool) string {
 		return " and EAB credentials"
 	}
 	return ""
+}
+
+// acmeChallengesDisplay formats the challenges slice for display in the table
+// cell: comma-separated, or "default" when empty (CA chooses).
+func acmeChallengesDisplay(challenges []string) string {
+	if len(challenges) == 0 {
+		return "default"
+	}
+	return strings.Join(challenges, ", ")
+}
+
+// eabKeyIDShort returns a truncated key ID for display (show prefix…suffix).
+// If the ID is short enough to fit, it is returned as-is.
+func eabKeyIDShort(id string) string {
+	const maxLen = 16
+	if len(id) <= maxLen {
+		return id
+	}
+	return id[:6] + "…" + id[len(id)-3:]
+}
+
+// fmtEABCreatedAt formats the RFC3339 createdAt timestamp from the CA as a
+// UTC date. Returns "—" on parse failure.
+func fmtEABCreatedAt(ts string) string {
+	if ts == "" {
+		return "—"
+	}
+	t, err := time.Parse(time.RFC3339, ts)
+	if err != nil {
+		return ts
+	}
+	return t.UTC().Format("2006-01-02")
 }
 
 // auditPageURL builds a relative URL for a given audit page + existing filters.
