@@ -281,14 +281,18 @@ func TestACMECreateProvisionerWithOptions(t *testing.T) {
 		t.Fatalf("CA challenges = %+v, want [DNS_01]", acme["challenges"])
 	}
 
-	// The provisioner now appears with its directory URL on the list page.
+	// The provisioner now appears on the list page.
+	// The directory URL is shown on the per-provisioner EAB page (FR-3 is
+	// satisfied there; the redesigned ACME list shows Name/EAB/Challenges only).
 	f.provJSON = `{"provisioners":[{"type":"ACME","name":"acme1"}]}`
 	_, body := e.getBody(t, "/acme")
 	if !strings.Contains(body, "acme1") {
 		t.Fatalf("ACME list missing acme1; body:\n%s", body)
 	}
-	if !strings.Contains(body, f.url+"/acme/acme1/directory") {
-		t.Fatalf("ACME list missing directory URL; body:\n%s", body)
+	// Directory URL is accessible via the EAB page for the provisioner (FR-3).
+	_, eabBody := e.getBody(t, "/acme/eab/acme1")
+	if !strings.Contains(eabBody, f.url+"/acme/acme1/directory") {
+		t.Fatalf("EAB page missing directory URL; body:\n%s", eabBody)
 	}
 
 	// Audit event recorded, attributed to the session user, with no secret.

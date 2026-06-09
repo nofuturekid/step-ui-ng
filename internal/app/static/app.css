@@ -1570,6 +1570,34 @@ table.table {
   border-color: var(--danger-border);
 }
 
+/* ---- ACME/EAB: one-time HMAC reveal panel -------------------------------- */
+.onetime {
+  border: 2px solid var(--warn-border);
+  border-radius: var(--radius);
+  background: var(--warn-bg);
+  padding: var(--space-4);
+}
+.onetime__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  color: var(--warn-fg);
+  font-size: var(--fs-sm);
+  margin-bottom: var(--space-4);
+}
+.onetime__head .ico {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--warn-fg);
+}
+.onetime__body {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: var(--space-4);
+}
+
 /* =========================================================================
    Legacy page-interior styles
    These are used by templates not yet ported to the new design system.

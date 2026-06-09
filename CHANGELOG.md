@@ -10,6 +10,39 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- **ACME + EAB pages redesign** (PR E): ports `GET /acme` and `GET /acme/eab/{provisioner}`
+  to the approved design mock (`docs/design/acme.html`). No behaviour change to
+  handlers, routes, field names, validation, htmx wiring, or RBAC.
+  - **ACME list page** (`acmePage`): `content--narrow` wrapper, `page-head` with
+    breadcrumb (`Settings / ACME`), `page-title` "ACME", `page-sub` copy mentioning
+    certbot/acme.sh/lego/Caddy and EAB. Table uses `section-title` heading
+    ("ACME provisioners — N from CA" badge), `table-wrap table-scroll`,
+    `table.table` with Name / EAB / Challenges / Actions columns. The EAB column
+    shows `badge--ok` "Required" or `badge--neutral` "Off" per provisioner state.
+    The Actions column shows "Manage EAB" link to the EAB sub-page (admin+ only)
+    plus inline edit/delete forms (admin+ only). Locked notice with
+    "Configure admin authentication" link when no admin auth is set.
+  - **EAB sub-page** (`eabPage`): `page-head` with breadcrumb (`ACME / EAB`),
+    `page-title` "External Account Binding — <provisioner>", `page-sub` intro copy
+    ("Each EAB key authorises one ACME client… HMAC shown once at creation…").
+    EAB management card: copyable directory URL, `grid-2` create form
+    (`reference` input + Generate key button), existing keys table
+    (`table.table` with Key ID / Reference / Created / Status / Actions columns;
+    revoke icon button). Client snippets card with `codeblock--cmd` blocks and
+    `data-copy` copy buttons for certbot, acme.sh, Caddy, Traefik.
+  - **One-time HMAC reveal** (`class="onetime"`): rendered only in the `postEAB`
+    create response (when `v.Created != nil`). Shows the real kid and HMAC as
+    visible selectable `<span class="mono">` text with `data-copy-target` copy
+    buttons (app-wide copy handler). Client snippets in the panel carry the real
+    kid + HMAC values. The panel does NOT appear on `GET /acme/eab/{provisioner}`.
+    Security invariant enforced by `v.Created` being `nil` on all GET paths.
+  - **New CSS** in `app.css`: `.onetime` / `.onetime__head` / `.onetime__body`
+    (warning-bordered panel for the one-time HMAC reveal).
+  - New pure-Go helpers: `acmeChallengesDisplay`, `eabKeyIDShort`, `fmtEABCreatedAt`.
+  - **`TestACMECreateProvisionerWithOptions`** updated: the directory URL is now
+    shown on the per-provisioner EAB page (FR-3) rather than the ACME list; the
+    test now checks `/acme/eab/acme1` instead (design-only change, FR-3 satisfied).
+
 - **Provisioners page redesign** (PR D): ports `GET /provisioners` to the approved
   design mock (`docs/design/provisioners.html`). No behaviour change to handlers,
   routes, field names, validation, or the active-delete guard.
