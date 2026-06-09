@@ -357,6 +357,78 @@ func TestListFilters(t *testing.T) {
 	}
 }
 
+// TestListFiltersExpiring covers the boundary conditions for the "expiring"
+// filter (active certs with DaysLeft ≤ ExpiringThresholdDays=30).
+// Rule 9: each case fails if the filter logic breaks for that boundary.
+func TestListFiltersExpiring(t *testing.T) {
+	svc, db, _, _ := testService(t)
+
+	now := time.Now()
+	// Seed certs covering each boundary:
+	//  1. 30d — exactly at threshold → must be included (DaysLeft = 30)
+	//  2. 32d — clearly over threshold → must be excluded (DaysLeft = 32;
+	//     using 32 not 31 because Unix-second truncation makes 31d compute as 30d)
+	//  3. expired (past) — must be excluded (it is "expired", not "expiring")
+	//  4. revoked, future-dated — must be excluded (status=revoked overrides)
+	//  5. 0d (today) — boundary: still active at 0 days left → included
+	seedCert(t, db, "expiring-30d.test", `["expiring-30d.test"]`, "valid", now.Add(30*24*time.Hour).Unix())
+	seedCert(t, db, "active-32d.test", `["active-32d.test"]`, "valid", now.Add(32*24*time.Hour).Unix())
+	seedCert(t, db, "expired-past.test", `["expired-past.test"]`, "valid", now.Add(-24*time.Hour).Unix())
+	seedCert(t, db, "revoked-future.test", `["revoked-future.test"]`, "revoked", now.Add(30*24*time.Hour).Unix())
+	seedCert(t, db, "expiring-0d.test", `["expiring-0d.test"]`, "valid", now.Add(12*time.Hour).Unix())
+
+	cases := []struct {
+		name      string
+		wantCNs   []string
+		unwantCNs []string
+	}{
+		{
+			name:      "30d cert at threshold is included",
+			wantCNs:   []string{"expiring-30d.test"},
+			unwantCNs: nil,
+		},
+		{
+			name:      "32d cert over threshold is excluded",
+			unwantCNs: []string{"active-32d.test"},
+		},
+		{
+			name:      "expired cert is excluded from expiring filter",
+			unwantCNs: []string{"expired-past.test"},
+		},
+		{
+			name:      "revoked future-dated cert is excluded from expiring filter",
+			unwantCNs: []string{"revoked-future.test"},
+		},
+		{
+			name:    "0d cert (today) is included",
+			wantCNs: []string{"expiring-0d.test"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			list, err := svc.List(context.Background(), certs.ListFilter{Status: "expiring"})
+			if err != nil {
+				t.Fatalf("List: %v", err)
+			}
+			got := make(map[string]bool)
+			for _, c := range list {
+				got[c.CN] = true
+			}
+			for _, want := range tc.wantCNs {
+				if !got[want] {
+					t.Errorf("expiring filter: want %q included, got keys %v", want, keys(got))
+				}
+			}
+			for _, unwant := range tc.unwantCNs {
+				if got[unwant] {
+					t.Errorf("expiring filter: unwanted %q included, got keys %v", unwant, keys(got))
+				}
+			}
+		})
+	}
+}
+
 // --- FR-1: Detail view (Get by ID) ------------------------------------------
 
 func TestGetReturnsDetail(t *testing.T) {

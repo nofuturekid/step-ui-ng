@@ -161,9 +161,14 @@ func TestRevokeAlreadyRevokedShowsError(t *testing.T) {
 	}
 }
 
-// --- Guard rail: missing reason → error, no CA call -------------------------
-
-func TestRevokeMissingReasonShowsError(t *testing.T) {
+// --- Guard rail: blank reason note → handler defaults to reason_code label ---
+//
+// Design change (PR-B fix): the reason note field is optional in the form. When
+// the user leaves it blank, the handler defaults to the reason_code's label so
+// the domain's ErrReasonRequired guard is satisfied without forcing extra typing.
+// This test encodes that the happy path (blank note + reason_code selected)
+// succeeds and the CA is called.
+func TestRevokeBlankReasonNoteDefaultsToCodeLabel(t *testing.T) {
 	e := newTestEnv(t)
 	e.completeSetup(t, "root")
 	f := startSignCAFixture(t)
@@ -172,19 +177,21 @@ func TestRevokeMissingReasonShowsError(t *testing.T) {
 	id := revInsertCert(t, e, "noreason.test", "777", time.Now().Add(90*24*time.Hour).Unix())
 	path := "/certificates/" + strconv.FormatInt(id, 10) + "/revoke"
 	token := e.csrfToken(t, "/certificates/"+strconv.FormatInt(id, 10))
-	_, body := e.postForm(t, path, url.Values{
-		"csrf_token": {token},
-		"reason":     {""},
-		"confirm":    {"REVOKE"},
+	// Blank reason note — the handler must default to the reason_code label ("unspecified").
+	status, body := e.postForm(t, path, url.Values{
+		"csrf_token":  {token},
+		"reason":      {""},
+		"reason_code": {"0"},
+		"confirm":     {"REVOKE"},
 	})
-	if f.revokeCalled {
-		t.Fatal("the CA must NOT be called when the reason is missing")
+	if status != http.StatusOK && status != http.StatusSeeOther {
+		t.Fatalf("revoke with blank note = %d, want 200/303; body:\n%s", status, body)
 	}
-	if !strings.Contains(strings.ToLower(body), "reason") {
-		t.Fatalf("expected a 'reason required' error; body:\n%s", body)
+	if !f.revokeCalled {
+		t.Fatal("the CA must be called when reason defaults from reason_code label")
 	}
-	if s := revStatus(t, e, id); s != "valid" {
-		t.Fatalf("status = %q, want unchanged", s)
+	if s := revStatus(t, e, id); s != "revoked" {
+		t.Fatalf("status = %q, want revoked after successful revoke with defaulted reason", s)
 	}
 }
 

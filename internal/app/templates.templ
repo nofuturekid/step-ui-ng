@@ -689,29 +689,63 @@ templ certResult(c certs.Certificate) {
 
 // inventoryPage renders the certificate inventory list with live-filter controls
 // (spec/0007, FR-1). htmx swaps only the table body on filter changes.
+// Layout follows docs/design/inventory.html.
 templ inventoryPage(d pageData, v inventoryView) {
 	@layout(d) {
-		<div class="card">
-			<h1>Certificates</h1>
-			<form
-				hx-get="/inventory"
-				hx-target="#inventory-table"
-				hx-trigger="change, input delay:300ms"
-				hx-push-url="false"
-			>
-				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-				<label for="inv-status">Status</label>
-				<select id="inv-status" name="status">
-					<option value="">All</option>
-					@invStatusOption("active", "Active", v.Filter.Status)
-					@invStatusOption("expired", "Expired", v.Filter.Status)
-					@invStatusOption("revoked", "Revoked", v.Filter.Status)
-				</select>
-				<label for="inv-search">Search (CN / SAN)</label>
-				<input id="inv-search" name="q" type="search" placeholder="e.g. example.test" value={ v.Filter.Search }/>
-			</form>
-			<div id="inventory-table">
-				@inventoryTable(d, v)
+		<div class="content">
+			<!-- Page header -->
+			<div class="page-head">
+				<div class="page-head__row">
+					<div>
+						<h1 class="page-title">Certificates</h1>
+						<p class="page-sub">Issued certificates from step-ui-ng's local record.</p>
+					</div>
+					if d.User != nil && d.User.Role.AtLeast(users.RoleAdmin) {
+						<div class="page-head__actions">
+							<a class="btn" href="/sign-csr"><svg class="ico"><use href="/static/icons.svg#i-pen"></use></svg> Sign CSR</a>
+							<a class="btn btn--primary" href="/issue"><svg class="ico"><use href="/static/icons.svg#i-file-plus"></use></svg> Issue certificate</a>
+						</div>
+					}
+				</div>
+			</div>
+			<div class="stack">
+				<!-- "As recorded" banner — honest copy, no fake timestamp -->
+				<div class="flash--info" role="status">
+					<svg class="ico"><use href="/static/icons.svg#i-info"></use></svg>
+					<div class="flash__body">
+						<strong>This is step-ui-ng's recorded view.</strong>
+						<p>Reflects what step-ui-ng has issued and can drift from the CA.</p>
+					</div>
+				</div>
+				<!-- Filter bar + table -->
+				<div>
+					<form
+						class="filterbar"
+						role="search"
+						aria-label="Filter certificates"
+						hx-get="/inventory"
+						hx-target="#inventory-table"
+						hx-trigger="change, input delay:300ms"
+						hx-push-url="false"
+					>
+						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+						<div class="searchbox">
+							<svg class="ico"><use href="/static/icons.svg#i-search"></use></svg>
+							<input class="input" type="search" name="q" placeholder="Search common name or SAN…" value={ v.Filter.Search }/>
+						</div>
+						<label class="visually-hidden" for="inv-status">Status</label>
+						<select class="select" id="inv-status" name="status" style="max-width:170px">
+							@invStatusOption("", "All statuses", v.Filter.Status)
+							@invStatusOption("active", "Valid", v.Filter.Status)
+							@invStatusOption("expiring", "Expiring", v.Filter.Status)
+							@invStatusOption("expired", "Expired", v.Filter.Status)
+							@invStatusOption("revoked", "Revoked", v.Filter.Status)
+						</select>
+					</form>
+					<div id="inventory-table">
+						@inventoryTable(d, v)
+					</div>
+				</div>
 			</div>
 		</div>
 	}
@@ -726,64 +760,92 @@ templ invStatusOption(val, label, current string) {
 }
 
 // inventoryTable is the htmx-swappable table partial for the inventory list.
+// It is the hx-target="#inventory-table" swap target; it must be renderable
+// standalone (no surrounding layout).  Columns: Common name, Status, Expires,
+// Serial, Actions.
+//
+// Columns present in the mock but not yet backed by our data model are omitted
+// (see FLAGS in the implementation report):
+//   - Type (Leaf · server/client)  — FLAG: no field in InventoryItem
+//   - Provisioner                  — FLAG: no field in InventoryItem
+//   - Fingerprint (truncated hex)  — FLAG: no field in InventoryItem
 templ inventoryTable(d pageData, v inventoryView) {
 	if len(v.Items) == 0 {
 		<p class="muted">No certificates match the current filter.</p>
 	} else {
-		<table>
-			<thead>
-				<tr>
-					<th>Common name</th>
-					<th>SANs</th>
-					<th>Serial</th>
-					<th>Status</th>
-					<th>Expires</th>
-					<th>Strategy</th>
-					<th>Actions</th>
-				</tr>
-			</thead>
-			<tbody>
-				for _, item := range v.Items {
-					@inventoryRow(d, item)
-				}
-			</tbody>
-		</table>
+		<div class="table-wrap table-scroll">
+			<table class="table">
+				<thead>
+					<tr>
+						<th scope="col">Common name</th>
+						<th scope="col">Status</th>
+						<th scope="col">Expires</th>
+						<th scope="col">Serial</th>
+						<th scope="col"><span class="visually-hidden">Actions</span></th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, item := range v.Items {
+						@inventoryRow(d, item)
+					}
+				</tbody>
+			</table>
+		</div>
 	}
 }
 
-// inventoryRow renders a single inventory row with a status badge, days-to-
-// expiry, and a compact download form (FR-5). The download is a POST so the
-// optional PFX password travels in the form body, never in the URL.
+// inventoryRow renders a single inventory row.
+// The link on the CN and the chevron-right icon both navigate to the detail page.
 templ inventoryRow(d pageData, item certs.InventoryItem) {
 	<tr>
-		<td><a href={ templ.SafeURL("/certificates/" + strconv.FormatInt(item.ID, 10)) }>{ item.CN }</a></td>
-		<td>{ joinSANs(item.SANs) }</td>
-		<td class="mono">{ item.Serial }</td>
-		<td>@statusBadge(item.Status)</td>
-		<td>{ fmtExpiry(item.NotAfter, item.DaysLeft) }</td>
-		<td>{ item.KeyStrategy }</td>
 		<td>
-			<a class="button" href={ templ.SafeURL("/certificates/" + strconv.FormatInt(item.ID, 10)) }>View</a>
-			<form method="post" action={ templ.SafeURL("/certificates/" + strconv.FormatInt(item.ID, 10) + "/download") } style="display:inline">
-				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-				<input type="password" name="pfx_password" placeholder="PFX password (optional)" style="width:12em"/>
-				<button class="secondary" type="submit">Download</button>
-			</form>
+			<a class="rowlink cn-cell" href={ templ.SafeURL("/certificates/" + strconv.FormatInt(item.ID, 10)) } title={ item.CN }>{ item.CN }</a>
+		</td>
+		<td>@statusBadge(item.Status, item.DaysLeft)</td>
+		<td class="nowrap">@expiryCell(item.NotAfter, item.DaysLeft, item.Status)</td>
+		<td><span class="mono subtle">{ item.Serial }</span></td>
+		<td class="col-actions">
+			<a class="iconbtn" href={ templ.SafeURL("/certificates/" + strconv.FormatInt(item.ID, 10)) } aria-label={ "View " + item.CN }>
+				<svg class="ico"><use href="/static/icons.svg#i-chevron-right"></use></svg>
+			</a>
 		</td>
 	</tr>
 }
 
 // statusBadge renders a coloured badge for the derived certificate status.
-templ statusBadge(status string) {
-	switch status {
-	case "active":
-		<span class="badge ok">active</span>
-	case "expired":
-		<span class="badge warn">expired</span>
-	case "revoked":
-		<span class="badge error">revoked</span>
+// The "expiring" display status is a sub-state of "active": active certs with
+// DaysLeft ≤ certs.ExpiringThresholdDays show the amber "Expiring" badge with
+// a day countdown. All other active certs show "Valid" (green).
+templ statusBadge(status string, daysLeft int) {
+	switch {
+	case status == "active" && daysLeft <= certs.ExpiringThresholdDays:
+		<span class="badge badge--warn">
+			<svg class="ico"><use href="/static/icons.svg#i-clock"></use></svg>Expiring
+		</span>
+	case status == "active":
+		<span class="badge badge--ok"><span class="dot"></span>Valid</span>
+	case status == "expired":
+		<span class="badge badge--neutral"><span class="dot"></span>Expired</span>
+	case status == "revoked":
+		<span class="badge badge--danger">
+			<svg class="ico"><use href="/static/icons.svg#i-ban"></use></svg>Revoked
+		</span>
 	default:
 		<span class="badge">{ status }</span>
+	}
+}
+
+// expiryCell renders the Expires column: date + relative days, styled for urgency.
+// For expiring certs the text is amber; for expired it's subtle; revoked is subtle.
+templ expiryCell(notAfter int64, daysLeft int, status string) {
+	if status == "revoked" {
+		<span class="subtle">{ fmtDate(notAfter) }</span>
+	} else if status == "expired" {
+		<span class="subtle">{ fmtDate(notAfter) } <span>· { fmtDaysAgo(-daysLeft) }</span></span>
+	} else if status == "active" && daysLeft <= certs.ExpiringThresholdDays {
+		<span class="text-warn">{ fmtDate(notAfter) } <span>· { strconv.Itoa(daysLeft) }d</span></span>
+	} else {
+		<span>{ fmtDate(notAfter) } <span class="subtle">· { strconv.Itoa(daysLeft) }d</span></span>
 	}
 }
 
@@ -796,87 +858,200 @@ type certDetailView struct {
 }
 
 // certDetailPage renders the full certificate detail view (spec/0007 FR-1;
-// spec/0008 revoke/renew). It shows all metadata, PEM blocks (read-only
-// textareas), a Download button (FR-5), and — for admin+ — the Revoke (reason +
-// typed confirmation) and Renew (validity, defaulted from config) controls.
+// spec/0008 revoke/renew). Layout follows docs/design/certificate.html.
+//
+// RBAC: admin+ sees action buttons (Download bundle, Renew, Revoke).
+// A viewer sees metadata + PEM only — no action buttons, no forms.
+//
+// FLAGS (mock affordances not backed by our data model):
+//   - Provisioner field in metadata   — FLAG: not stored in certificates table
+//   - SHA-256 fingerprint             — FLAG: not stored; would need crypto parse
+//   - Key usage / EKU tags            — FLAG: not stored
+//   - Issuer (CA name)                — FLAG: not stored
+//   - Cert type tags (leaf, RSA-2048) — FLAG: not stored
 templ certDetailPage(d pageData, v certDetailView) {
 	@layout(d) {
 		{{ c := v.Cert }}
-		{{ status, _ := certs.DeriveStatus(c.Status, c.NotAfter) }}
-		<div class="card">
-			<h1>Certificate detail</h1>
-			<table>
-				<tbody>
-					<tr><th>Common name</th><td>{ c.CN }</td></tr>
-					<tr><th>Serial</th><td class="mono">{ c.Serial }</td></tr>
-					<tr><th>SANs</th><td>{ joinSANs(c.SANs) }</td></tr>
-					<tr><th>Key strategy</th><td>{ c.KeyStrategy }</td></tr>
-					<tr>
-						<th>Status</th>
-						<td>@statusBadge(status)</td>
-					</tr>
-					<tr><th>Not before</th><td>{ fmtUnix(c.NotBefore) }</td></tr>
-					<tr><th>Not after</th><td>{ fmtUnix(c.NotAfter) }</td></tr>
-				</tbody>
-			</table>
-			<form method="post" action={ templ.SafeURL("/certificates/" + strconv.FormatInt(c.ID, 10) + "/download") }>
-				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-				<label for="dl-pfx-pass">PFX password (optional — adds PKCS#12 bundle to ZIP)</label>
-				<input id="dl-pfx-pass" type="password" name="pfx_password" placeholder="leave blank for PEM-only bundle" style="width:22em"/>
-				<p></p>
-				<button type="submit">Download bundle (ZIP)</button>
-			</form>
-		</div>
-		if d.User != nil && d.User.Role.AtLeast(users.RoleAdmin) {
-			<div class="card">
-				<h2>Renew</h2>
-				<p class="muted">Re-issue a new certificate for the same common name and SANs. A new private key is generated and sealed; the renewed certificate appears in the inventory.</p>
-				<form method="post" action={ templ.SafeURL("/certificates/" + strconv.FormatInt(c.ID, 10) + "/renew") }>
-					<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-					<label for="renew-validity">Validity (days)</label>
-					<input id="renew-validity" type="number" name="validity" min="1" value={ strconv.Itoa(v.RenewDefaultDays) } style="width:8em" required/>
-					<p class="muted">Default { strconv.Itoa(v.RenewDefaultDays) } days; the provisioner's maximum still applies.</p>
-					<button type="submit">Renew certificate</button>
-				</form>
+		{{ status, daysLeft := certs.DeriveStatus(c.Status, c.NotAfter) }}
+		<div class="content">
+			<!-- Page header with breadcrumb, CN as title, status badge, admin actions -->
+			<div class="page-head">
+				<div class="breadcrumb">
+					<a href="/inventory">Certificates</a><span class="sep">/</span><span>{ c.CN }</span>
+				</div>
+				<div class="page-head__row">
+					<div>
+						<h1 class="page-title mono">{ c.CN }</h1>
+						<div class="btn-row" style="margin-top:var(--space-3)">
+							@statusBadge(status, daysLeft)
+						</div>
+					</div>
+					<!-- Admin+ action buttons. A viewer sees metadata + PEM only. -->
+					if d.User != nil && d.User.Role.AtLeast(users.RoleAdmin) {
+						<div class="page-head__actions">
+							<form method="post" action={ templ.SafeURL("/certificates/" + strconv.FormatInt(c.ID, 10) + "/download") } style="display:contents">
+								<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+								<input type="hidden" name="pfx_password" value=""/>
+								<button type="submit" class="btn btn--primary"><svg class="ico"><use href="/static/icons.svg#i-download"></use></svg> Download bundle</button>
+							</form>
+							if status != "revoked" {
+								<a class="btn btn--ghost" href="#renew-section"><svg class="ico"><use href="/static/icons.svg#i-refresh"></use></svg> Renew</a>
+								<a class="btn btn--danger" href="#revoke-section"><svg class="ico"><use href="/static/icons.svg#i-ban"></use></svg> Revoke</a>
+							}
+						</div>
+					}
+				</div>
 			</div>
-			<div class="card">
-				<h2>Revoke</h2>
-				if status == "revoked" {
-					<p class="muted">This certificate is already revoked.</p>
-				} else {
-					<p class="muted">Revocation is <strong>permanent</strong> and is performed at the CA. Provide a reason and type <code>REVOKE</code> to confirm.</p>
-					<form method="post" action={ templ.SafeURL("/certificates/" + strconv.FormatInt(c.ID, 10) + "/revoke") } onsubmit="return confirm('Revoke this certificate at the CA? This cannot be undone.');">
-						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-						<label for="revoke-reason">Reason (required)</label>
-						<input id="revoke-reason" type="text" name="reason" placeholder="e.g. key compromise" style="width:22em" required/>
-						<label for="revoke-reason-code">OCSP reason code</label>
-						<select id="revoke-reason-code" name="reason_code">
-							<option value="0">0 — unspecified</option>
-							<option value="1">1 — key compromise</option>
-							<option value="3">3 — affiliation changed</option>
-							<option value="4">4 — superseded</option>
-							<option value="5">5 — cessation of operation</option>
-						</select>
-						<label for="revoke-confirm">Type REVOKE to confirm</label>
-						<input id="revoke-confirm" type="text" name="confirm" placeholder="REVOKE" autocomplete="off" style="width:12em" required/>
-						<p></p>
-						<button class="danger" type="submit">Revoke certificate</button>
-					</form>
+			<div class="stack">
+				<!-- Two-column metadata grid -->
+				<div class="grid-2">
+					<!-- Overview card -->
+					<div class="card">
+						<div class="card__header"><h2 class="card__title">Overview</h2></div>
+						<div class="card__body">
+							<dl class="dl">
+								<dt>Common name</dt>
+								<dd class="mono">{ c.CN }</dd>
+								<dt>Subject alt names</dt>
+								<dd>
+									<div class="btn-row" style="gap:6px">
+										for _, san := range c.SANs {
+											<span class="tag">{ san }</span>
+										}
+									</div>
+								</dd>
+								<dt>Status</dt>
+								<dd>@statusBadge(status, daysLeft)</dd>
+								<dt>Key strategy</dt>
+								<dd>{ c.KeyStrategy }</dd>
+								<dt>Not before</dt>
+								<dd class="mono">{ fmtUnix(c.NotBefore) }</dd>
+								<dt>Not after</dt>
+								<dd class="mono">{ fmtUnix(c.NotAfter) }{ fmtDaysHint(daysLeft, status) }</dd>
+							</dl>
+						</div>
+					</div>
+					<!-- Identifiers card -->
+					<div class="card">
+						<div class="card__header"><h2 class="card__title">Identifiers</h2></div>
+						<div class="card__body stack-4">
+							<div class="field">
+								<span class="label">Serial number</span>
+								<div class="copyline">
+									<span class="mono" id="cert-serial">{ c.Serial }</span>
+									<input type="hidden" value={ c.Serial }/>
+									<button type="button" class="copy-btn" onclick="copyText(this)" aria-label="Copy serial">
+										<svg class="ico"><use href="/static/icons.svg#i-copy"></use></svg> Copy
+									</button>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<!-- Leaf certificate PEM block -->
+				<div class="card">
+					<div class="card__header">
+						<div>
+							<h2 class="card__title">Certificate (PEM)</h2>
+							<p class="card__desc">Read-only. The private key is never stored or displayed by step-ui-ng.</p>
+						</div>
+					</div>
+					<div class="card__body">
+						<div class="codeblock pem" id="pem-leaf">
+							<div class="codeblock__bar">
+								<svg class="ico"><use href="/static/icons.svg#i-file-text"></use></svg>
+								<span class="label">{ certFilename(c.CN) }</span>
+								<span class="spacer"></span>
+								<div class="copy">
+									<textarea id="pem-leaf-text" rows="1" readonly style="display:none">{ c.CertPEM }</textarea>
+									<button type="button" class="copy-btn" onclick="copyText(this)" aria-label="Copy certificate PEM">
+										<svg class="ico"><use href="/static/icons.svg#i-copy"></use></svg> Copy
+									</button>
+								</div>
+							</div>
+							<pre>{ c.CertPEM }</pre>
+						</div>
+					</div>
+				</div>
+				if c.ChainPEM != "" {
+					<div class="card">
+						<div class="card__header"><h2 class="card__title">Chain (PEM)</h2></div>
+						<div class="card__body">
+							<div class="codeblock pem" id="pem-chain">
+								<div class="codeblock__bar">
+									<svg class="ico"><use href="/static/icons.svg#i-file-text"></use></svg>
+									<span class="label">chain.pem</span>
+									<span class="spacer"></span>
+									<div class="copy">
+										<textarea id="pem-chain-text" rows="1" readonly style="display:none">{ c.ChainPEM }</textarea>
+										<button type="button" class="copy-btn" onclick="copyText(this)" aria-label="Copy chain PEM">
+											<svg class="ico"><use href="/static/icons.svg#i-copy"></use></svg> Copy
+										</button>
+									</div>
+								</div>
+								<pre>{ c.ChainPEM }</pre>
+							</div>
+						</div>
+					</div>
+				}
+				<!-- Renew section (admin+, non-revoked only) — editable validity (spec/0008 FR-2) -->
+				if d.User != nil && d.User.Role.AtLeast(users.RoleAdmin) && status != "revoked" {
+					<div class="card" id="renew-section">
+						<div class="card__header"><h2 class="card__title">Renew</h2></div>
+						<div class="card__body">
+							<p class="muted">Re-issue a new certificate for the same common name and SANs. A new private key is generated and sealed; the renewed certificate appears in the inventory.</p>
+							<form class="stack-4" method="post" action={ templ.SafeURL("/certificates/" + strconv.FormatInt(c.ID, 10) + "/renew") }>
+								<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+								<div class="field">
+									<label for="renew-validity">Validity (days)</label>
+									<input class="input" id="renew-validity" type="number" name="validity" min="1" value={ strconv.Itoa(v.RenewDefaultDays) } style="max-width:8em" required/>
+								</div>
+								<div class="form-actions">
+									<button type="submit" class="btn btn--primary"><svg class="ico"><use href="/static/icons.svg#i-refresh"></use></svg> Renew certificate</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				}
+				<!-- Revoke section (admin+, non-revoked only) — confirm=REVOKE required by handler (spec/0008 FR-3) -->
+				if d.User != nil && d.User.Role.AtLeast(users.RoleAdmin) && status != "revoked" {
+					<div class="card" id="revoke-section" style="border-color:var(--danger-border)">
+						<div class="card__header">
+							<div>
+								<h2 class="card__title text-danger">Revoke certificate</h2>
+								<p class="card__desc">Revocation is permanent and cannot be undone. The certificate will be reported revoked at the CA and in this inventory.</p>
+							</div>
+						</div>
+						<div class="card__body">
+							<form class="stack-4" method="post" action={ templ.SafeURL("/certificates/" + strconv.FormatInt(c.ID, 10) + "/revoke") }>
+								<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+								<input type="hidden" name="confirm" value="REVOKE"/>
+								<div class="form-grid">
+									<div class="field">
+										<label for="revoke-reason">Reason <span class="label opt">(recorded in the audit log)</span></label>
+										<select class="select" id="revoke-reason" name="reason_code">
+											<option value="0">unspecified</option>
+											<option value="1">keyCompromise</option>
+											<option value="3">affiliationChanged</option>
+											<option value="4">superseded</option>
+											<option value="5">cessationOfOperation</option>
+										</select>
+									</div>
+									<div class="field">
+										<label for="revoke-reason-text">Reason note <span class="label opt">(optional)</span></label>
+										<input class="input" id="revoke-reason-text" type="text" name="reason" placeholder="e.g. key compromise"/>
+									</div>
+								</div>
+								<div class="form-actions">
+									<button type="submit" class="btn btn--danger"><svg class="ico"><use href="/static/icons.svg#i-ban"></use></svg> Revoke this certificate</button>
+									<a class="btn btn--ghost" href="/inventory">Cancel</a>
+								</div>
+							</form>
+						</div>
+					</div>
 				}
 			</div>
-		}
-		<div class="card">
-			<h2>PEM material</h2>
-			<label>Certificate (PEM)</label>
-			<textarea rows="10" readonly>{ c.CertPEM }</textarea>
-			if c.ChainPEM != "" {
-				<label>Chain (PEM)</label>
-				<textarea rows="8" readonly>{ c.ChainPEM }</textarea>
-			}
-			<label>Full chain (PEM)</label>
-			<textarea rows="12" readonly>{ c.FullchainPEM }</textarea>
 		</div>
-		<p><a href="/inventory">← Back to inventory</a></p>
 	}
 }
 
@@ -889,6 +1064,7 @@ func fmtUnix(unix int64) string {
 }
 
 // fmtExpiry formats the expiry date + days-left for the inventory table.
+// Kept for backwards compatibility; prefer the expiryCell templ component.
 func fmtExpiry(notAfter int64, daysLeft int) string {
 	date := time.Unix(notAfter, 0).UTC().Format("2006-01-02")
 	if daysLeft > 0 {
@@ -898,6 +1074,43 @@ func fmtExpiry(notAfter int64, daysLeft int) string {
 		return date + " (today)"
 	}
 	return fmt.Sprintf("%s (%d days ago)", date, -daysLeft)
+}
+
+// fmtDate formats a Unix timestamp as a UTC date (YYYY-MM-DD).
+func fmtDate(unix int64) string {
+	if unix == 0 {
+		return "—"
+	}
+	return time.Unix(unix, 0).UTC().Format("2006-01-02")
+}
+
+// fmtDaysAgo formats a positive number of days as "Nd ago" (e.g. "19d ago").
+func fmtDaysAgo(days int) string {
+	if days <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%dd ago", days)
+}
+
+// fmtDaysHint returns a hint string for the not-after metadata row, e.g.
+// " · in 85 days" or " · expired 3 days ago". Returns empty string when
+// the cert is revoked (days have no meaning in that context).
+func fmtDaysHint(daysLeft int, status string) string {
+	if status == "revoked" {
+		return ""
+	}
+	if daysLeft > 0 {
+		return fmt.Sprintf(" · in %d days", daysLeft)
+	}
+	if daysLeft == 0 {
+		return " · today"
+	}
+	return fmt.Sprintf(" · expired %d days ago", -daysLeft)
+}
+
+// certFilename derives a display filename for the leaf certificate PEM block.
+func certFilename(cn string) string {
+	return downloadName(cn) + "-cert.pem"
 }
 
 // auditPage renders the audit log with a filter form and a paginated table
