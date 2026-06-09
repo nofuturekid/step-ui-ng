@@ -25,8 +25,14 @@ common abstraction, so the operator picks what fits their CA:
   cert/key, plus an upload for the result. The app reuses its existing x5c token signer.
 - **(C) JWK / password** — _direct_: the operator enters an admin subject + the admin's
   JWK provisioner + that provisioner's password; the app fetches the provisioner's
-  published `encryptedKey` from `/provisioners`, decrypts it in-memory with the
-  password, and signs a JWK admin token. No certificate, no CA-host steps.
+  published `encryptedKey` from `/provisioners`, decrypts it in-memory with the password,
+  uses it to **mint a short-lived admin certificate** (provisioner OTT → `POST /1.0/sign`),
+  and signs the **x5c** admin token with that ephemeral cert+key. No upload, no CA-host steps.
+
+> **One token type, two credential sources.** Step-CA's Admin API accepts **only x5c**
+> admin tokens — there is no "JWK admin token" (verified, see Notes). So both methods feed
+> the same, existing x5c token signer; they differ only in **where the admin cert+key come
+> from**: uploaded (B) vs. minted on demand from the JWK password (C).
 
 ## User stories
 
@@ -49,16 +55,22 @@ common abstraction, so the operator picks what fits their CA:
   **private key (PEM)**. Wire `SaveAdminCredential`. The key is **sealed** at rest
   (ADR-0006), write-only, never echoed; validate keypair match, clientAuth/digital-
   signature usage, and a non-empty leaf CN. A status badge shows configured/empty.
-- **FR-3 (JWK, in-app signing):** when `jwk` is chosen, fields are **admin subject** +
-  **admin provisioner** (chosen from the CA's JWK provisioners) + **password** (sealed,
-  write-only, badge). At admin-operation time the app fetches the named JWK
-  provisioner's `encryptedKey`/`kid` from `/provisioners` over the pinned client,
-  decrypts in-memory with the password, and signs a JWK admin token (correct
-  `iss`/`kid`/`sub`/`aud` for Step-CA's `AuthorizeAdminToken`).
-- **FR-4 (common abstraction):** introduce an `AdminAuth` token source —
-  `AdminToken(ctx, endpoint) (string, error)` — with `x5cAuth` and `jwkAuth`
-  implementations. `CreateProvisioner`/`DeleteProvisioner` (0005) and the ACME/EAB admin
-  calls (0010) take this source instead of a concrete `AdminCredential`; their request
+- **FR-3 (JWK, in-app cert minting):** when `jwk` is chosen, fields are **admin subject**
+  - **admin provisioner** (a JWK provisioner on the CA) + **password** (sealed, write-only,
+    badge). Step-CA's `AuthorizeAdminToken` accepts **only x5c** tokens (verified — see
+    Notes), so there is no "JWK admin token". At admin-operation time the app: fetches the
+    named JWK provisioner's `encryptedKey`/`kid` from `/provisioners` over the pinned client;
+    decrypts the key in-memory with the password; signs a provisioner **OTT** and mints a
+    short-lived admin certificate (`POST /1.0/sign`) for the admin subject; then signs the
+    existing **x5c** admin token with that ephemeral cert+key (`ca.generateAdminToken`,
+    unchanged). The minted cert/key live only in memory.
+- **FR-4 (common abstraction):** introduce an `AdminAuth` **credential source** that
+  yields a ready-to-use `ca.AdminCredential` (cert chain + signer) —
+  `Credential(ctx) (AdminCredential, error)` — with two implementations: `x5cStored` (the
+  uploaded PEM) and `jwkMinted` (mints the cert per FR-3). The **token signer stays a
+  single x5c path** (`generateAdminToken`), unchanged.
+  `CreateProvisioner`/`DeleteProvisioner` (0005) and the ACME/EAB admin calls (0010) obtain
+  their credential from this source instead of a concrete `AdminCredential`; their request
   flow is otherwise unchanged. Exactly one method is active (the configured one).
 - **FR-5 (switching is clean):** changing the method clears the other method's stored
   secret material (no stale sealed key/password lingering).
@@ -97,17 +109,20 @@ common abstraction, so the operator picks what fits their CA:
 
 ## Tests
 
-- `internal/ca`: JWK admin-token generation against an httptest mock CA that publishes a
-  JWK provisioner (`encryptedKey`/`kid`) and asserts the token's `iss`/`kid`/`sub`/`aud`
-  - signature; create/delete and EAB exercised through both `x5cAuth` and `jwkAuth`
-    (the x5c path already has tests). Wrong password → typed error, not a leak.
+- `internal/ca`: the JWK **cert-minting** path against an httptest mock CA that publishes
+  a JWK provisioner (`encryptedKey`/`kid`) and a `/1.0/sign` endpoint: assert the OTT is
+  correctly signed (iss=provisioner, aud=sign URL, sub/sans), the minted cert+key produce
+  a valid x5c admin token, and create/delete + EAB work through both credential sources
+  (`x5cStored`, `jwkMinted`); the x5c signer already has tests. Wrong password → typed
+  error, not a leak.
 - `internal/settings`: store/seal/clear admin-auth material; `HasAdminKey` /
   `HasAdminJWK`-style flags; switching method clears the other's secret.
 - `internal/app`: settings page renders the method selector, the **CA-tailored** x5c
   command snippet, and the JWK fields; secrets never echoed; provisioner/ACME management
   controls gated on configured auth.
-- **Real-CA smoke** (throwaway, like the 0011/CA-fix verification): a generated JWK admin
-  token is accepted by the live CA for a read-only admin call; deleted after.
+- **Real-CA smoke** (throwaway, like the 0011/CA-fix verification): the app's JWK-minted
+  x5c admin token is accepted by the live CA for a read-only admin call (e.g.
+  `GET /admin/provisioners`); the minted cert is short-lived, nothing persisted.
 
 ## Out of scope
 
@@ -117,13 +132,18 @@ common abstraction, so the operator picks what fits their CA:
 
 ## Notes
 
-- **Assumptions to verify at implementation (against the step-ca SDK + the maintainer's
-  live CA), flagged like 0011's CA-wire assumptions:**
-  1. The exact JWK **admin-token** format `AuthorizeAdminToken` accepts (claims, `kid`
-     vs `iss=provisioner-name`, signature alg) and how the `encryptedKey` is decrypted
-     (the SDK's scrypt/JWE scheme).
-  2. The exact **x5c command sequence** (X5C provisioner ↔ admin subject ↔ cert/EKU)
-     so the shown commands actually work — not guesses.
+- **CA-wire findings (verified against the maintainer's live CA, 2026-06-09):**
+  1. **RESOLVED — admin auth is x5c-only.** `AuthorizeAdminToken` (smallstep/certificates
+     `authority/authorize.go`) accepts **only** x5c tokens; `ca/adminClient.go` always sets
+     `WithX5CCerts`. There is **no JWK admin token** — hence FR-3 mints an x5c cert via the
+     JWK provisioner instead of signing a JWK token. The published `encryptedKey` is a JWE
+     decrypted with the provisioner password (`go.step.sm/crypto/jose`). Confirmed via
+     `step ca admin list`: super-admin **subject=`step`**, **provisioner=`admin`** (JWK,
+     SUPER_ADMIN). The JWK provisioner password is the operator's admin password, **not**
+     `/home/step/secrets/password` (that is the CA-key password — a different secret).
+  2. **Still to verify at build — the exact `step` command sequence** for FR-2 (X5C
+     provisioner ↔ admin subject ↔ cert/EKU) so the shown commands actually work — not
+     guesses.
 - Architecture decision recorded as **ADR-0018** (the `AdminAuth` abstraction + the two
   methods + rationale: x5c was the only path and unreachable; JWK/password is the
   default remote-management admin; mock≠real, see [[ca-pinning-mock-vs-real]]).
