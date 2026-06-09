@@ -72,8 +72,16 @@ func (s *server) getCertDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	// Parse the leaf PEM to derive enriched metadata (fingerprint, issuer, key type,
+	// key usage, EKU). Failures are ignored — the page degrades gracefully by showing
+	// only the stored fields and omitting the derived ones.
+	parsed, _ := certs.ParseLeafPEM(cert.CertPEM)
 	d := s.page(r, "Certificate — "+cert.CN)
-	s.render(w, r, http.StatusOK, certDetailPage(d, certDetailView{Cert: cert, RenewDefaultDays: s.renewDefaultDays()}))
+	s.render(w, r, http.StatusOK, certDetailPage(d, certDetailView{
+		Cert:             cert,
+		Parsed:           parsed,
+		RenewDefaultDays: s.renewDefaultDays(),
+	}))
 }
 
 // postCertDownload assembles a ZIP bundle in memory and streams it to the

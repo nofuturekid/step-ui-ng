@@ -24,6 +24,10 @@ package app_test
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/hex"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
@@ -635,5 +639,163 @@ func TestInventoryStatusBadgeActiveNotExpiring(t *testing.T) {
 	// Expiring badge should not appear since DaysLeft=45 > 30
 	if strings.Contains(body, "badge--warn") {
 		t.Error("active cert (45d): must NOT have badge--warn (Expiring) for 45d cert")
+	}
+}
+
+// --- PEM enrichment: cert-detail page (backlog item ①) ----------------------
+//
+// These tests verify that the cert-detail page renders the derived fields
+// (SHA-256 fingerprint, issuer, public key type, key usage and EKU tags) when
+// the stored cert_pem is a real parseable certificate. They would FAIL if:
+//   - ParseLeafPEM stops being called in the handler
+//   - The fingerprint / issuer / key-type fields are removed from the template
+//   - Key usage / EKU tags are no longer rendered as .tag chips
+
+// TestCertDetailFingerprintRendered verifies that the SHA-256 fingerprint of
+// the leaf cert is shown in the Identifiers card with a copy affordance.
+// Business rule: the fingerprint must be visible, copyable, and in plain
+// lowercase hex format (no separators) — matching "step certificate fingerprint".
+// A format regression (e.g. reverting to colon-separated) would fail this test.
+func TestCertDetailFingerprintRendered(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	// Seed a real server-issued cert so cert_pem is parseable.
+	id := invSeedServerCert(t, e, "fp-test.test")
+
+	// Independently compute the expected fingerprint from the stored cert PEM.
+	var certPEMStr string
+	if err := e.db.QueryRow(`SELECT cert_pem FROM certificates WHERE id=?`, id).Scan(&certPEMStr); err != nil {
+		t.Fatalf("fetch cert_pem for id %d: %v", id, err)
+	}
+	block, _ := pem.Decode([]byte(certPEMStr))
+	if block == nil {
+		t.Fatal("cert_pem stored in DB is not a valid PEM block")
+	}
+	leaf, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		t.Fatalf("parse stored cert DER: %v", err)
+	}
+	sum := sha256.Sum256(leaf.Raw)
+	wantFingerprint := hex.EncodeToString(sum[:])
+
+	_, body := e.get(t, fmt.Sprintf("/certificates/%d", id))
+
+	// The fingerprint label must appear in the Identifiers card.
+	if !strings.Contains(body, "SHA-256 fingerprint") {
+		t.Error("cert detail: missing 'SHA-256 fingerprint' label in Identifiers card")
+	}
+
+	// The exact fingerprint string must appear (plain lowercase hex, 64 chars, no colons).
+	// This fails if the format changes (e.g. colons are added) or the wrong digest is used.
+	if !strings.Contains(body, wantFingerprint) {
+		t.Errorf("cert detail: rendered fingerprint %q not found in page body", wantFingerprint)
+	}
+
+	// Double-check: the fingerprint we assert is plain hex (no colons) — so a
+	// colon-separated format would fail the above check.
+	if strings.ContainsRune(wantFingerprint, ':') {
+		t.Errorf("test bug: wantFingerprint should be plain hex, got %q", wantFingerprint)
+	}
+
+	// data-copy-target must be present for the copy button to work.
+	if !strings.Contains(body, `data-copy-target="#cert-fp"`) {
+		t.Error("cert detail: missing data-copy-target for fingerprint copy button")
+	}
+}
+
+// TestCertDetailIssuerRendered verifies that the issuer (CA name) is shown in
+// the Overview card. Business rule: the issuer DN / CN must be visible so
+// users can identify which CA issued the certificate.
+func TestCertDetailIssuerRendered(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	// The fake CA used by invSeedServerCert has CN "Inv Test Root".
+	id := invSeedServerCert(t, e, "issuer-test.test")
+
+	_, body := e.get(t, fmt.Sprintf("/certificates/%d", id))
+
+	if !strings.Contains(body, "Issuer") {
+		t.Error("cert detail: missing 'Issuer' label in Overview card")
+	}
+	// The fake CA's CN is "Inv Test Root".
+	if !strings.Contains(body, "Inv Test Root") {
+		t.Error("cert detail: issuer CN 'Inv Test Root' not found in Overview card")
+	}
+}
+
+// TestCertDetailPublicKeyTypeRendered verifies that the public-key algorithm
+// and size are shown in the Overview card.
+// Business rule: the key type ("ECDSA P-256", "RSA 2048", etc.) must be
+// visible so users know the cryptographic strength of the certificate.
+func TestCertDetailPublicKeyTypeRendered(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	// invSeedServerCert uses certs.Issue which generates an ECDSA P-256 key.
+	id := invSeedServerCert(t, e, "keytype-test.test")
+
+	_, body := e.get(t, fmt.Sprintf("/certificates/%d", id))
+
+	if !strings.Contains(body, "Public key") {
+		t.Error("cert detail: missing 'Public key' label in Overview card")
+	}
+	// The issued leaf is ECDSA P-256.
+	if !strings.Contains(body, "ECDSA P-256") {
+		t.Error("cert detail: 'ECDSA P-256' public key type not rendered in Overview card")
+	}
+}
+
+// TestCertDetailKeyUsageTagsRendered verifies that key usage strings are shown
+// as tag chips in the Identifiers card.
+// Business rule: usage tags (e.g. "digitalSignature") must be visible so
+// users can confirm the cert's intended purpose.
+func TestCertDetailKeyUsageTagsRendered(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	// invSeedServerCert → invFakeCA sets KeyUsage=DigitalSignature and
+	// ExtKeyUsage=ServerAuth on the leaf.
+	id := invSeedServerCert(t, e, "usage-test.test")
+
+	_, body := e.get(t, fmt.Sprintf("/certificates/%d", id))
+
+	// Key usage section heading must be present.
+	if !strings.Contains(body, "Key usage") {
+		t.Error("cert detail: missing 'Key usage' label in Identifiers card")
+	}
+	// At least the digitalSignature tag must appear.
+	if !strings.Contains(body, "digitalSignature") {
+		t.Error("cert detail: 'digitalSignature' key usage tag not rendered")
+	}
+	// Server auth EKU tag must appear (fake CA sets ExtKeyUsageServerAuth).
+	if !strings.Contains(body, "serverAuth") {
+		t.Error("cert detail: 'serverAuth' EKU tag not rendered")
+	}
+}
+
+// TestCertDetailDegradationOnBadPEM verifies that the cert-detail page renders
+// gracefully when cert_pem cannot be parsed (e.g. placeholder text in the DB),
+// showing the existing fields without crashing or returning a 5xx.
+// Business rule: parse failures must not surface as an error page — they
+// should degrade to showing what we have (CN, SANs, etc.) and omit derived fields.
+func TestCertDetailDegradationOnBadPEM(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	// invInsertMinimalCert stores "certpem" (non-PEM) — simulating a bad PEM.
+	now := time.Now()
+	id := invInsertMinimalCert(t, e.db, "bad-pem.test", now.Add(90*24*time.Hour).Unix())
+
+	resp, body := e.get(t, fmt.Sprintf("/certificates/%d", id))
+
+	// Must render a 200 — no panic, no 5xx.
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("cert detail bad PEM = %d, want 200; body: %s", resp.StatusCode, truncate(body, 300))
+	}
+	// The CN must still be visible.
+	if !strings.Contains(body, "bad-pem.test") {
+		t.Error("cert detail bad PEM: CN not rendered (degradation broken)")
 	}
 }
