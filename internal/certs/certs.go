@@ -200,7 +200,7 @@ func (s *Service) Issue(ctx context.Context, p IssueParams) (Certificate, error)
 		return Certificate{}, fmt.Errorf("certs: seal private key: %w", err)
 	}
 
-	cert, err := s.persist(ctx, res, sans, "server", sql.NullString{String: sealed, Valid: true}, p.Actor)
+	cert, err := s.persist(ctx, res, sans, "server", sql.NullString{String: sealed, Valid: true}, p.Actor, p.ProvisionerName)
 	if err != nil {
 		return Certificate{}, err
 	}
@@ -257,7 +257,7 @@ func (s *Service) Sign(ctx context.Context, p SignParams) (Certificate, error) {
 		return Certificate{}, err
 	}
 
-	cert, err := s.persist(ctx, res, info.SANs, "csr", sql.NullString{}, p.Actor)
+	cert, err := s.persist(ctx, res, info.SANs, "csr", sql.NullString{}, p.Actor, p.ProvisionerName)
 	if err != nil {
 		return Certificate{}, err
 	}
@@ -290,8 +290,9 @@ func ParseCSR(csrPEM string) (CSRInfo, error) {
 }
 
 // persist inserts a certificate row and returns the stored Certificate. serial,
-// not_before and not_after are parsed from the issued leaf.
-func (s *Service) persist(ctx context.Context, res ca.SignResult, sans []string, strategy string, privSealed sql.NullString, actor string) (Certificate, error) {
+// not_before and not_after are parsed from the issued leaf. provisioner is the
+// name of the active provisioner used to sign (may be empty for legacy paths).
+func (s *Service) persist(ctx context.Context, res ca.SignResult, sans []string, strategy string, privSealed sql.NullString, actor, provisioner string) (Certificate, error) {
 	leaf := res.Certificate
 	if leaf == nil {
 		return Certificate{}, fmt.Errorf("certs: CA returned no certificate")
@@ -305,15 +306,20 @@ func (s *Service) persist(ctx context.Context, res ca.SignResult, sans []string,
 	notBefore := leaf.NotBefore.Unix()
 	notAfter := leaf.NotAfter.Unix()
 
+	var provNullable sql.NullString
+	if provisioner != "" {
+		provNullable = sql.NullString{String: provisioner, Valid: true}
+	}
+
 	result, err := s.db.ExecContext(ctx,
 		`INSERT INTO certificates
 		   (cn, sans_json, serial, not_before, not_after, status, key_strategy,
 		    cert_pem, chain_pem, fullchain_pem, privkey_sealed, created_by,
-		    created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, 'valid', ?, ?, ?, ?, ?, ?, ?, ?)`,
+		    created_at, updated_at, provisioner)
+		 VALUES (?, ?, ?, ?, ?, 'valid', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		leaf.Subject.CommonName, string(sansJSON), serial, notBefore, notAfter,
 		strategy, res.CertPEM, res.ChainPEM, res.FullchainPEM, privSealed,
-		actor, ts, ts)
+		actor, ts, ts, provNullable)
 	if err != nil {
 		return Certificate{}, fmt.Errorf("certs: insert: %w", err)
 	}

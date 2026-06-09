@@ -26,6 +26,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"crypto/x509"
+	"database/sql"
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
@@ -798,4 +799,187 @@ func TestCertDetailDegradationOnBadPEM(t *testing.T) {
 	if !strings.Contains(body, "bad-pem.test") {
 		t.Error("cert detail bad PEM: CN not rendered (degradation broken)")
 	}
+}
+
+// --- Provisioner column + filter (backlog item ②) ---------------------------
+
+// TestInventoryProvisionerColumnHeader verifies the inventory table has a
+// "Provisioner" column header.
+func TestInventoryProvisionerColumnHeader(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	now := time.Now()
+	invInsertMinimalCert(t, e.db, "col-header.test", now.Add(60*24*time.Hour).Unix())
+
+	_, body := e.get(t, "/inventory")
+
+	if !strings.Contains(body, "Provisioner") {
+		t.Error("inventory: missing 'Provisioner' column header in table")
+	}
+}
+
+// TestInventoryProvisionerColumnValue verifies that a cert with a stored
+// provisioner shows the provisioner name in the table row.
+func TestInventoryProvisionerColumnValue(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	now := time.Now()
+	invInsertCertWithProvisioner(t, e.db, "prov-col.test", now.Add(60*24*time.Hour).Unix(), "my-jwk-prov")
+
+	_, body := e.get(t, "/inventory")
+
+	if !strings.Contains(body, "my-jwk-prov") {
+		t.Error("inventory: stored provisioner name 'my-jwk-prov' not visible in table row")
+	}
+}
+
+// TestInventoryProvisionerColumnNullShowsDash verifies that a cert whose
+// provisioner is NULL (pre-migration cert) renders a muted dash "—" in the
+// Provisioner column, not an empty cell.
+func TestInventoryProvisionerColumnNullShowsDash(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	now := time.Now()
+	invInsertMinimalCert(t, e.db, "null-prov-dash.test", now.Add(60*24*time.Hour).Unix())
+
+	_, body := e.get(t, "/inventory")
+
+	// The em-dash character must appear in the provisioner cell for NULL rows.
+	if !strings.Contains(body, "—") {
+		t.Error("inventory: NULL provisioner must render as '—' (em-dash) in the table")
+	}
+}
+
+// TestInventoryProvisionerFilterSelect verifies that the filter bar contains a
+// provisioner filter <select> with the "All provisioners" option.
+func TestInventoryProvisionerFilterSelect(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	_, body := e.get(t, "/inventory")
+
+	if !strings.Contains(body, "All provisioners") {
+		t.Error("inventory filter: missing 'All provisioners' option in provisioner filter select")
+	}
+}
+
+// TestInventoryProvisionerFilterShowsDistinctOptions verifies that the
+// provisioner filter dropdown contains the distinct provisioner names from the
+// DB. This fails if the options are hardcoded or come from the wrong source.
+func TestInventoryProvisionerFilterShowsDistinctOptions(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	now := time.Now()
+	invInsertCertWithProvisioner(t, e.db, "opt-acme1.test", now.Add(60*24*time.Hour).Unix(), "acme-prov")
+	invInsertCertWithProvisioner(t, e.db, "opt-acme2.test", now.Add(60*24*time.Hour).Unix(), "acme-prov") // duplicate → must appear once
+	invInsertCertWithProvisioner(t, e.db, "opt-jwk.test", now.Add(60*24*time.Hour).Unix(), "jwk-prov")
+	invInsertMinimalCert(t, e.db, "opt-null.test", now.Add(60*24*time.Hour).Unix()) // NULL → must not appear as option
+
+	_, body := e.get(t, "/inventory")
+
+	// The filter option tag for acme-prov must appear exactly once in the
+	// <select> (value attribute), even though acme-prov was seeded twice.
+	// We check the value="acme-prov" attribute form which appears only in options.
+	if strings.Count(body, `value="acme-prov"`) != 1 {
+		t.Errorf("provisioner filter: value=\"acme-prov\" option count = %d, want 1 (distinct)",
+			strings.Count(body, `value="acme-prov"`))
+	}
+	if strings.Count(body, `value="jwk-prov"`) != 1 {
+		t.Errorf("provisioner filter: value=\"jwk-prov\" option count = %d, want 1",
+			strings.Count(body, `value="jwk-prov"`))
+	}
+}
+
+// TestInventoryProvisionerFilterFilters verifies that selecting a provisioner
+// in the filter restricts the table to certs issued by that provisioner.
+// This is the end-to-end integration test: ?provisioner=X → handler → List(Provisioner:X).
+func TestInventoryProvisionerFilterFilters(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	now := time.Now()
+	invInsertCertWithProvisioner(t, e.db, "filter-acme.test", now.Add(60*24*time.Hour).Unix(), "acme-prov")
+	invInsertCertWithProvisioner(t, e.db, "filter-jwk.test", now.Add(60*24*time.Hour).Unix(), "jwk-prov")
+	invInsertMinimalCert(t, e.db, "filter-null.test", now.Add(60*24*time.Hour).Unix())
+
+	// Filter by acme-prov → only filter-acme.test visible.
+	_, body := e.get(t, "/inventory?provisioner=acme-prov")
+
+	if !strings.Contains(body, "filter-acme.test") {
+		t.Error("provisioner filter: 'filter-acme.test' must be in results for provisioner=acme-prov")
+	}
+	if strings.Contains(body, "filter-jwk.test") {
+		t.Error("provisioner filter: 'filter-jwk.test' must NOT be in results for provisioner=acme-prov")
+	}
+	if strings.Contains(body, "filter-null.test") {
+		t.Error("provisioner filter: NULL-provisioner cert must NOT appear for provisioner=acme-prov")
+	}
+}
+
+// TestInventoryAllProvisionersShowsAll verifies that the "All provisioners"
+// selection (empty provisioner param) shows all certs including NULL-provisioner.
+func TestInventoryAllProvisionersShowsAll(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	now := time.Now()
+	invInsertCertWithProvisioner(t, e.db, "all-acme.test", now.Add(60*24*time.Hour).Unix(), "acme-prov")
+	invInsertMinimalCert(t, e.db, "all-null.test", now.Add(60*24*time.Hour).Unix())
+
+	_, body := e.get(t, "/inventory") // no provisioner param = All provisioners
+
+	if !strings.Contains(body, "all-acme.test") {
+		t.Error("All provisioners: missing 'all-acme.test'")
+	}
+	if !strings.Contains(body, "all-null.test") {
+		t.Error("All provisioners: missing 'all-null.test' (NULL provisioner must appear)")
+	}
+}
+
+// TestInventoryProvisionerStatusComposeFilter verifies that provisioner + status
+// filters compose (AND semantics) at the handler level.
+func TestInventoryProvisionerStatusComposeFilter(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	now := time.Now()
+	// active + acme-prov
+	invInsertCertWithProvisioner(t, e.db, "compose-active-acme.test", now.Add(60*24*time.Hour).Unix(), "acme-prov")
+	// expired + acme-prov
+	invInsertCertWithProvisioner(t, e.db, "compose-expired-acme.test", now.Add(-24*time.Hour).Unix(), "acme-prov")
+	// active + jwk-prov
+	invInsertCertWithProvisioner(t, e.db, "compose-active-jwk.test", now.Add(60*24*time.Hour).Unix(), "jwk-prov")
+
+	_, body := e.get(t, "/inventory?status=active&provisioner=acme-prov")
+
+	if !strings.Contains(body, "compose-active-acme.test") {
+		t.Error("compose filter: 'compose-active-acme.test' must appear for status=active&provisioner=acme-prov")
+	}
+	if strings.Contains(body, "compose-expired-acme.test") {
+		t.Error("compose filter: expired cert must NOT appear for status=active")
+	}
+	if strings.Contains(body, "compose-active-jwk.test") {
+		t.Error("compose filter: jwk-prov cert must NOT appear for provisioner=acme-prov")
+	}
+}
+
+// invInsertCertWithProvisioner inserts a minimal cert row with the given provisioner.
+func invInsertCertWithProvisioner(t *testing.T, db *sql.DB, cn string, notAfter int64, provisioner string) int64 {
+	t.Helper()
+	ts := time.Now().Unix()
+	res, err := db.Exec(`INSERT INTO certificates
+		(cn, sans_json, serial, not_before, not_after, status, key_strategy,
+		 cert_pem, chain_pem, fullchain_pem, privkey_sealed, created_by, created_at, updated_at, provisioner)
+		VALUES (?, ?, ?, ?, ?, 'valid', 'csr', 'certpem', 'chainpem', 'fullchainpem',
+		        NULL, 'test', ?, ?, ?)`,
+		cn, `["`+cn+`"]`, "serial-"+cn, ts, notAfter, ts, ts, provisioner)
+	if err != nil {
+		t.Fatalf("invInsertCertWithProvisioner %s: %v", cn, err)
+	}
+	id, _ := res.LastInsertId()
+	return id
 }

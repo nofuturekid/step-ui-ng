@@ -10,6 +10,21 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- **Provisioner column + filter in inventory** (backlog ②): the inventory table
+  now records and displays the provisioner name used at issuance/signing.
+  - Migration `0008` adds a nullable `provisioner` column to `certificates`;
+    existing rows keep `NULL` and render as "—" in the UI.
+  - `Issue` and `Sign` write the active provisioner name (`ProvisionerName`)
+    into the new column via an updated `persist()` call.
+  - `InventoryItem` gains a `Provisioner` field; `ListFilter` gains a
+    `Provisioner` string that pushes an exact-match SQL `WHERE provisioner = ?`
+    into the query.
+  - `ListProvisioners()` returns the `DISTINCT` non-NULL provisioner names for
+    the filter dropdown.
+  - The inventory page filter bar gains an "All provisioners" `<select>` wired
+    as `?provisioner=<name>` (composes with status + search). The table has a
+    new Provisioner column; NULL rows show a muted "—".
+
 - **Certificate detail enrichment** (backlog ①): the cert-detail page now
   derives and displays richer metadata directly from the stored leaf PEM — no
   schema change. New fields surfaced:
