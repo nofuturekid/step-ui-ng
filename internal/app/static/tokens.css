@@ -128,18 +128,11 @@
   color-scheme: light;
 
   /* ===================================================================== */
-  /* Compatibility aliases — map the old app.css token vocabulary to the   */
-  /* new design tokens so existing page templates keep rendering correctly  */
-  /* during the migration. These should be removed as pages are ported.    */
+  /* Compatibility aliases — still referenced by app.css rules.           */
   /* ===================================================================== */
-  --fg: var(--text);
-  --card: var(--surface);
-  --muted: var(--text-muted);
   --input-bg: var(--surface);
   --on-accent: var(--accent-contrast);
   --danger: var(--danger-fg);
-  --radius: var(--r-md);
-  --radius-sm: var(--r);
   --shadow: var(--shadow-pop);
   --content-width: 56rem;
   --content-width-wide: 72rem;
@@ -202,9 +195,6 @@
     color-scheme: dark;
 
     /* Compatibility alias overrides for dark */
-    --fg: var(--text);
-    --card: var(--surface);
-    --muted: var(--text-muted);
     --input-bg: var(--surface-inset);
     --on-accent: var(--accent-contrast);
     --danger: var(--danger-fg);
