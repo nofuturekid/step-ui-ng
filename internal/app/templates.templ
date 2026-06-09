@@ -316,11 +316,59 @@ templ settingsPage(d pageData, v settings.View) {
 						<span class="badge">{ string(v.AdminAuthMethod) }</span>
 					}
 				</label>
-				<select id="admin-auth-method" name="admin_auth_method" onchange="document.getElementById('jwk-fields').style.display=(this.value==='jwk'?'block':'none')">
+				<select
+					id="admin-auth-method"
+					name="admin_auth_method"
+					onchange="(function(v){document.getElementById('x5c-fields').style.display=(v==='x5c'?'block':'none');document.getElementById('jwk-fields').style.display=(v==='jwk'?'block':'none');})(this.value)"
+				>
 					@adminAuthOption(settings.AdminAuthNone, "None (disable admin operations)", v.AdminAuthMethod)
 					@adminAuthOption(settings.AdminAuthX5C, "x5c — admin certificate + key", v.AdminAuthMethod)
 					@adminAuthOption(settings.AdminAuthJWK, "JWK — provisioner password", v.AdminAuthMethod)
 				</select>
+				<div
+					id="x5c-fields"
+					if v.AdminAuthMethod == settings.AdminAuthX5C {
+						style="display:block"
+					} else {
+						style="display:none"
+					}
+				>
+					<p>
+						Admin key status:
+						if v.HasAdminKey {
+							<span class="badge">set</span>
+						} else {
+							<span class="badge">none</span>
+						}
+					</p>
+					if v.AdminCertPEM != "" {
+						<label>Current certificate chain (read-only)</label>
+						<textarea rows="6" readonly class="mono">{ v.AdminCertPEM }</textarea>
+					}
+					<label for="admin-x5c-cert">Certificate chain (PEM, leaf first)</label>
+					<textarea id="admin-x5c-cert" name="admin_x5c_cert" rows="8" autocomplete="off" placeholder="-----BEGIN CERTIFICATE-----"></textarea>
+					<label for="admin-x5c-key">
+						Private key (PEM) — write-only, never shown
+						if v.HasAdminKey {
+							<span class="badge">set</span>
+						} else {
+							<span class="badge">none</span>
+						}
+					</label>
+					<textarea id="admin-x5c-key" name="admin_x5c_key" rows="6" autocomplete="off" placeholder="-----BEGIN PRIVATE KEY-----&#10;(required — the key is sealed at rest and never echoed)"></textarea>
+					<p class="muted">
+						To get an admin certificate, issue one for a registered super-admin subject using a
+						provisioner that can sign (e.g. your JWK provisioner). The leaf needs the clientAuth EKU:
+					</p>
+					<div class="copy">
+						<textarea rows="3" readonly class="mono">{ fmt.Sprintf(`step ca certificate "<admin-subject>" admin.crt admin.key --provisioner <provisioner> --ca-url %s --root root.crt`, v.CAURL) }</textarea>
+						<button type="button" class="secondary" onclick="copyText(this)">Copy</button>
+					</div>
+					<p class="muted">
+						To register a super-admin or set up an X5C provisioner, see the
+						<a href="https://smallstep.com/docs/step-ca/provisioners/#x509-certificates-x5c" target="_blank" rel="noopener noreferrer">Step-CA admin/X5C docs</a>.
+					</p>
+				</div>
 				<div
 					id="jwk-fields"
 					if v.AdminAuthMethod == settings.AdminAuthJWK {

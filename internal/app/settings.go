@@ -1,7 +1,10 @@
 package app
 
 import (
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -69,11 +72,12 @@ func (s *server) postSettingsTest(w http.ResponseWriter, r *http.Request) {
 }
 
 // postAdminAuth saves the admin-authentication method and its material
-// (spec/0012 FR-1/FR-3). The method field selects "none", "x5c", or "jwk".
+// (spec/0012 FR-1/FR-2/FR-3). The method field selects "none", "x5c", or "jwk".
 // For "jwk": subject, provisioner, and an optional password (leave blank to
-// keep). For "none": clears all admin credential material. The "x5c" method
-// is selected but upload is deferred to PR 2 (FR-2 guided upload out of scope
-// for this PR). An audit event is recorded on success — never with secrets.
+// keep). For "x5c": an uploaded admin certificate chain + private key, validated
+// (keypair match, digitalSignature, clientAuth EKU, non-empty CN) before the key
+// is sealed. For "none": clears all admin credential material. An audit event is
+// recorded on success — never with secrets.
 func (s *server) postAdminAuth(w http.ResponseWriter, r *http.Request) {
 	actor := userFromContext(r.Context())
 	method := strings.TrimSpace(r.PostFormValue("admin_auth_method"))
@@ -97,11 +101,37 @@ func (s *server) postAdminAuth(w http.ResponseWriter, r *http.Request) {
 			s.sessions.Put(r.Context(), flashKey, "Admin authentication cleared.")
 			_ = s.audit.Record(r.Context(), actor.Username, "settings.admin_auth", "admin_auth", "method=none")
 		}
+	case settings.AdminAuthX5C:
+		cert := strings.TrimSpace(r.PostFormValue("admin_x5c_cert"))
+		key := strings.TrimSpace(r.PostFormValue("admin_x5c_key"))
+		if cert == "" || key == "" {
+			s.sessions.Put(r.Context(), errorKey, "Certificate and key are required for x5c authentication.")
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
+			return
+		}
+		// Validate via NewAdminCredential (keypair match, digitalSignature, CN).
+		if _, err := ca.NewAdminCredential([]byte(cert), []byte(key)); err != nil {
+			s.sessions.Put(r.Context(), errorKey, x5cCredentialErrorMessage(err))
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
+			return
+		}
+		// Additionally require clientAuth EKU (Step-CA's AuthorizeAdminToken checks it).
+		if err := requireClientAuth(cert); err != nil {
+			s.sessions.Put(r.Context(), errorKey, err.Error())
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
+			return
+		}
+		saveErr = s.settings.SaveAdminCredential(r.Context(), cert, key)
+		if saveErr == nil {
+			// Audit: non-secret fields only — never log the key.
+			leaf, _ := parseLeafCN(cert)
+			s.sessions.Put(r.Context(), flashKey, "Admin authentication saved (x5c).")
+			_ = s.audit.Record(r.Context(), actor.Username, "settings.admin_auth", "admin_auth",
+				"method=x5c subject="+leaf)
+		}
 	default:
-		// "x5c" selected: method is noted but upload UI (FR-2) is out of scope.
-		// For now treat it as a no-op; the operator can use SaveAdminCredential
-		// once the upload form is added in the next PR.
-		s.sessions.Put(r.Context(), flashKey, "Admin authentication method noted. Upload the x5c certificate and key once the upload form is available.")
+		// Unknown method: reject.
+		s.sessions.Put(r.Context(), errorKey, "Unknown admin authentication method.")
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}
@@ -134,6 +164,63 @@ func settingsErrorMessage(err error) string {
 	default:
 		return "Could not save CA settings."
 	}
+}
+
+// requireClientAuth checks that the leaf certificate in the PEM chain has the
+// clientAuth (or any) extended key usage — Step-CA's AuthorizeAdminToken verifies
+// the chain with the clientAuth EKU. It parses only the first CERTIFICATE block
+// (the leaf).
+func requireClientAuth(certChainPEM string) error {
+	block, _ := pem.Decode([]byte(certChainPEM))
+	if block == nil || block.Type != "CERTIFICATE" {
+		return fmt.Errorf("invalid admin credential: cannot parse the certificate")
+	}
+	leaf, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return fmt.Errorf("invalid admin credential: parse leaf: %v", err)
+	}
+	for _, eku := range leaf.ExtKeyUsage {
+		// ExtKeyUsageAny permits all usages (incl. clientAuth), so accept it too.
+		if eku == x509.ExtKeyUsageClientAuth || eku == x509.ExtKeyUsageAny {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid admin credential: leaf certificate must have the clientAuth (or any) extended key usage (required by Step-CA)")
+}
+
+// parseLeafCN returns the Common Name of the first certificate in the PEM chain.
+// On any error it returns an empty string (used for audit detail only).
+func parseLeafCN(certChainPEM string) (string, error) {
+	block, _ := pem.Decode([]byte(certChainPEM))
+	if block == nil {
+		return "", fmt.Errorf("no PEM block")
+	}
+	leaf, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return "", err
+	}
+	return leaf.Subject.CommonName, nil
+}
+
+// x5cCredentialErrorMessage maps a ca.ErrInvalidAdminCredential to a clear,
+// secret-free message suitable for the flash error.
+func x5cCredentialErrorMessage(err error) string {
+	if errors.Is(err, ca.ErrInvalidAdminCredential) {
+		return "Invalid admin credential: " + extractInvalidCredentialDetail(err)
+	}
+	return "Invalid admin credential."
+}
+
+// extractInvalidCredentialDetail extracts a human-readable detail from the
+// ErrInvalidAdminCredential wrapped error text, without leaking key material.
+func extractInvalidCredentialDetail(err error) string {
+	msg := err.Error()
+	// Strip the sentinel prefix so the user sees the useful part.
+	const prefix = "ca: invalid admin credential: "
+	if after, ok := strings.CutPrefix(msg, prefix); ok {
+		return after
+	}
+	return "check that the certificate chain and private key match"
 }
 
 // testFailureMessage maps a ca.TestConnection error to a clear message (FR-2),
