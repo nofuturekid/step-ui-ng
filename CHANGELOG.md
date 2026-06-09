@@ -34,6 +34,11 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Changed
 
+- Corrected spec 0012 (dual admin auth) and recorded **ADR-0018** after verifying against
+  a live Step-CA: the Admin API accepts **only x5c** tokens (there is no "JWK admin
+  token"), so the JWK/password method mints a short-lived x5c admin cert via the
+  provisioner rather than signing a JWK token, reusing the existing x5c signer. Docs only;
+  implementation pending.
 - CI: `main.yml` also runs on `release: published`, so `:main` is rebuilt at the tagged
   commit after a release and reports the release version (a new tag changes
   `git describe` without a file change, so the push trigger alone left `:main` on the
