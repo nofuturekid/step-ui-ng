@@ -24,21 +24,44 @@ import (
 	"github.com/nofuturekid/step-ui-ng/internal/users"
 )
 
+// inventoryPageSize is the number of certificates shown per page.
+// Matches auditPageSize for consistency across paginated views.
+const inventoryPageSize = 50
+
 // getInventory renders the certificate inventory list (FR-1).
 // Filter parameters:
 //
 //	?status=active|expired|revoked  — derives status from not_after + DB status.
 //	?q=<text>                       — substring search over CN/SAN.
 //	?provisioner=<name>             — exact match on recorded provisioner name.
+//	?page=<n>                       — 0-based page number (default 0).
+//
+// Pagination note: certs.Service.List returns the full filtered slice because
+// the "expired" status is derived from not_after (not stored in the DB status
+// column), so status filtering must happen in Go after the SQL query. SQL
+// LIMIT/OFFSET is therefore not used — it would paginate before the Go-side
+// status derivation and yield wrong counts and short pages. Pagination is
+// applied here, after List returns the fully-filtered result set.
 //
 // htmx: when the request carries HX-Request the response replaces only the
 // table partial (hx-target="#inventory-table"), keeping the layout intact.
+// The pagination block lives inside inventoryTable so a filter change (which
+// always resets to page 0) also updates the footer.
 func (s *server) getInventory(w http.ResponseWriter, r *http.Request) {
-	filter := certs.ListFilter{
-		Status:      r.URL.Query().Get("status"),
-		Search:      r.URL.Query().Get("q"),
-		Provisioner: r.URL.Query().Get("provisioner"),
+	q := r.URL.Query()
+
+	page, _ := strconv.Atoi(q.Get("page"))
+	if page < 0 {
+		page = 0
 	}
+
+	filter := certs.ListFilter{
+		Status:      q.Get("status"),
+		Search:      q.Get("q"),
+		Provisioner: q.Get("provisioner"),
+	}
+
+	// List returns the full filtered slice (no SQL LIMIT — see note above).
 	list, err := s.certs.List(r.Context(), filter)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -51,13 +74,44 @@ func (s *server) getInventory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Paginate the fully-filtered slice in-handler.
+	total := len(list)
+	offset := page * inventoryPageSize
+	var pageItems []certs.InventoryItem
+	var end int
+	if offset < total {
+		end = min(offset+inventoryPageSize, total)
+		pageItems = list[offset:end]
+	}
+	hasMore := offset+inventoryPageSize < total
+
+	// 1-based display range (Showing X–Y of N). When total==0, both are 0.
+	rangeFrom := 0
+	rangeTo := 0
+	if total > 0 && len(pageItems) > 0 {
+		rangeFrom = offset + 1
+		rangeTo = end
+	}
+
 	d := s.page(r, "Certificates")
 	d.Wide = true // data-heavy table: render at the wider content width
 	d.ActiveSection = "/inventory"
-	v := inventoryView{Filter: filter, Items: list, Provisioners: provisioners}
+	v := inventoryView{
+		Filter:       filter,
+		Items:        pageItems,
+		Provisioners: provisioners,
+		Total:        total,
+		Page:         page,
+		HasMore:      hasMore,
+		NextPage:     page + 1,
+		PrevPage:     page - 1,
+		RangeFrom:    rangeFrom,
+		RangeTo:      rangeTo,
+	}
 
 	if r.Header.Get("HX-Request") == "true" {
-		// htmx live-filter: replace only the table partial.
+		// htmx live-filter: replace only the table partial (which includes the
+		// pagination footer so the footer also refreshes on filter changes).
 		s.render(w, r, http.StatusOK, inventoryTable(d, v))
 		return
 	}
@@ -157,8 +211,16 @@ func (s *server) postCertDownload(w http.ResponseWriter, r *http.Request) {
 // inventoryView carries the data for the inventory page.
 type inventoryView struct {
 	Filter       certs.ListFilter
-	Items        []certs.InventoryItem
-	Provisioners []string // distinct provisioner names for the filter dropdown
+	Items        []certs.InventoryItem // current page slice (len ≤ inventoryPageSize)
+	Provisioners []string              // distinct provisioner names for the filter dropdown
+	// Pagination fields (mirroring auditView).
+	Total     int  // total filtered item count (across all pages)
+	Page      int  // 0-based current page
+	HasMore   bool // true when there are further pages after this one
+	NextPage  int
+	PrevPage  int
+	RangeFrom int // 1-based index of the first item on this page (0 when empty)
+	RangeTo   int // 1-based index of the last item on this page (0 when empty)
 }
 
 // registerInventoryRoutes wires the inventory routes into mux. Separated so
