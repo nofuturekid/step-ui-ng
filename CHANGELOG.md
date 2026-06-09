@@ -8,7 +8,64 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+### Fixed
+
+- **Revoke form confirm input** (PR B review): the redesigned revoke form was
+  missing `<input type="hidden" name="confirm" value="REVOKE"/>`, causing every
+  real browser submission to fail with "Revocation not confirmed". Added the
+  required hidden field (spec/0008 FR-3).
+- **Revoke reason defaulting** (PR B review): when the optional reason note is
+  left blank the handler now defaults to the selected reason-code's label
+  (e.g. "unspecified", "keyCompromise") so the domain's `ErrReasonRequired`
+  guard is satisfied without forcing extra typing.
+- **Renew form placement** (PR B review): the editable validity Renew form
+  (spec/0008 FR-2) now appears for **non-revoked** certs (active/expiring) as
+  a card section below the metadata. Revoked certs no longer show a Renew form.
+  The quick header "Renew" button (with hidden default validity) is replaced by
+  a link scrolling to the editable form card.
+- **Badge CSS conflict** (PR B review): a stale `.badge` rule at the bottom of
+  `app.css` set `background: var(--surface-2)` and `border-radius: 999px`,
+  overriding the design-system `.badge--ok/warn/danger/neutral` modifier
+  backgrounds (making all badges grey) and forcing a pill shape. The base
+  `.badge` rule now carries only `font-size`, `padding`, and
+  `border-radius: var(--r-sm, 4px)` (rounded-rect); semantic backgrounds and
+  colors remain in the modifier rules.
+- **Serial Copy button** (PR B review): the `.copyline` for the serial number
+  lacked an `input` or `textarea`, making `copyText()` a no-op. A hidden
+  `<input type="hidden" value={serial}/>` is now included so the browser copy
+  path works correctly.
+
 ### Added
+
+- **Inventory + certificate detail redesign** (PR B): ports the inventory list
+  and certificate detail screens to the approved Claude-Design mock.
+  - **Inventory page** (`inventoryPage`, `inventoryTable`): new `page-head` with
+    title, subtitle, and admin-only action buttons (Issue certificate / Sign CSR);
+    `flash--info` "recorded view" banner with honest copy (no fake timestamp);
+    `.filterbar` / `.searchbox` / `.select` filter bar; `.table-wrap` /
+    `table.table` design-system table with columns: Common name, Status, Expires,
+    Serial, Actions; chevron-right icon link per row.
+  - **Status badges** (`statusBadge`): `badge--ok` "Valid" (green with dot) for
+    active certs; `badge--warn` "Expiring" (amber with clock icon + day countdown)
+    for active certs with ≤ 30 days remaining; `badge--neutral` "Expired" (grey)
+    for expired; `badge--danger` "Revoked" (red with ban icon) for revoked.
+  - **"Expiring" filter**: `status=expiring` in the filter bar / htmx partial now
+    selects active certs with DaysLeft ≤ `ExpiringThresholdDays` (30). Added
+    `ExpiringThresholdDays` constant to `internal/certs/inventory.go`; filter
+    logic extended in `List()`.
+  - **Certificate detail page** (`certDetailPage`): `page-head` with breadcrumb
+    (Certificates / CN), monospace `page-title`, status badge + admin action
+    buttons (Download bundle, Renew, Revoke) in `page-head__actions`; two-column
+    `grid-2` metadata (Overview / Identifiers cards) with `dl` definition list;
+    `.codeblock.pem` PEM viewers with `.codeblock__bar` toolbar and copy button;
+    admin-only Revoke card with reason dropdown; viewer sees metadata + PEM only.
+  - **Design-system CSS** ported into `internal/app/static/app.css`: page-head,
+    stack, card sub-elements (card**header / card**body / card\_\_footer), btn
+    variants (btn--primary / btn--danger / btn--ghost), badge modifiers
+    (badge--ok / badge--warn / badge--danger / badge--neutral), tag, flash--info,
+    table-wrap / table.table, filterbar / searchbox, input / select, field,
+    form-actions, codeblock, copyline, dl, grid-2.
+  - New pure-Go helpers: `fmtDate`, `fmtDaysAgo`, `fmtDaysHint`, `certFilename`.
 
 - **Design foundation + new app shell** (PR A): ports the approved Claude-Design
   token system and app shell into the Templ/htmx app.

@@ -44,6 +44,11 @@ func (s *server) postCertRevoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	reasonCode := parseReasonCode(r.PostFormValue("reason_code"))
+	reason := strings.TrimSpace(r.PostFormValue("reason"))
+	if reason == "" {
+		reason = reasonCodeLabel(reasonCode)
+	}
 	err := s.certs.Revoke(r.Context(), certs.RevokeParams{
 		Actor:           actor.Username,
 		ID:              id,
@@ -51,8 +56,8 @@ func (s *server) postCertRevoke(w http.ResponseWriter, r *http.Request) {
 		Password:        conn.password,
 		CAURL:           conn.caURL,
 		Fingerprint:     conn.fingerprint,
-		Reason:          r.PostFormValue("reason"),
-		ReasonCode:      parseReasonCode(r.PostFormValue("reason_code")),
+		Reason:          reason,
+		ReasonCode:      reasonCode,
 	})
 	if err != nil {
 		s.renderDetailMsg(w, r, id, "", revokeErrorMessage(err))
@@ -122,6 +127,34 @@ func parseReasonCode(raw string) int {
 		return 0
 	}
 	return n
+}
+
+// reasonCodeLabel returns a human-readable label for an OCSP reason code.
+// Used to default the Reason field when the user leaves the note blank, so the
+// domain's ErrReasonRequired guard is satisfied without forcing extra typing.
+func reasonCodeLabel(code int) string {
+	switch code {
+	case 1:
+		return "keyCompromise"
+	case 2:
+		return "cACompromise"
+	case 3:
+		return "affiliationChanged"
+	case 4:
+		return "superseded"
+	case 5:
+		return "cessationOfOperation"
+	case 6:
+		return "certificateHold"
+	case 8:
+		return "removeFromCRL"
+	case 9:
+		return "privilegeWithdrawn"
+	case 10:
+		return "aACompromise"
+	default:
+		return "unspecified"
+	}
 }
 
 // renderDetailMsg re-renders the certificate detail view with a flash or error

@@ -28,10 +28,17 @@ var ErrNotFound = errors.New("certs: not found")
 // nowTime is overridable in tests; defaults to wall-clock time.
 var nowTime = time.Now
 
+// ExpiringThresholdDays is the number of days before expiry at which an active
+// certificate is considered "expiring soon" for display and filtering purposes.
+// This mirrors the mock's amber "Expiring" badge logic (≤ 30 days remaining).
+const ExpiringThresholdDays = 30
+
 // ListFilter carries the optional filter parameters for List.
 type ListFilter struct {
 	// Status restricts results to certs whose derived status equals this value.
-	// Allowed values: "active", "expired", "revoked".  Empty means no filter.
+	// Allowed values: "active", "expiring", "expired", "revoked".  Empty means
+	// no filter.  "expiring" selects active certs with DaysLeft ≤
+	// ExpiringThresholdDays (derived display status, not a stored DB value).
 	Status string
 	// Search restricts results to rows where cn or sans_json contains the
 	// substring (case-insensitive).  Empty means no filter.
@@ -126,8 +133,20 @@ func (s *Service) List(ctx context.Context, f ListFilter) ([]InventoryItem, erro
 		it.Status, it.DaysLeft = DeriveStatus(it.StoredStatus, it.NotAfter)
 
 		// Apply status filter (derived, not stored).
-		if f.Status != "" && it.Status != f.Status {
-			continue
+		// "expiring" is a display-only sub-status: active certs with DaysLeft ≤
+		// ExpiringThresholdDays.  The stored status is "valid" (not "expiring"),
+		// so we must handle it separately rather than comparing it.Status.
+		switch f.Status {
+		case "":
+			// no filter — include all
+		case "expiring":
+			if it.Status != "active" || it.DaysLeft > ExpiringThresholdDays {
+				continue
+			}
+		default:
+			if it.Status != f.Status {
+				continue
+			}
 		}
 		out = append(out, it)
 	}
