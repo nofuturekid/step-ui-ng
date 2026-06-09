@@ -10,6 +10,38 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- **Provisioners page redesign** (PR D): ports `GET /provisioners` to the approved
+  design mock (`docs/design/provisioners.html`). No behaviour change to handlers,
+  routes, field names, validation, or the active-delete guard.
+  - **Page shell**: `content--narrow` wrapper, `page-head` with breadcrumb
+    (`Settings / Provisioners`), `page-title` "Provisioners", and `page-sub`
+    subtitle ("Read live from the CA...").
+  - **Locked notice** (`class="locked"`): shown when admin auth is NOT configured.
+    Includes honest copy (names both `x5c` and `jwk` methods and the `step` CLI),
+    a "Configure admin authentication" link to `/settings`, and a "Copy CLI
+    command" button (`data-copy="step ca provisioner add my-provisioner --type JWK
+--create"`).
+  - **Create form**: shown only when admin auth IS configured (replaces the old
+    plain muted paragraph). Uses `card__header` / `card__body`, `.form-grid`,
+    `.input`, `.select`, `btn--primary`.
+  - **Active provisioner card**: `card__header` "Active provisioner for issuance" +
+    `card__body` form posting to `/provisioners/select`; `select[name="name"]` for
+    provisioner choice; `secret-row` with `input[name="secret"]` (type=password)
+    and a `badge--set`/`badge--none` secret-state indicator; `field__hint`
+    "Write-only. Stored encrypted for the active provisioner only."
+  - **All provisioners table**: `section-title` heading with `"N from CA"` count
+    badge (`badge--neutral`); `table-wrap table-scroll` container; `table.table`
+    with Name / Type / Issuance / Actions columns. Active row: `badge--info`
+    "Active" in Issuance; delete button `aria-disabled` + `disabled` with "The
+    active provisioner cannot be deleted" title. Non-active rows without admin auth:
+    disabled trash button ("Requires admin authentication"). Non-active rows with
+    admin auth: live delete form posting to `/provisioners/{name}`.
+  - **Footnote** below the table: "Delete is disabled until admin auth is set; the
+    Active provisioner can never be deleted."
+  - **New CSS** in `app.css`: `.locked` / `.locked__body` (honest-disabled notice),
+    `.section-title`, `.rowact` (icon-button group in table cells),
+    `.iconbtn--danger` (hover variant).
+
 - **CA settings page redesign** (PR C): ports `GET /settings` to the approved
   design mock (`docs/design/ca-settings.html`).
   - **Page shell**: `content--narrow` wrapper, `page-head` with breadcrumb
@@ -51,6 +83,30 @@ certificate …` codeblock with the CA URL interpolated.
     `settingsSecretBadgeClass`, `settingsSecretBadgeLabel`.
 
 ### Fixed
+
+- **Copy mechanism app-wide** (PR D review — HIGH): `data-copy` and
+  `data-copy-target` buttons were dead because `ui.js` was never ported. Added
+  a single delegated `click` handler in the shared layout `<script>` block:
+  `[data-copy]` writes the attribute value to `navigator.clipboard`;
+  `[data-copy-target]` reads the referenced element's `.value` / `.textContent`.
+  Both the provisioners "Copy CLI command" button and the CA-settings "Get an
+  admin cert" copy button now work via this handler. The provisioners CLI command
+  is also rendered as visible, selectable `<pre>` text (works without JS).
+  Existing `copyText(btn)` buttons (serial, PEM blocks, ACME snippets) are
+  unaffected.
+- **"Set active" table row button** (PR D review — MEDIUM): the per-row "Set
+  active" was a dead `<button type="button">` that did nothing. Changed to
+  `<a class="btn btn--sm" href="#active-card">Set active</a>` so clicking
+  scrolls the operator to the active-provisioner card where they enter the name
+  and secret. The active-provisioner card now carries `id="active-card"` as the
+  scroll target. No one-click `POST` is issued; the secret-entry step is preserved.
+- **Active-card select falls back to stored provisioner** (PR D review — LOW):
+  the active provisioner `<select>` only rendered options from the live CA list.
+  When the list was empty (CA unreachable, `ListError`) the select had no options
+  and the operator could not retain or re-set their active provisioner. The stored
+  `Selected` is now rendered as an extra option (labelled "stored — not in live
+  list") when it is absent from the live list, ensuring the card remains usable
+  offline.
 
 - **Revoke form confirm input** (PR B review): the redesigned revoke form was
   missing `<input type="hidden" name="confirm" value="REVOKE"/>`, causing every

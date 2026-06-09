@@ -1512,6 +1512,64 @@ table.table {
   color: var(--text);
 }
 
+/* ---- Provisioners: locked notice ---------------------------------------- */
+/* Shown when admin auth is not configured; explains why write actions are
+   disabled rather than just graying out a button with no context. */
+.locked {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--neutral-border);
+  border-radius: var(--r);
+  background: var(--neutral-bg);
+  color: var(--neutral-fg);
+}
+.locked .ico {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  margin-top: 2px;
+  opacity: 0.7;
+}
+.locked__body {
+  flex: 1;
+}
+.locked__body strong {
+  font-weight: var(--fw-semibold);
+}
+.locked__body p {
+  margin-top: var(--space-2);
+  font-size: var(--fs-sm);
+  opacity: 0.85;
+}
+.locked__body .btn-row {
+  margin-top: var(--space-4);
+}
+
+/* ---- Provisioners: section title above the table ------------------------ */
+.section-title {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+  margin-bottom: var(--space-3);
+}
+
+/* ---- Provisioners: row actions (icon button group inside a table cell) -- */
+.rowact {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+/* Danger variant of the icon button */
+.iconbtn--danger:hover {
+  color: var(--danger-strong);
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+}
+
 /* =========================================================================
    Legacy page-interior styles
    These are used by templates not yet ported to the new design system.

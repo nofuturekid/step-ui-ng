@@ -72,6 +72,30 @@ templ layout(d pageData) {
 						navigator.clipboard.writeText(f.value).then(done, function(){ document.execCommand("copy"); done(); });
 					} else { document.execCommand("copy"); done(); }
 				}
+				// Delegated handler for data-copy and data-copy-target buttons.
+				// data-copy="<text>"  — copies the attribute value directly.
+				// data-copy-target="<selector>" — copies the text/value of the target element.
+				document.addEventListener("click", function(e) {
+					var el = e.target.closest("[data-copy],[data-copy-target]");
+					if (!el) { return; }
+					var text = "";
+					if (el.dataset.copy !== undefined) {
+						text = el.dataset.copy;
+					} else if (el.dataset.copyTarget) {
+						var tgt = document.querySelector(el.dataset.copyTarget);
+						if (!tgt) { return; }
+						text = tgt.value !== undefined ? tgt.value : tgt.textContent;
+					}
+					var done = function() {
+						var lbl = el.querySelector(".label") || el;
+						var orig = lbl.textContent;
+						lbl.textContent = "Copied";
+						setTimeout(function() { lbl.textContent = orig; }, 1200);
+					};
+					if (navigator.clipboard && navigator.clipboard.writeText) {
+						navigator.clipboard.writeText(text).then(done, function() { done(); });
+					} else { done(); }
+				});
 			</script>
 		</head>
 		<body>
@@ -542,6 +566,18 @@ func settingsSecretBadgeLabel(hasSecret bool) string {
 	return "none"
 }
 
+// provisionerNameInList reports whether a provisioner with the given name is
+// present in the list. Used to detect when the stored Selected is absent from
+// the live CA list so we can render a fallback option in the active-card select.
+func provisionerNameInList(list []provisionerRow, name string) bool {
+	for _, p := range list {
+		if p.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // testSuccess is the htmx partial shown when the connection test passes (FR-2).
 templ testSuccess(rootCount int) {
 	<div class="flash info" role="status">
@@ -560,103 +596,202 @@ templ testResult(ok bool, msg string) {
 
 // provisionersPage lists the CA provisioners with their types, marks the active
 // one, and (when an admin credential is configured) offers create/delete and
-// select controls (spec/0005, admin+). It never renders any secret value.
+// select controls (spec/0005, admin+). Layout follows docs/design/provisioners.html.
+// It never renders any secret value.
 templ provisionersPage(d pageData, v provisionersView) {
 	@layout(d) {
-		<div class="card">
-			<h1>Provisioners</h1>
-			<p class="muted">The CA owns provisioners; this list is read from the CA. Pick the active one for issuance.</p>
-			if v.ListError != "" {
-				<div class="flash error" role="alert">{ v.ListError }</div>
-			}
-			if v.CASettings {
-				<table>
-					<thead>
-						<tr>
-							<th>Name</th><th>Type</th><th>Active</th><th>Actions</th>
-						</tr>
-					</thead>
-					<tbody>
-						for _, p := range v.Provisioners {
-							@provisionerRowTempl(d, p, v.HasAdminCred)
-						}
-					</tbody>
-				</table>
-				if len(v.Provisioners) == 0 && v.ListError == "" {
-					<p class="muted">No provisioners returned by the CA.</p>
-				}
-			}
-		</div>
-		if v.CASettings {
-			<div class="card">
-				<h1>Select active provisioner</h1>
-				<p class="muted">The active provisioner (and its secret) is used for issuance. Secrets are encrypted at rest and never shown.</p>
-				<form method="post" action="/provisioners/select">
-					<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-					<label for="select-name">Provisioner name</label>
-					<input id="select-name" name="name" type="text" required value={ v.Selected } placeholder="provisioner name"/>
-					<label for="select-secret">
-						Provisioner secret
-						if v.HasSelectedSecret {
-							<span class="badge">set</span>
-						} else {
-							<span class="badge">none</span>
-						}
-					</label>
-					<input id="select-secret" name="secret" type="password" autocomplete="new-password" placeholder="leave blank to keep the current secret"/>
-					if v.HasSelectedSecret {
-						<p class="muted">A secret is stored for this provisioner. Leave blank to keep it, or type a new one to replace it. Switching to a different provisioner with a blank secret clears it.</p>
-					} else {
-						<p class="muted">No secret stored. Leave blank if this provisioner needs none.</p>
-					}
-					<button type="submit">Set active</button>
-				</form>
+		<div class="content--narrow">
+			<!-- Page header -->
+			<div class="page-head">
+				<div class="breadcrumb"><a href="#">Settings</a><span class="sep">/</span><span>Provisioners</span></div>
+				<div class="page-head__row">
+					<div>
+						<h1 class="page-title">Provisioners</h1>
+						<p class="page-sub">Read live from the CA. The active provisioner is used when issuing certificates from step-ui-ng.</p>
+					</div>
+				</div>
 			</div>
-			<div class="card">
-				<h1>Create provisioner</h1>
+			<div class="stack">
+				if v.ListError != "" {
+					<div class="flash flash--error" role="alert">
+						<div class="flash__body">{ v.ListError }</div>
+					</div>
+				}
+				if !v.CASettings {
+					<div class="flash--warn">
+						<svg class="ico"><use href="/static/icons.svg#i-info"></use></svg>
+						<div class="flash__body">
+							<strong>CA not configured.</strong>
+							<p>Configure the CA connection first (<a href="/settings">CA settings</a>).</p>
+						</div>
+					</div>
+				}
 				if !v.HasAdminCred {
-					<p class="muted">Creating and deleting provisioners requires an admin credential. Configure it on the CA settings page (x5c certificate or JWK provisioner password), or use the Step CLI directly.</p>
+					<!-- Locked notice — gated on admin auth not configured -->
+					<div class="locked">
+						<svg class="ico"><use href="/static/icons.svg#i-lock"></use></svg>
+						<div class="locked__body">
+							<strong>Creating and deleting provisioners requires an admin credential.</strong>
+							<p>step-ui-ng can read provisioners and set the active one without credentials, but writing to the CA&#39;s admin API requires an <span class="mono">x5c</span> or <span class="mono">jwk</span> admin method. You can also manage provisioners directly with the <span class="mono">step</span> CLI.</p>
+							<div class="btn-row">
+								<a class="btn btn--sm" href="/settings"><svg class="ico"><use href="/static/icons.svg#i-settings"></use></svg> Configure admin authentication</a>
+							</div>
+							<div class="codeblock codeblock--cmd" style="margin-top:var(--space-3)">
+								<div class="codeblock__bar">
+									<svg class="ico"><use href="/static/icons.svg#i-terminal"></use></svg>
+									<span class="label">Add a provisioner via the CLI</span>
+									<span class="spacer"></span>
+									<button type="button" class="copy-btn" data-copy="step ca provisioner add my-provisioner --type JWK --create">
+										<svg class="ico"><use href="/static/icons.svg#i-copy"></use></svg>
+										<span class="label">Copy CLI command</span>
+									</button>
+								</div>
+								<pre>step ca provisioner add my-provisioner --type JWK --create</pre>
+							</div>
+						</div>
+					</div>
 				} else {
-					<form method="post" action="/provisioners">
-						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-						<label for="prov-name">Name</label>
-						<input id="prov-name" name="name" type="text" required pattern="[a-zA-Z0-9._-]+" placeholder="my-provisioner"/>
-						<label for="prov-type">Type</label>
-						<select id="prov-type" name="type">
-							<option value="JWK">JWK</option>
-							<option value="ACME">ACME</option>
-							<option value="SSHPOP">SSHPOP</option>
-						</select>
-						<label for="prov-secret">JWK secret (min 8 chars; JWK only)</label>
-						<input id="prov-secret" name="secret" type="password" autocomplete="new-password" minlength="8" placeholder="encrypts the generated JWK key"/>
-						<p></p>
-						<button type="submit">Create</button>
-					</form>
+					<!-- Create provisioner form — only when admin auth IS configured -->
+					<div class="card">
+						<div class="card__header">
+							<div>
+								<h2 class="card__title">Create provisioner</h2>
+								<p class="card__desc">Add a new provisioner to the CA via the admin API.</p>
+							</div>
+						</div>
+						<form class="card__body" method="post" action="/provisioners">
+							<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+							<div class="form-grid">
+								<div class="field">
+									<label for="prov-name">Name <span class="req" aria-hidden="true">*</span></label>
+									<input class="input" id="prov-name" name="name" type="text" required pattern="[a-zA-Z0-9._-]+" placeholder="my-provisioner"/>
+								</div>
+								<div class="field">
+									<label for="prov-type">Type</label>
+									<select class="select" id="prov-type" name="type">
+										<option value="JWK">JWK</option>
+										<option value="ACME">ACME</option>
+										<option value="SSHPOP">SSHPOP</option>
+									</select>
+								</div>
+								<div class="field col-span-2">
+									<label for="prov-secret">JWK secret <span class="opt">(min 8 chars; JWK only)</span></label>
+									<input class="input" id="prov-secret" name="secret" type="password" autocomplete="new-password" minlength="8" placeholder="encrypts the generated JWK key"/>
+								</div>
+							</div>
+							<div class="form-actions" style="margin-top:var(--space-5)">
+								<button type="submit" class="btn btn--primary"><svg class="ico"><use href="/static/icons.svg#i-plus"></use></svg> Create provisioner</button>
+							</div>
+						</form>
+					</div>
+				}
+				if v.CASettings {
+					<!-- Active provisioner control — works without admin auth -->
+					<div class="card" id="active-card">
+						<div class="card__header">
+							<div>
+								<h2 class="card__title">Active provisioner for issuance</h2>
+								<p class="card__desc">step-ui-ng signs new certificates through this provisioner. Some provisioners need a secret (password) to use.</p>
+							</div>
+						</div>
+						<form class="card__body" method="post" action="/provisioners/select">
+							<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+							<div class="form-grid">
+								<div class="field">
+									<label for="select-name">Provisioner</label>
+									<select class="select" id="select-name" name="name">
+										if v.Selected != "" && !provisionerNameInList(v.Provisioners, v.Selected) {
+											<option value={ v.Selected } selected>{ v.Selected } (stored — not in live list)</option>
+										}
+										for _, p := range v.Provisioners {
+											if p.Name == v.Selected {
+												<option value={ p.Name } selected>{ p.Name } — { p.Type }</option>
+											} else {
+												<option value={ p.Name }>{ p.Name } — { p.Type }</option>
+											}
+										}
+									</select>
+								</div>
+								<div class="field secret-field">
+									<label for="select-secret">Provisioner password <span class="opt">(if required)</span></label>
+									<div class="secret-row">
+										<input class="input" id="select-secret" name="secret" type="password" autocomplete="new-password" placeholder="•••••••• (unchanged)"/>
+										<span class="secret-state">
+											if v.HasSelectedSecret {
+												<span class="badge badge--set"><span class="dot"></span>set</span>
+											} else {
+												<span class="badge badge--none"><span class="dot"></span>none</span>
+											}
+										</span>
+									</div>
+									<span class="field__hint">Write-only. Stored encrypted for the active provisioner only.</span>
+								</div>
+							</div>
+							<div class="form-actions" style="margin-top:var(--space-5)">
+								<button type="submit" class="btn btn--primary">Set active</button>
+							</div>
+						</form>
+					</div>
+					<!-- Live list from the CA -->
+					<div>
+						<h2 class="section-title">All provisioners <span class="badge badge--neutral" style="vertical-align:middle">{ strconv.Itoa(len(v.Provisioners)) } from CA</span></h2>
+						<div class="table-wrap table-scroll">
+							<table class="table">
+								<thead>
+									<tr>
+										<th scope="col">Name</th>
+										<th scope="col">Type</th>
+										<th scope="col">Issuance</th>
+										<th scope="col"><span class="visually-hidden">Actions</span></th>
+									</tr>
+								</thead>
+								<tbody>
+									for _, p := range v.Provisioners {
+										@provisionerRowTempl(d, p, v.HasAdminCred)
+									}
+								</tbody>
+							</table>
+						</div>
+						if len(v.Provisioners) == 0 && v.ListError == "" {
+							<p class="muted">No provisioners returned by the CA.</p>
+						}
+						<p class="field__hint" style="margin-top:var(--space-3)"><svg class="ico" style="width:13px;height:13px"><use href="/static/icons.svg#i-lock"></use></svg> Delete is disabled until admin auth is set; the <span class="mono">Active</span> provisioner can never be deleted.</p>
+					</div>
 				}
 			</div>
-		}
+		</div>
 	}
 }
 
-// provisionerRowTempl renders one provisioner with its active marker and a delete
-// control (only when an admin credential is configured; the active provisioner
-// cannot be deleted — the handler enforces and the UI hides the button).
+// provisionerRowTempl renders one provisioner row in the design-system table.
+// The Issuance column shows either an "Active" badge (for the active provisioner)
+// or a "Set active" button. The Actions column always shows a trash icon button:
+//   - disabled (aria-disabled + disabled) if this is the active provisioner
+//     (the active provisioner can never be deleted — enforced by the handler and UI)
+//   - disabled if no admin auth is configured
+//   - enabled (a real delete form) only for non-active rows with admin auth set
 templ provisionerRowTempl(d pageData, p provisionerRow, hasAdminCred bool) {
 	<tr>
-		<td>{ p.Name }</td>
-		<td>{ p.Type }</td>
+		<td class="mono">{ p.Name }</td>
+		<td><span class="tag">{ p.Type }</span></td>
 		<td>
 			if p.Active {
-				<span class="badge">active</span>
+				<span class="badge badge--info"><span class="dot"></span>Active</span>
+			} else {
+				<a class="btn btn--sm" href="#active-card">Set active</a>
 			}
 		</td>
-		<td>
-			<div class="actions">
-				if hasAdminCred && !p.Active {
-					<form method="post" action={ templ.SafeURL("/provisioners/" + p.Name) }>
+		<td class="col-actions">
+			<div class="rowact">
+				if p.Active {
+					<button class="iconbtn" aria-disabled="true" disabled title="The active provisioner cannot be deleted"><svg class="ico"><use href="/static/icons.svg#i-trash"></use></svg></button>
+				} else if !hasAdminCred {
+					<button class="iconbtn" aria-disabled="true" disabled title="Requires admin authentication"><svg class="ico"><use href="/static/icons.svg#i-trash"></use></svg></button>
+				} else {
+					<form method="post" action={ templ.SafeURL("/provisioners/" + p.Name) } style="display:contents">
 						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
 						<input type="hidden" name="action" value="delete"/>
-						<button class="danger" type="submit">Delete</button>
+						<button class="iconbtn iconbtn--danger" type="submit" title="Delete provisioner"><svg class="ico"><use href="/static/icons.svg#i-trash"></use></svg></button>
 					</form>
 				}
 			</div>
