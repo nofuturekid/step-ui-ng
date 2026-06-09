@@ -8,6 +8,8 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+## [0.4.0-beta.1] - 2026-06-09
+
 ### Fixed
 
 - **The topbar main-menu dropdown now closes on an outside click or Escape.**
