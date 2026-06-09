@@ -370,7 +370,7 @@ func buildBundlePFX(keyPEM, certPEM, chainPEM, password string) ([]byte, error) 
 // buildReadme returns the README.txt content describing the bundle files.
 func buildReadme(cn, serial, keyStrategy string, hasKey, hasPFX bool) string {
 	var sb strings.Builder
-	sb.WriteString("step-ui-ng certificate bundle\n")
+	sb.WriteString("NextGen UI certificate bundle\n")
 	sb.WriteString("==============================\n\n")
 	fmt.Fprintf(&sb, "Common name : %s\n", cn)
 	fmt.Fprintf(&sb, "Serial      : %s\n", serial)

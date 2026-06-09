@@ -10,7 +10,7 @@ package app_test
 //   - loginPage: renders Username (name="username") and Password (name="password")
 //     inputs inside a card.
 //   - loginPage: renders the "Sign in" submit button.
-//   - loginPage: renders the authfoot "step-ui-ng · self-hosted Step-CA admin".
+//   - loginPage: renders the authfoot "NextGen UI · self-hosted Step-CA admin".
 //   - loginPage: includes the CSRF token.
 //   - loginPage: password is NEVER echoed back into a value attribute on error.
 //   - setupPage: renders the authwrap layout — no topbar.
@@ -21,7 +21,7 @@ package app_test
 //   - setupPage: renders Username, Password, Confirm-password inputs.
 //   - setupPage: renders the password hint about 12+ characters.
 //   - setupPage: renders the "Create superadmin & continue" submit button.
-//   - setupPage: renders the authfoot "step-ui-ng · first-run setup".
+//   - setupPage: renders the authfoot "NextGen UI · first-run setup".
 //   - setupPage: includes the CSRF token.
 //   - setupPage: password is NEVER echoed back into a value attribute on error.
 
@@ -138,11 +138,8 @@ func TestLoginPageAuthfoot(t *testing.T) {
 
 	_, body := e.get(t, "/login")
 
-	if !strings.Contains(body, "step-ui-ng") {
-		t.Error("login: missing 'step-ui-ng' in authfoot")
-	}
-	if !strings.Contains(body, "self-hosted Step-CA admin") {
-		t.Error("login: missing 'self-hosted Step-CA admin' in authfoot")
+	if !strings.Contains(body, "NextGen UI · self-hosted Step-CA admin") {
+		t.Error("login: missing 'NextGen UI · self-hosted Step-CA admin' authfoot")
 	}
 	if !strings.Contains(body, "authfoot") {
 		t.Error("login: missing authfoot element")
@@ -327,11 +324,8 @@ func TestSetupPageAuthfoot(t *testing.T) {
 
 	_, body := e.get(t, "/setup")
 
-	if !strings.Contains(body, "step-ui-ng") {
-		t.Error("setup: missing 'step-ui-ng' in authfoot")
-	}
-	if !strings.Contains(body, "first-run setup") {
-		t.Error("setup: authfoot must say 'first-run setup'")
+	if !strings.Contains(body, "NextGen UI · first-run setup") {
+		t.Error("setup: missing 'NextGen UI · first-run setup' authfoot")
 	}
 	if !strings.Contains(body, "authfoot") {
 		t.Error("setup: missing authfoot element")
