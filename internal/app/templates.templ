@@ -235,6 +235,15 @@ templ userRow(d pageData, u users.User) {
 	</tr>
 }
 
+// adminAuthOption renders a <select> option for the admin-auth method.
+templ adminAuthOption(opt settings.AdminAuthMethod, label string, current settings.AdminAuthMethod) {
+	if opt == current {
+		<option value={ string(opt) } selected>{ label }</option>
+	} else {
+		<option value={ string(opt) }>{ label }</option>
+	}
+}
+
 templ roleOption(opt users.Role, current users.Role) {
 	if opt == current {
 		<option value={ string(opt) } selected>{ string(opt) }</option>
@@ -292,6 +301,56 @@ templ settingsPage(d pageData, v settings.View) {
 				<button class="secondary" type="submit">Test connection</button>
 			</form>
 			<div id="test-result"></div>
+		</div>
+		<div class="card">
+			<h1>Admin authentication</h1>
+			<p class="muted">
+				Configure how the UI authenticates to the CA admin API (used for provisioner and ACME management).
+				Secrets are encrypted at rest and never shown.
+			</p>
+			<form method="post" action="/settings/admin-auth">
+				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+				<label for="admin-auth-method">
+					Method
+					if v.AdminAuthMethod != "" && v.AdminAuthMethod != settings.AdminAuthNone {
+						<span class="badge">{ string(v.AdminAuthMethod) }</span>
+					}
+				</label>
+				<select id="admin-auth-method" name="admin_auth_method" onchange="document.getElementById('jwk-fields').style.display=(this.value==='jwk'?'block':'none')">
+					@adminAuthOption(settings.AdminAuthNone, "None (disable admin operations)", v.AdminAuthMethod)
+					@adminAuthOption(settings.AdminAuthX5C, "x5c — admin certificate + key", v.AdminAuthMethod)
+					@adminAuthOption(settings.AdminAuthJWK, "JWK — provisioner password", v.AdminAuthMethod)
+				</select>
+				<div
+					id="jwk-fields"
+					if v.AdminAuthMethod == settings.AdminAuthJWK {
+						style="display:block"
+					} else {
+						style="display:none"
+					}
+				>
+					<label for="admin-jwk-subject">Admin subject</label>
+					<input id="admin-jwk-subject" name="admin_jwk_subject" type="text" value={ v.AdminJWKSubject } placeholder="e.g. step"/>
+					<label for="admin-jwk-provisioner">JWK provisioner name</label>
+					<input id="admin-jwk-provisioner" name="admin_jwk_provisioner" type="text" value={ v.AdminJWKProvisioner } placeholder="e.g. admin-jwk"/>
+					<label for="admin-jwk-password">
+						Provisioner password
+						if v.HasAdminJWK {
+							<span class="badge">set</span>
+						} else {
+							<span class="badge">none</span>
+						}
+					</label>
+					<input id="admin-jwk-password" name="admin_jwk_password" type="password" autocomplete="new-password" placeholder="leave blank to keep the current password"/>
+					if v.HasAdminJWK {
+						<p class="muted">A password is stored — leave blank to keep it, or type a new one to replace it.</p>
+					} else {
+						<p class="muted">No password stored yet.</p>
+					}
+				</div>
+				<p></p>
+				<button type="submit">Save admin authentication</button>
+			</form>
 		</div>
 	}
 }
@@ -369,7 +428,7 @@ templ provisionersPage(d pageData, v provisionersView) {
 			<div class="card">
 				<h1>Create provisioner</h1>
 				if !v.HasAdminCred {
-					<p class="muted">Creating and deleting provisioners requires an admin credential. Add an admin certificate and key on the CA settings page.</p>
+					<p class="muted">Creating and deleting provisioners requires an admin credential. Configure it on the CA settings page (x5c certificate or JWK provisioner password), or use the Step CLI directly.</p>
 				} else {
 					<form method="post" action="/provisioners">
 						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
@@ -853,7 +912,7 @@ templ acmePage(d pageData, v acmeView) {
 			<div class="card">
 				<h1>Create ACME provisioner</h1>
 				if !v.HasAdminCred {
-					<p class="muted">Managing ACME provisioners requires an admin credential. Add an admin certificate and key on the CA settings page.</p>
+					<p class="muted">Managing ACME provisioners requires an admin credential. Configure it on the CA settings page (x5c certificate or JWK provisioner password), or use the Step CLI directly.</p>
 				} else {
 					<form method="post" action="/acme/provisioners">
 						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>

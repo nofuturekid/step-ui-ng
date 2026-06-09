@@ -37,6 +37,21 @@ type Input struct {
 	AdminSecret      string // plaintext; sealed before storage, never persisted as-is
 }
 
+// AdminAuthMethod is the configured admin-authentication method (spec/0012 FR-1).
+type AdminAuthMethod string
+
+const (
+	// AdminAuthNone means no admin credential is configured; create/delete and
+	// ACME management are disabled.
+	AdminAuthNone AdminAuthMethod = "none"
+	// AdminAuthX5C means the operator uploaded an admin cert+key (spec/0005,
+	// migration 0004 columns admin_cert_pem / admin_key_sealed).
+	AdminAuthX5C AdminAuthMethod = "x5c"
+	// AdminAuthJWK means the operator supplied a JWK provisioner + password; the
+	// app mints a short-lived admin cert on demand (spec/0012 FR-3, ADR-0018).
+	AdminAuthJWK AdminAuthMethod = "jwk"
+)
+
 // View is the read model returned to callers/templates. It deliberately omits
 // any secret value: the Has* bools only report whether a secret/key is set
 // (FR-5 of 0004; spec/0005). The admin certificate chain is public, so it is
@@ -52,6 +67,11 @@ type View struct {
 	HasSelectedSecret   bool
 	AdminCertPEM        string // the x5c chain (public)
 	HasAdminKey         bool   // an admin signing key is configured
+	// Admin auth method (spec/0012, migration 0006).
+	AdminAuthMethod     AdminAuthMethod
+	AdminJWKSubject     string // public; the admin subject used for cert minting
+	AdminJWKProvisioner string // public; the JWK provisioner name
+	HasAdminJWK         bool   // a JWK password is sealed
 	CreatedAt           int64
 	UpdatedAt           int64
 }
@@ -71,26 +91,35 @@ func NewRepo(db *sql.DB, box *crypto.Box) *Repo { return &Repo{db: db, box: box}
 var now = func() int64 { return time.Now().Unix() }
 
 // Get loads the single settings row. ok is false when no settings exist yet.
-// The admin secret is never decrypted: only HasAdminSecret is reported.
+// The admin secret and JWK password are never decrypted: only Has* bools
+// report whether a secret/key is set.
 func (r *Repo) Get(ctx context.Context) (View, bool, error) {
 	var (
-		v         View
-		sealed    sql.NullString
-		prov      sql.NullString
-		subj      sql.NullString
-		selProv   sql.NullString
-		selSecret sql.NullString
-		adminCert sql.NullString
-		adminKey  sql.NullString
+		v           View
+		sealed      sql.NullString
+		prov        sql.NullString
+		subj        sql.NullString
+		selProv     sql.NullString
+		selSecret   sql.NullString
+		adminCert   sql.NullString
+		adminKey    sql.NullString
+		authMethod  sql.NullString
+		jwkSubject  sql.NullString
+		jwkProv     sql.NullString
+		jwkPassword sql.NullString
 	)
 	err := r.db.QueryRowContext(ctx,
 		`SELECT ca_url, root_fingerprint, admin_provisioner, admin_subject,
 		        admin_secret_sealed, selected_provisioner,
 		        selected_provisioner_secret_sealed, admin_cert_pem, admin_key_sealed,
+		        admin_auth_method, admin_jwk_subject, admin_jwk_provisioner,
+		        admin_jwk_password_sealed,
 		        created_at, updated_at
 		 FROM ca_settings WHERE id = 1`).
 		Scan(&v.CAURL, &v.RootFingerprint, &prov, &subj, &sealed,
-			&selProv, &selSecret, &adminCert, &adminKey, &v.CreatedAt, &v.UpdatedAt)
+			&selProv, &selSecret, &adminCert, &adminKey,
+			&authMethod, &jwkSubject, &jwkProv, &jwkPassword,
+			&v.CreatedAt, &v.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return View{}, false, nil
 	}
@@ -104,6 +133,16 @@ func (r *Repo) Get(ctx context.Context) (View, bool, error) {
 	v.HasSelectedSecret = selSecret.Valid && selSecret.String != ""
 	v.AdminCertPEM = adminCert.String
 	v.HasAdminKey = adminKey.Valid && adminKey.String != ""
+	// Admin auth method fields (spec/0012).
+	switch AdminAuthMethod(authMethod.String) {
+	case AdminAuthX5C, AdminAuthJWK:
+		v.AdminAuthMethod = AdminAuthMethod(authMethod.String)
+	default:
+		v.AdminAuthMethod = AdminAuthNone
+	}
+	v.AdminJWKSubject = jwkSubject.String
+	v.AdminJWKProvisioner = jwkProv.String
+	v.HasAdminJWK = jwkPassword.Valid && jwkPassword.String != ""
 	return v, true, nil
 }
 
@@ -209,8 +248,11 @@ func (r *Repo) SelectProvisioner(ctx context.Context, name, secret string) error
 
 // SaveAdminCredential stores the admin certificate chain (PEM, public) and seals
 // the admin private key (PEM) used to sign x5c admin tokens (FR-3/FR-4,
-// ADR-0012). The CA settings row must already exist. The private key is
-// write-only: it is sealed before storage and never returned toward the client.
+// ADR-0012). It also sets admin_auth_method = 'x5c' so that adminAuth() can
+// route correctly (spec/0012 FR-1) and clears any stored JWK material so no
+// stale sealed password lingers (FR-5). The CA settings row must already exist.
+// The private key is write-only: it is sealed before storage and never returned
+// toward the client.
 func (r *Repo) SaveAdminCredential(ctx context.Context, certPEM, keyPEM string) error {
 	if strings.TrimSpace(certPEM) == "" || strings.TrimSpace(keyPEM) == "" {
 		return fmt.Errorf("settings: admin credential: cert and key are required")
@@ -221,7 +263,13 @@ func (r *Repo) SaveAdminCredential(ctx context.Context, certPEM, keyPEM string) 
 	}
 	res, err := r.db.ExecContext(ctx,
 		`UPDATE ca_settings
-		    SET admin_cert_pem = ?, admin_key_sealed = ?, updated_at = ?
+		    SET admin_auth_method         = 'x5c',
+		        admin_cert_pem            = ?,
+		        admin_key_sealed          = ?,
+		        admin_jwk_subject         = NULL,
+		        admin_jwk_provisioner     = NULL,
+		        admin_jwk_password_sealed = NULL,
+		        updated_at                = ?
 		  WHERE id = 1`,
 		certPEM, sealedKey, now())
 	if err != nil {
@@ -256,6 +304,110 @@ func (r *Repo) AdminCredential(ctx context.Context) (certPEM, keyPEM string, ok 
 		return "", "", false, fmt.Errorf("settings: open admin key: %w", oErr)
 	}
 	return cert.String, string(plain), true, nil
+}
+
+// SaveAdminJWK stores the JWK admin-auth method and its non-secret fields, and
+// seals the password. On success the method is set to "jwk" and the x5c
+// material is cleared (FR-5 switching is clean). An empty password preserves
+// the existing sealed value (leave-blank-to-keep semantics). The CA settings
+// row must already exist.
+func (r *Repo) SaveAdminJWK(ctx context.Context, subject, provisioner, password string) error {
+	subject = strings.TrimSpace(subject)
+	provisioner = strings.TrimSpace(provisioner)
+	if subject == "" || provisioner == "" {
+		return fmt.Errorf("settings: admin JWK: subject and provisioner are required")
+	}
+
+	if password != "" {
+		sealedPass, err := r.box.Seal([]byte(password))
+		if err != nil {
+			return fmt.Errorf("settings: seal admin JWK password: %w", err)
+		}
+		res, err := r.db.ExecContext(ctx,
+			`UPDATE ca_settings
+			    SET admin_auth_method           = 'jwk',
+			        admin_jwk_subject           = ?,
+			        admin_jwk_provisioner       = ?,
+			        admin_jwk_password_sealed   = ?,
+			        admin_cert_pem              = NULL,
+			        admin_key_sealed            = NULL,
+			        updated_at                  = ?
+			  WHERE id = 1`,
+			subject, provisioner, sealedPass, now())
+		if err != nil {
+			return fmt.Errorf("settings: save admin JWK: %w", err)
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return ErrNoSettings
+		}
+	} else {
+		// Blank password: keep the existing sealed value (only update subject/prov).
+		res, err := r.db.ExecContext(ctx,
+			`UPDATE ca_settings
+			    SET admin_auth_method     = 'jwk',
+			        admin_jwk_subject     = ?,
+			        admin_jwk_provisioner = ?,
+			        admin_cert_pem        = NULL,
+			        admin_key_sealed      = NULL,
+			        updated_at            = ?
+			  WHERE id = 1`,
+			subject, provisioner, now())
+		if err != nil {
+			return fmt.Errorf("settings: save admin JWK (no password): %w", err)
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return ErrNoSettings
+		}
+	}
+	return nil
+}
+
+// SetAdminAuthNone resets the admin-auth method to "none" and clears all
+// admin credential material (both x5c and JWK).  Use when the operator
+// explicitly removes admin authentication.
+func (r *Repo) SetAdminAuthNone(ctx context.Context) error {
+	res, err := r.db.ExecContext(ctx,
+		`UPDATE ca_settings
+		    SET admin_auth_method         = 'none',
+		        admin_cert_pem            = NULL,
+		        admin_key_sealed          = NULL,
+		        admin_jwk_subject         = NULL,
+		        admin_jwk_provisioner     = NULL,
+		        admin_jwk_password_sealed = NULL,
+		        updated_at                = ?
+		  WHERE id = 1`, now())
+	if err != nil {
+		return fmt.Errorf("settings: set admin auth none: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNoSettings
+	}
+	return nil
+}
+
+// AdminJWKPassword returns the decrypted JWK provisioner password for use by
+// the CA admin operations. ok is false when no JWK password is configured.
+// The plaintext password is returned ONLY here, for internal use — never
+// toward the client (callers must not render it or log it).
+func (r *Repo) AdminJWKPassword(ctx context.Context) (password string, ok bool, err error) {
+	var sealed sql.NullString
+	qErr := r.db.QueryRowContext(ctx,
+		`SELECT admin_jwk_password_sealed FROM ca_settings WHERE id = 1`).
+		Scan(&sealed)
+	if errors.Is(qErr, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if qErr != nil {
+		return "", false, fmt.Errorf("settings: admin JWK password: %w", qErr)
+	}
+	if !sealed.Valid || sealed.String == "" {
+		return "", false, nil
+	}
+	plain, oErr := r.box.Open(sealed.String)
+	if oErr != nil {
+		return "", false, fmt.Errorf("settings: open admin JWK password: %w", oErr)
+	}
+	return string(plain), true, nil
 }
 
 // SelectedSecret returns the decrypted secret of the selected provisioner for

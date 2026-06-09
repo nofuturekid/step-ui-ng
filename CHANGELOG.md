@@ -10,6 +10,21 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- **Dual admin authentication** (spec/0012): the CA-settings page gains an
+  **Admin authentication** card. Operators choose between three methods:
+  - `none` — disables admin operations (create/delete provisioners, ACME management).
+  - `x5c` — uses an admin certificate + private key (existing mechanism;
+    `SaveAdminCredential` sets the method). The guided **upload form** lands in a
+    follow-up PR; for now `jwk` is the method wired end-to-end from the UI.
+  - `jwk` — stores a JWK provisioner name, subject, and password. On demand the app
+    mints an ephemeral P-256 key, obtains a short-lived admin cert via `POST /1.0/sign`
+    (signed with a JWK OTT), then uses that cert to sign admin tokens — the ephemeral
+    key and cert live only in memory (ADR-0018). The password is AES-256-GCM–sealed
+    at rest and never logged, echoed, or included in audit details (FR-7).
+    Switching methods clears the other method's sealed material (FR-5). The provisioner
+    and ACME pages show an honest FR-6 hint naming both options when no auth is
+    configured.
+
 - Unraid Community-Applications template for **Step-CA** itself
   (`deploy/unraid/step-ca.xml`), alongside the existing step-ui-ng template, so the
   repository serves both halves of the stack. Documented how to register the repo as an
