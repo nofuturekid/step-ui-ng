@@ -22,7 +22,10 @@ package app_test
 //   - htmx filter partial (HX-Request) swaps only the table.
 
 import (
+	"archive/zip"
+	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -530,6 +533,81 @@ func TestSerialCopylineHasHiddenInput(t *testing.T) {
 	serial := "serial-serial-copy.test"
 	if !strings.Contains(body, `type="hidden" value="`+serial+`"`) {
 		t.Errorf("serial copyline: missing hidden input with serial value %q — copyText reads input/textarea only", serial)
+	}
+}
+
+// TestCertDetailDownloadFormHasPFXPasswordInput verifies that the cert-detail
+// download form (admin+ only) exposes a pfx_password input so the user can
+// obtain a password-protected PKCS#12 bundle. The backend supports PFX via
+// Service.Bundle when pfx_password is non-empty (spec/0007 FR-3); the UI must
+// surface this path.
+func TestCertDetailDownloadFormHasPFXPasswordInput(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	now := time.Now()
+	id := invInsertMinimalCert(t, e.db, "pfx-form.test", now.Add(90*24*time.Hour).Unix())
+
+	_, body := e.get(t, fmt.Sprintf("/certificates/%d", id))
+
+	// The download form must include a pfx_password input so the user can
+	// request a PKCS#12 bundle from the detail page.
+	if !strings.Contains(body, `name="pfx_password"`) {
+		t.Error("cert detail download form: missing pfx_password input — " +
+			"the user must be able to request a PKCS#12 bundle via the detail download form")
+	}
+	// The pfx_password input must NOT be type="hidden" (it must be user-fillable).
+	if strings.Contains(body, `type="hidden" name="pfx_password"`) {
+		t.Error("cert detail download form: pfx_password must be a visible text/password input, " +
+			"not a hidden field with an empty value")
+	}
+}
+
+// TestCertDetailDownloadFormPFXPasswordYieldsP12 verifies that submitting the
+// cert-detail download form with a non-empty pfx_password produces a ZIP that
+// contains cert.p12. This is the end-to-end path: form → handler (postCertDownload)
+// → Service.Bundle(pfxPassword) → cert.p12 in ZIP (spec/0007 FR-3).
+func TestCertDetailDownloadFormPFXPasswordYieldsP12(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	// Seed a server-issued cert (sealed private key required to build the PFX).
+	id := invSeedServerCert(t, e, "pfx-detail-dl.test")
+	path := fmt.Sprintf("/certificates/%d/download", id)
+
+	token := e.csrfToken(t, fmt.Sprintf("/certificates/%d", id))
+	resp, rawBody := e.postResp(t, path, url.Values{
+		"csrf_token":   {token},
+		"pfx_password": {"hunter2"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("detail download with pfx_password = %d; body: %s", resp.StatusCode, truncate(rawBody, 300))
+	}
+
+	// Parse the ZIP and assert cert.p12 is present.
+	zr, err := zip.NewReader(bytes.NewReader([]byte(rawBody)), int64(len(rawBody)))
+	if err != nil {
+		t.Fatalf("parse ZIP: %v (first 64 bytes: %q)", err, truncate(rawBody, 64))
+	}
+	var found bool
+	for _, f := range zr.File {
+		if f.Name == "cert.p12" {
+			found = true
+			// Verify the entry is non-empty (a valid PKCS#12 is at least a few bytes).
+			rc, _ := f.Open()
+			p12bytes, _ := io.ReadAll(rc)
+			_ = rc.Close()
+			if len(p12bytes) == 0 {
+				t.Error("cert.p12 in ZIP is empty")
+			}
+		}
+	}
+	if !found {
+		var names []string
+		for _, f := range zr.File {
+			names = append(names, f.Name)
+		}
+		t.Fatalf("ZIP missing cert.p12; entries: %v", names)
 	}
 }
 
