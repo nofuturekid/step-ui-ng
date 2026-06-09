@@ -8,6 +8,14 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+### Added
+
+- Unraid Community-Applications template for **Step-CA** itself
+  (`deploy/unraid/step-ca.xml`), alongside the existing step-ui-ng template, so the
+  repository serves both halves of the stack. Documented how to register the repo as an
+  Unraid template source (CA scans `.xml`; each template's `<TemplateURL>` enables
+  update tracking).
+
 ### Fixed
 
 - The CA-settings **Admin secret** and the **Provisioner secret** are write-only (never

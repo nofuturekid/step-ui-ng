@@ -1,0 +1,169 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>step-ca</Name>
+  <Repository>smallstep/step-ca</Repository>
+  <Registry>https://hub.docker.com/r/smallstep/step-ca</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/nofuturekid/step-ui-ng/issues</Support>
+  <Project>https://smallstep.com/docs/step-ca/</Project>
+  <Overview>
+    Smallstep Step-CA — a self-hosted online Certificate Authority. This template is
+    published alongside step-ui-ng (https://github.com/nofuturekid/step-ui-ng) as the
+    CA half of the stack: run step-ca here, then point step-ui-ng at it to manage
+    certificates, provisioners and ACME from a web UI.
+
+    IMPORTANT — the DOCKER_STEPCA_INIT_* variables are evaluated ONLY on the very first
+    start, while the appdata path (/home/step) is still EMPTY. On an already-initialized
+    CA they are ignored; config/ca.json is authoritative from then on.
+
+    First start (empty appdata):
+      1. Set "Init: DNS Names" to include every name/IP clients will use to reach the
+         CA (your Unraid host IP and/or hostname) — these become the TLS SANs. Keep
+         localhost,127.0.0.1 so the built-in healthcheck can validate locally.
+      2. Start the container, then open `docker logs step-ca`: it prints the admin
+         username and admin password (the Remote-Management / JWK super-admin). Save
+         these once — they are not shown again.
+      3. Get the root fingerprint to configure clients:
+         docker exec step-ca step certificate fingerprint certs/root_ca.crt
+      4. In step-ui-ng enter the CA URL (https://HOST:9000) and that fingerprint.
+
+    Networking: this template defaults to bridge with published port 9000, so clients
+    reach the CA at https://UNRAID-HOST:9000 — make sure that host IP/hostname is in the
+    DNS Names. For a stable address, a custom br0 network with a fixed IP is recommended
+    for production CAs.
+  </Overview>
+  <Category>Network:Other Security:</Category>
+  <WebUI/>
+  <TemplateURL>https://raw.githubusercontent.com/nofuturekid/step-ui-ng/main/deploy/unraid/step-ca.xml</TemplateURL>
+  <Icon>https://github.com/smallstep.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+
+  <!-- CA HTTPS API port -->
+  <Config
+    Name="CA Port"
+    Target="9000"
+    Default="9000"
+    Mode="tcp"
+    Description="Port the CA's HTTPS API listens on. Clients (incl. step-ui-ng) connect to https://HOST:9000."
+    Type="Port"
+    Display="always"
+    Required="true"
+    Mask="false">9000</Config>
+
+  <!-- Persistent CA state: keys, certs, config, secrets, DB -->
+  <Config
+    Name="Appdata (CA state)"
+    Target="/home/step"
+    Default="/mnt/user/appdata/step-ca"
+    Mode="rw"
+    Description="Persistent storage (bind mount): root/intermediate keys, certs, config/ca.json, secrets/password and the CA database. BACK THIS UP and restrict access. Deleting this directory means a full reinit — a NEW root CA, invalidating every certificate issued so far."
+    Type="Path"
+    Display="always"
+    Required="true"
+    Mask="false">/mnt/user/appdata/step-ca</Config>
+
+  <!-- Timezone -->
+  <Config
+    Name="Timezone"
+    Target="TZ"
+    Default="Europe/Berlin"
+    Mode=""
+    Description="Container timezone."
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="false">Europe/Berlin</Config>
+
+  <!-- FIRST START ONLY: CA name -->
+  <Config
+    Name="Init: CA Name"
+    Target="DOCKER_STEPCA_INIT_NAME"
+    Default="Step CA"
+    Mode=""
+    Description="FIRST START ONLY (ignored once initialized). The CA name / certificate issuer."
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="false">Step CA</Config>
+
+  <!-- FIRST START ONLY: DNS names / SANs -->
+  <Config
+    Name="Init: DNS Names"
+    Target="DOCKER_STEPCA_INIT_DNS_NAMES"
+    Default="localhost,127.0.0.1"
+    Mode=""
+    Description="FIRST START ONLY. Comma-separated names/IPs the CA is reachable on; these become the CA's TLS SANs. ADD YOUR UNRAID HOST IP AND/OR HOSTNAME here (e.g. localhost,127.0.0.1,192.168.1.10,ca.example.lan) — clients can only verify TLS for names listed here. Keep localhost,127.0.0.1 so the built-in healthcheck works."
+    Type="Variable"
+    Display="always"
+    Required="true"
+    Mask="false">localhost,127.0.0.1</Config>
+
+  <!-- FIRST START ONLY: remote management (Admin API) -->
+  <Config
+    Name="Init: Remote Management"
+    Target="DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT"
+    Default="true"
+    Mode=""
+    Description="FIRST START ONLY. true = enable the Admin API and a JWK super-admin (you get a password, not a cert). Required to manage provisioners at runtime (incl. from step-ui-ng)."
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="false">true</Config>
+
+  <!-- FIRST START ONLY: initial ACME provisioner -->
+  <Config
+    Name="Init: ACME Provisioner"
+    Target="DOCKER_STEPCA_INIT_ACME"
+    Default="true"
+    Mode=""
+    Description="FIRST START ONLY. true = create an initial ACME provisioner."
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="false">true</Config>
+
+  <!-- FIRST START ONLY: SSH CA (advanced) -->
+  <Config
+    Name="Init: SSH CA"
+    Target="DOCKER_STEPCA_INIT_SSH"
+    Default="false"
+    Mode=""
+    Description="FIRST START ONLY. true = also provision an SSH certificate authority (host/user CA)."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false">false</Config>
+
+  <!-- FIRST START ONLY: admin provisioner name (advanced) -->
+  <Config
+    Name="Init: Provisioner Name"
+    Target="DOCKER_STEPCA_INIT_PROVISIONER_NAME"
+    Default="admin"
+    Mode=""
+    Description="FIRST START ONLY. Name of the initial JWK admin provisioner."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false">admin</Config>
+
+  <!-- FIRST START ONLY: key password (advanced, optional) -->
+  <Config
+    Name="Init: Password (optional)"
+    Target="DOCKER_STEPCA_INIT_PASSWORD"
+    Default=""
+    Mode=""
+    Description="FIRST START ONLY. Leave EMPTY (recommended): a strong password is generated and printed to docker logs. Only set this to provide the CA key password yourself (less secure than letting it be generated)."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="true"/>
+</Container>
