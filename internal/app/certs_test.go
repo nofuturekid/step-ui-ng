@@ -463,12 +463,17 @@ func TestIssueValidityOverMaxRejected(t *testing.T) {
 		"validity":   {"365"},
 		"format":     {"pem"},
 	})
-	if status != http.StatusBadRequest {
-		t.Fatalf("POST /issue over max = %d, want 400", status)
+	// The response is HTTP 200 so htmx can swap the panel (bug-fix: was 400).
+	if status != http.StatusOK {
+		t.Fatalf("POST /issue over max = %d, want 200 (error rendered in-panel)", status)
 	}
 	if !strings.Contains(strings.ToLower(body), "maximum") &&
 		!strings.Contains(strings.ToLower(body), "rejected") {
 		t.Fatalf("expected a clear validity error; body:\n%s", body)
+	}
+	// The error must be inside the #issue-panel, not only in the layout header.
+	if !strings.Contains(body, "issue-panel") || !strings.Contains(strings.ToLower(body), "flash--error") {
+		t.Fatalf("rejection error must be rendered inside #issue-panel; body:\n%s", body)
 	}
 	var n int
 	_ = e.db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM certificates`).Scan(&n)
@@ -531,11 +536,16 @@ func TestSignCSRGarbledRejected(t *testing.T) {
 		"csr":        {"-----BEGIN CERTIFICATE REQUEST-----\nnope\n-----END CERTIFICATE REQUEST-----"},
 		"validity":   {"30"},
 	})
-	if status != http.StatusBadRequest {
-		t.Fatalf("garbled CSR = %d, want 400", status)
+	// The response is HTTP 200 so htmx can swap the panel (bug-fix: was 400).
+	if status != http.StatusOK {
+		t.Fatalf("garbled CSR = %d, want 200 (error rendered in-panel)", status)
 	}
 	if !strings.Contains(strings.ToLower(body), "csr") {
 		t.Fatalf("expected a CSR error; body:\n%s", body)
+	}
+	// The error must be inside the #sign-panel.
+	if !strings.Contains(body, "sign-panel") || !strings.Contains(strings.ToLower(body), "flash--error") {
+		t.Fatalf("rejection error must be rendered inside #sign-panel; body:\n%s", body)
 	}
 }
 
@@ -559,11 +569,16 @@ func TestIssueNoProvisionerSelected(t *testing.T) {
 		"validity":   {"7"},
 		"format":     {"pem"},
 	})
-	if status != http.StatusBadRequest {
-		t.Fatalf("issue with no provisioner = %d, want 400", status)
+	// The response is HTTP 200 so htmx can swap the panel (bug-fix: was 400).
+	if status != http.StatusOK {
+		t.Fatalf("issue with no provisioner = %d, want 200 (error rendered in-panel)", status)
 	}
 	if !strings.Contains(strings.ToLower(body), "provisioner") {
 		t.Fatalf("expected a 'provisioner' error; body:\n%s", body)
+	}
+	// The error must be inside the #issue-panel.
+	if !strings.Contains(body, "issue-panel") || !strings.Contains(strings.ToLower(body), "flash--error") {
+		t.Fatalf("provisioner error must be rendered inside #issue-panel; body:\n%s", body)
 	}
 }
 

@@ -1062,6 +1062,12 @@ templ issuePage(d pageData, v issueView) {
 				<!-- Swap panel: State 1 (form) → State 2 (result). htmx replaces this
 				     div with the server response via hx-select="#issue-panel". -->
 				<div id="issue-panel">
+					if v.Error != "" {
+						<div class="flash flash--error" role="alert">
+							<svg class="ico"><use href="/static/icons.svg#i-alert-triangle"></use></svg>
+							<div class="flash__body">{ v.Error }</div>
+						</div>
+					}
 					if v.Result == nil {
 						<!-- State 1 — the request form -->
 						<form
@@ -1153,7 +1159,7 @@ templ issueSuccessPanel(v issueView) {
 						<pre id="pem-key-text">{ c.PrivateKeyPEM }</pre>
 					</div>
 					<div class="form-actions">
-						<a class="btn btn--primary" download={ keyFilename(c.CN) } href={ pemKeyDataURI(c.PrivateKeyPEM) }>
+						<a class="btn btn--primary" hx-boost="false" download={ keyFilename(c.CN) } href={ pemKeyDataURI(c.PrivateKeyPEM) }>
 							<svg class="ico"><use href="/static/icons.svg#i-download"></use></svg> Download private key
 						</a>
 					</div>
@@ -1168,7 +1174,7 @@ templ issueSuccessPanel(v issueView) {
 				</div>
 				<div class="onetime__body">
 					<div class="form-actions">
-						<a class="btn btn--primary" download={ pfxFilename(c.CN) } href={ pfxDataURI(c.PFX) }>
+						<a class="btn btn--primary" hx-boost="false" download={ pfxFilename(c.CN) } href={ pfxDataURI(c.PFX) }>
 							<svg class="ico"><use href="/static/icons.svg#i-download"></use></svg> Download PKCS#12 bundle ({ pfxFilename(c.CN) })
 						</a>
 						<span class="secret-state">
@@ -1241,6 +1247,12 @@ templ signCSRPage(d pageData, v signView) {
 				}
 				<!-- Swap panel: State 1 (form) → State 2 (result) -->
 				<div id="sign-panel">
+					if v.Error != "" {
+						<div class="flash flash--error" role="alert">
+							<svg class="ico"><use href="/static/icons.svg#i-alert-triangle"></use></svg>
+							<div class="flash__body">{ v.Error }</div>
+						</div>
+					}
 					if v.Result == nil {
 						<!-- State 1 — the CSR form -->
 						<form
@@ -1569,7 +1581,7 @@ templ certDetailPage(d pageData, v certDetailView) {
 					<!-- Admin+ action buttons. A viewer sees metadata + PEM only. -->
 					if d.User != nil && d.User.Role.AtLeast(users.RoleAdmin) {
 						<div class="page-head__actions">
-							<form method="post" action={ templ.SafeURL("/certificates/" + strconv.FormatInt(c.ID, 10) + "/download") } style="display:contents">
+							<form method="post" hx-boost="false" action={ templ.SafeURL("/certificates/" + strconv.FormatInt(c.ID, 10) + "/download") } style="display:contents">
 								<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
 								<input
 									class="input"
@@ -1673,7 +1685,11 @@ templ certDetailPage(d pageData, v certDetailView) {
 					<div class="card__header">
 						<div>
 							<h2 class="card__title">Certificate (PEM)</h2>
-							<p class="card__desc">Read-only. The private key is never stored or displayed by NextGen UI.</p>
+							if c.KeyStrategy == "server" {
+								<p class="card__desc">Read-only. The private key is not shown here — it is sealed at rest and included in the downloadable bundle.</p>
+							} else {
+								<p class="card__desc">Read-only. NextGen UI does not hold the private key for CSR-signed certificates.</p>
+							}
 						</div>
 					</div>
 					<div class="card__body">
