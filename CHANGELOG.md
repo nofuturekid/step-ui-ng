@@ -8,6 +8,48 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+### Added
+
+- **CA settings page redesign** (PR C): ports `GET /settings` to the approved
+  design mock (`docs/design/ca-settings.html`).
+  - **Page shell**: `content--narrow` wrapper, `page-head` with breadcrumb
+    (`Settings / CA settings`), `page-title`, and `page-sub` subtitle.
+  - **Card 1 — CA connection**: `card__header` / `card__body` layout; two
+    `.field .input.mono` controls for CA URL and root fingerprint (with
+    `field__hint` helper text); `btn--primary` "Save connection" + plain `btn`
+    "Test connection" in `.form-actions`; the Test button carries the existing
+    `hx-post="/settings/test"` / `hx-target="#test-result"` wiring (behaviour
+    unchanged); `#test-result` div preserved for the htmx swap.
+  - **Card 2 — Admin authentication**: `card__header` with `card__actions`
+    holding an `"Active: <method>"` badge (`badge--info` for x5c/jwk,
+    `badge--neutral` for none); method selector replaced from `<select
+onchange=…>` to a `.seg` radio group (three `<input type="radio"
+name="admin_auth_method">`) — **no inline JS**; the checked state is driven
+    by the stored method from the server.
+  - **Method-group reveal via CSS `:has()`**: three `.method-group` divs
+    (`.mg-none` / `.mg-x5c` / `.mg-jwk`) are always in the DOM; the active
+    group is shown by `.method-fieldset:has(#m-<method>:checked) .mg-<method>
+{ display: block }`. An `@supports not (selector(:has(*)))` fallback shows
+    all groups when `:has()` is unsupported, keeping the form usable in older
+    browsers without requiring any server-side class.
+  - **x5c group**: `admin_x5c_cert` + `admin_x5c_key` `.textarea.mono` fields;
+    `badge--set` / `badge--none` key-status indicator; copyable `step ca
+certificate …` codeblock with the CA URL interpolated.
+  - **jwk group**: `admin_jwk_subject` + `admin_jwk_provisioner` `.input.mono`
+    inputs; `secret-row` wrapper with `admin_jwk_password type="password"` +
+    `badge--set` / `badge--none` inline status badge; `field__hint` text varies
+    with stored vs. not-stored state. Secrets never echoed.
+  - **New CSS** in `internal/app/static/app.css`: `.content--narrow`,
+    `.req`/`.opt` markers, `.field__hint`, `.col-span-2`, `.textarea`,
+    `.flash--warn` / `.flash--ok` / `.flash--error`, `.seg` / `.seg__name` /
+    `.seg__desc`, `.method-fieldset` / `.method-group` / `:has()` reveal rules
+    - `@supports not (selector(:has(*)))` fallback, `.method-group__title`,
+      `.badge--set` / `.badge--none`, `.secret-row` / `.secret-state`,
+      `.codeblock--cmd`.
+  - Dead `adminAuthOption` templ helper removed (no callers after rewrite to `.seg` radio group).
+  - New pure-Go helpers: `activeBadgeClass`, `activeMethodLabel`,
+    `settingsSecretBadgeClass`, `settingsSecretBadgeLabel`.
+
 ### Fixed
 
 - **Revoke form confirm input** (PR B review): the redesigned revoke form was
