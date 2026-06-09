@@ -26,17 +26,13 @@ func (s *server) getSettings(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, http.StatusOK, settingsPage(d, view))
 }
 
-// postSettings validates and saves the CA connection (FR-1, FR-4). The admin
-// secret field is write-only: an empty value preserves the stored sealed secret.
-// An audit event is recorded on success (spec/0009 FR-2).
+// postSettings validates and saves the CA connection — CA URL + root fingerprint
+// (FR-1, FR-4). An audit event is recorded on success (spec/0009 FR-2).
 func (s *server) postSettings(w http.ResponseWriter, r *http.Request) {
 	actor := userFromContext(r.Context())
 	in := settings.Input{
-		CAURL:            r.PostFormValue("ca_url"),
-		RootFingerprint:  r.PostFormValue("root_fingerprint"),
-		AdminProvisioner: r.PostFormValue("admin_provisioner"),
-		AdminSubject:     r.PostFormValue("admin_subject"),
-		AdminSecret:      r.PostFormValue("admin_secret"),
+		CAURL:           r.PostFormValue("ca_url"),
+		RootFingerprint: r.PostFormValue("root_fingerprint"),
 	}
 	if err := s.settings.Save(r.Context(), in); err != nil {
 		s.sessions.Put(r.Context(), errorKey, settingsErrorMessage(err))

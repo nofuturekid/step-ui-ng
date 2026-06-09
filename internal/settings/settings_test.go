@@ -43,18 +43,14 @@ func TestGetEmpty(t *testing.T) {
 	}
 }
 
-// CRUD: save then load round-trips the non-secret fields and exposes "secret
-// set" without revealing the value.
+// CRUD: save then load round-trips the CA connection fields.
 func TestSaveAndGet(t *testing.T) {
 	repo, _, _ := newRepo(t)
 	ctx := context.Background()
 
 	in := settings.Input{
-		CAURL:            "https://ca.example:9000",
-		RootFingerprint:  validFP,
-		AdminProvisioner: "admin-jwk",
-		AdminSubject:     "step@example.com",
-		AdminSecret:      "super-secret-password",
+		CAURL:           "https://ca.example:9000",
+		RootFingerprint: validFP,
 	}
 	if err := repo.Save(ctx, in); err != nil {
 		t.Fatalf("Save: %v", err)
@@ -69,105 +65,6 @@ func TestSaveAndGet(t *testing.T) {
 	}
 	if got.CAURL != in.CAURL || got.RootFingerprint != in.RootFingerprint {
 		t.Fatalf("round-trip mismatch: %+v", got)
-	}
-	if got.AdminProvisioner != in.AdminProvisioner || got.AdminSubject != in.AdminSubject {
-		t.Fatalf("admin identity round-trip mismatch: %+v", got)
-	}
-	if !got.HasAdminSecret {
-		t.Fatal("HasAdminSecret = false after saving a secret")
-	}
-}
-
-// FR-5: the Settings view exposes a "secret set" bool but never the plaintext
-// — there must be no field carrying the clear-text secret.
-func TestGetNeverExposesPlaintextSecret(t *testing.T) {
-	repo, _, _ := newRepo(t)
-	ctx := context.Background()
-	const secret = "do-not-leak-me-1234567890"
-
-	if err := repo.Save(ctx, settings.Input{
-		CAURL: "https://ca.example", RootFingerprint: validFP, AdminSecret: secret,
-	}); err != nil {
-		t.Fatalf("Save: %v", err)
-	}
-	got, _, err := repo.Get(ctx)
-	if err != nil {
-		t.Fatalf("Get: %v", err)
-	}
-	// Reflectively render the struct and assert the secret is absent.
-	if strings.Contains(renderAllFields(got), secret) {
-		t.Fatal("Get result contains the plaintext admin secret")
-	}
-}
-
-// Sealing: the stored admin_secret_sealed column must NOT equal the plaintext
-// and must round-trip back through the Box to the original secret.
-func TestAdminSecretSealedAtRest(t *testing.T) {
-	repo, st, box := newRepo(t)
-	ctx := context.Background()
-	const secret = "plaintext-secret-value-xyz"
-
-	if err := repo.Save(ctx, settings.Input{
-		CAURL: "https://ca.example", RootFingerprint: validFP, AdminSecret: secret,
-	}); err != nil {
-		t.Fatalf("Save: %v", err)
-	}
-
-	var sealed string
-	if err := st.DB().QueryRowContext(ctx,
-		"SELECT admin_secret_sealed FROM ca_settings WHERE id = 1").Scan(&sealed); err != nil {
-		t.Fatalf("read sealed: %v", err)
-	}
-	if sealed == "" {
-		t.Fatal("admin_secret_sealed is empty after saving a secret")
-	}
-	if sealed == secret {
-		t.Fatal("admin_secret_sealed stored as PLAINTEXT")
-	}
-	opened, err := box.Open(sealed)
-	if err != nil {
-		t.Fatalf("Box.Open stored value: %v", err)
-	}
-	if string(opened) != secret {
-		t.Fatalf("sealed value did not round-trip: got %q", opened)
-	}
-}
-
-// An empty AdminSecret on a subsequent Save must leave the existing sealed value
-// untouched (write-only field semantics, FR-5).
-func TestEmptySecretLeavesExistingUntouched(t *testing.T) {
-	repo, st, _ := newRepo(t)
-	ctx := context.Background()
-	const secret = "keep-me-secret-abcdef"
-
-	if err := repo.Save(ctx, settings.Input{
-		CAURL: "https://ca.example", RootFingerprint: validFP, AdminSecret: secret,
-	}); err != nil {
-		t.Fatalf("Save 1: %v", err)
-	}
-	var first string
-	_ = st.DB().QueryRowContext(ctx,
-		"SELECT admin_secret_sealed FROM ca_settings WHERE id = 1").Scan(&first)
-
-	// Re-save without a secret; the sealed value must be unchanged.
-	if err := repo.Save(ctx, settings.Input{
-		CAURL: "https://ca2.example", RootFingerprint: validFP, AdminSecret: "",
-	}); err != nil {
-		t.Fatalf("Save 2: %v", err)
-	}
-	var second string
-	_ = st.DB().QueryRowContext(ctx,
-		"SELECT admin_secret_sealed FROM ca_settings WHERE id = 1").Scan(&second)
-
-	if second != first {
-		t.Fatalf("empty secret changed the sealed value: %q -> %q", first, second)
-	}
-	got, _, _ := repo.Get(ctx)
-	if got.CAURL != "https://ca2.example" {
-		t.Fatalf("non-secret fields should still update: %+v", got)
-	}
-	if !got.HasAdminSecret {
-		t.Fatal("HasAdminSecret should remain true after a no-secret update")
 	}
 }
 
@@ -239,7 +136,7 @@ func TestSaveFingerprintValidation(t *testing.T) {
 // of the plaintext secret into any field is caught.
 func renderAllFields(v settings.View) string {
 	return strings.Join([]string{
-		v.CAURL, v.RootFingerprint, v.AdminProvisioner, v.AdminSubject,
+		v.CAURL, v.RootFingerprint,
 		v.SelectedProvisioner, v.AdminCertPEM,
 		// spec/0012 additions: public fields only — secrets stay out.
 		string(v.AdminAuthMethod), v.AdminJWKSubject, v.AdminJWKProvisioner,
