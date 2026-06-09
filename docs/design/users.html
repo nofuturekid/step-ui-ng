@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Users · step-ui-ng</title>
+  <link rel="icon" href="static/logo.svg" />
+  <link rel="stylesheet" href="css/fonts.css" />
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="inventory.html" aria-label="Step-CA NextGen UI — home">
+          <img src="static/logo.svg" alt="" />
+          <span class="brand-name"><span class="b1">Step-CA</span><span class="b2">NextGen UI</span></span>
+        </a>
+        <div class="nav">
+          <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation menu" />
+          <label class="nav__burger" for="nav-toggle" title="Menu"><svg class="ico" style="width:20px;height:20px"><use href="icons.svg#i-menu"></use></svg></label>
+          <div class="nav__panel">
+            <nav class="nav__primary" aria-label="Primary">
+              <a class="navlink" href="inventory.html"><svg class="ico"><use href="icons.svg#i-list"></use></svg> Certificates</a>
+              <a class="navlink" href="issue.html"><svg class="ico"><use href="icons.svg#i-file-plus"></use></svg> Issue</a>
+              <a class="navlink" href="sign-csr.html"><svg class="ico"><use href="icons.svg#i-pen"></use></svg> Sign CSR</a>
+            </nav>
+            <div class="topbar-user">
+                            <div class="theme-footer"><span class="theme-label">Theme</span><div class="theme-toggle" role="group" aria-label="Theme (review-mock affordance)">
+                <button type="button" data-theme-set="auto" title="System theme"><svg class="ico"><use href="icons.svg#i-monitor"></use></svg></button>
+                <button type="button" data-theme-set="light" title="Light theme"><svg class="ico"><use href="icons.svg#i-sun"></use></svg></button>
+                <button type="button" data-theme-set="dark" title="Dark theme"><svg class="ico"><use href="icons.svg#i-moon"></use></svg></button>
+              </div></div>
+              <details class="menu mainmenu">
+                <summary class="mainmenu-trigger" aria-label="Main menu">
+                  <span class="avatar" aria-hidden="true">MR</span>
+                  <span class="mainmenu-id">
+                    <span class="uname">m.reyes</span>
+                    <span class="urole">admin</span>
+                  </span>
+                  <svg class="ico chev" style="width:14px;height:14px"><use href="icons.svg#i-chevron-down"></use></svg>
+                </summary>
+                <div class="menu__list mainmenu-list">
+                  <div class="menu__label">App</div>
+                  <a href="users.html" aria-current="page"><svg class="ico"><use href="icons.svg#i-users"></use></svg> Users</a>
+                  <a href="ca-settings.html"><svg class="ico"><use href="icons.svg#i-server"></use></svg> CA settings</a>
+                  <div class="menu__label">Step-CA</div>
+                  <a href="provisioners.html"><svg class="ico"><use href="icons.svg#i-key"></use></svg> Provisioners</a>
+                  <a href="acme.html"><svg class="ico"><use href="icons.svg#i-globe"></use></svg> ACME</a>
+                  <div class="menu__sep"></div>
+                  <div class="menu__label">Audit</div>
+                  <a href="audit.html"><svg class="ico"><use href="icons.svg#i-scroll"></use></svg> Log</a>
+                  <div class="menu__sep"></div>
+                  <a class="menu__logout" href="login.html"><svg class="ico"><use href="icons.svg#i-logout"></use></svg> Log out</a>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content" data-screen-label="Users (admin)">
+      <div class="page-head">
+        <div class="breadcrumb"><a href="#">Settings</a><span class="sep">/</span><span>Users</span></div>
+        <h1 class="page-title">Users</h1>
+        <p class="page-sub">Local accounts that can sign in to step-ui-ng. Roles: viewer &lt; admin &lt; superadmin.</p>
+      </div>
+
+      <div class="stack">
+        <!-- Create user -->
+        <div class="card">
+          <div class="card__header"><div><h2 class="card__title">Create user</h2><p class="card__desc">You're an <strong>admin</strong>, so you can create viewers and admins, but not superadmins.</p></div></div>
+          <form class="card__body" method="post" action="#">
+            <div class="form-grid">
+              <div class="field">
+                <label for="nu-name">Username <span class="req" aria-hidden="true">*</span></label>
+                <input class="input mono" id="nu-name" name="username" placeholder="j.doe" />
+              </div>
+              <div class="field">
+                <label for="nu-role">Role</label>
+                <select class="select" id="nu-role" name="role">
+                  <option>viewer</option>
+                  <option selected>admin</option>
+                  <option disabled>superadmin — requires superadmin</option>
+                </select>
+                <span class="field__hint">You can't assign a role higher than your own.</span>
+              </div>
+              <div class="field col-span-2 secret-field">
+                <label for="nu-pw">Initial password <span class="req" aria-hidden="true">*</span></label>
+                <div class="secret-row">
+                  <input class="input" id="nu-pw" name="password" type="password" placeholder="Generate or set" />
+                  <button type="button" class="btn">Generate</button>
+                </div>
+                <span class="field__hint">Shown once after creation. The user should change it on first sign-in.</span>
+              </div>
+            </div>
+            <div class="form-actions" style="margin-top:var(--space-5)">
+              <button type="submit" class="btn btn--primary"><svg class="ico"><use href="icons.svg#i-plus"></use></svg> Create user</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- User list -->
+        <div>
+          <h2 class="section-title">All users</h2>
+          <div class="table-wrap table-scroll">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th scope="col">Username</th>
+                  <th scope="col">Role</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Last seen</th>
+                  <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="mono">m.reyes <span class="tag" style="margin-left:6px">you</span></td>
+                  <td><span class="badge badge--role">admin</span></td>
+                  <td><span class="badge badge--ok"><span class="dot"></span>Enabled</span></td>
+                  <td class="nowrap muted">just now</td>
+                  <td class="col-actions"><div class="rowact">
+                    <button class="iconbtn" title="Disable" aria-label="Disable m.reyes"><svg class="ico"><use href="icons.svg#i-lock"></use></svg></button>
+                    <button class="iconbtn" aria-disabled="true" disabled title="You can't delete your own account"><svg class="ico"><use href="icons.svg#i-trash"></use></svg></button>
+                  </div></td>
+                </tr>
+                <tr>
+                  <td class="mono">a.okafor</td>
+                  <td>
+                    <label class="visually-hidden" for="r-okafor">Role for a.okafor</label>
+                    <select class="select" id="r-okafor" style="height:30px;max-width:140px"><option>viewer</option><option selected>admin</option></select>
+                  </td>
+                  <td><span class="badge badge--ok"><span class="dot"></span>Enabled</span></td>
+                  <td class="nowrap muted">2026-06-08 09:14</td>
+                  <td class="col-actions"><div class="rowact">
+                    <button class="iconbtn" title="Disable" aria-label="Disable a.okafor"><svg class="ico"><use href="icons.svg#i-lock"></use></svg></button>
+                    <button class="iconbtn" title="Delete" aria-label="Delete a.okafor"><svg class="ico"><use href="icons.svg#i-trash"></use></svg></button>
+                  </div></td>
+                </tr>
+                <tr>
+                  <td class="mono">grafana-bot</td>
+                  <td><span class="badge badge--role">viewer</span></td>
+                  <td><span class="badge badge--neutral"><span class="dot"></span>Disabled</span></td>
+                  <td class="nowrap muted">2026-05-20 22:01</td>
+                  <td class="col-actions"><div class="rowact">
+                    <button class="iconbtn" title="Enable" aria-label="Enable grafana-bot"><svg class="ico"><use href="icons.svg#i-lock-open"></use></svg></button>
+                    <button class="iconbtn" title="Delete" aria-label="Delete grafana-bot"><svg class="ico"><use href="icons.svg#i-trash"></use></svg></button>
+                  </div></td>
+                </tr>
+                <!-- A superadmin: an admin cannot manage or promote superadmins -->
+                <tr>
+                  <td class="mono">root</td>
+                  <td><span class="badge badge--info"><span class="dot"></span>superadmin</span></td>
+                  <td><span class="badge badge--ok"><span class="dot"></span>Enabled</span></td>
+                  <td class="nowrap muted">2026-06-09 07:42</td>
+                  <td class="col-actions"><div class="rowact">
+                    <span class="inline-icon subtle" style="font-size:var(--fs-xs)"><svg class="ico" style="width:13px;height:13px"><use href="icons.svg#i-lock"></use></svg> admins can't manage superadmins</span>
+                  </div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="field__hint" style="margin-top:var(--space-3)"><svg class="ico" style="width:13px;height:13px;vertical-align:-2px"><use href="icons.svg#i-info"></use></svg> The last remaining superadmin can't be deleted or demoted.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="js/ui.js"></script>
+</body>
+</html>

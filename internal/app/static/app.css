@@ -1,304 +1,580 @@
-:root {
-  --fg: #1a1a1a;
-  --bg: #f7f7f8;
-  --card: #ffffff;
-  --border: #d7d7db;
-  --accent: #2d6cdf;
-  --danger: #c0392b;
-  --muted: #6b6b70;
+/* =========================================================================
+   step-ui-ng — app.css
+   Loads after fonts.css + tokens.css.
+   This file carries:
+     • base reset / body
+     • shell: topbar, brand, nav (checkbox hamburger), navlinks, menus
+     • legacy page-interior styles (forms, tables, cards, flash)
+       used by templates not yet ported to the new design system.
+   ========================================================================= */
 
-  /* Surfaces & semantic tints (tokenised so dark mode can override one place). */
-  --input-bg: #ffffff;
-  --surface-2: #eeeeee;
-  --on-accent: #ffffff; /* text on accent/danger fills (buttons) */
-  --error-bg: #fdecea;
-  --error-border: #f5c6c0;
-  --info-bg: #e8f0fe;
-  --info-border: #c6d8f7;
-  --info-fg: #1b50b8; /* info-flash text — darker than --accent for AA on --info-bg */
-
-  /* Shape & elevation. */
-  --radius: 8px;
-  --radius-sm: 6px;
-  --shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-
-  /* Layout widths. */
-  --content-width: 56rem;
-  --content-width-wide: 72rem;
-}
-
-/* Dark theme: follows the OS setting. Only the tokens flip — every component reads
-   them, so no per-component dark rules are needed. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --fg: #e6e6e6;
-    --bg: #0f1115;
-    --card: #171a21;
-    --border: #2a2f3a;
-    --accent: #4d8bf0;
-    --danger: #e06c63;
-    --muted: #9aa0aa;
-
-    --input-bg: #11141a;
-    --surface-2: #2a2f3a;
-    --on-accent: #0f1115; /* dark text reads on the lightened dark accent/danger fills */
-    --error-bg: #3a1f1d;
-    --error-border: #5a2f2b;
-    --info-bg: #16233a;
-    --info-border: #2a3f63;
-    --info-fg: #4d8bf0;
-
-    --shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  }
-}
-
-* {
+/* ---- Reset / base ------------------------------------------------------- */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  font-family:
+  font-family: var(
+    --font-sans,
     system-ui,
     -apple-system,
     "Segoe UI",
     Roboto,
-    sans-serif;
-  color: var(--fg);
-  background: var(--bg);
-  line-height: 1.5;
+    sans-serif
+  );
+  color: var(--text, #15202b);
+  background: var(--bg, #f6f8fa);
+  line-height: var(--lh-base, 1.5);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* Full-bleed bar; its content is constrained + centered to align with <main>
-   (same box model: max-width var(--content-width), auto margins, 1.25rem padding). */
-header.topbar {
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
+h1,
+h2,
+h3,
+h4,
+p,
+figure {
+  margin: 0;
+}
+img,
+svg {
+  display: block;
+}
+button {
+  font: inherit;
+  color: inherit;
+}
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+.mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "ss01";
+}
+
+/* Icon base */
+.ico {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- App layout --------------------------------------------------------- */
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Topbar ------------------------------------------------------------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--topbar-bg);
+  color: var(--topbar-fg);
+  border-bottom: 1px solid var(--topbar-border);
 }
 .topbar-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  max-width: var(--content-width);
+  max-width: var(--content-max);
   margin: 0 auto;
-  padding: 0.75rem 1.25rem;
-  position: relative; /* anchor for the mobile nav panel */
-}
-
-header.topbar a {
-  color: var(--fg);
-  text-decoration: none;
-  font-weight: 600;
-}
-header.topbar .who {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-/* Top-level nav cluster */
-nav.mainnav {
+  min-height: var(--topbar-h);
+  padding: 0 var(--content-pad);
   display: flex;
   align-items: center;
-  gap: 1.1rem;
+  gap: var(--space-5);
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--topbar-fg);
+  text-decoration: none;
+  flex: none;
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
+}
+.brand:hover {
+  text-decoration: none;
+}
+.brand img {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+}
+.brand-name {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.04;
+}
+.brand-name .b1 {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+.brand-name .b2 {
+  font-size: 10px;
+  font-weight: var(--fw-medium);
+  color: var(--topbar-fg-muted);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-top: 1px;
 }
 
-/* Responsive nav. The nav lives in .navwrap, a SIBLING of the hamburger <details>
-   (not inside it) — so a collapsed <details> never hides it. On desktop the
-   hamburger is hidden and .navwrap collapses (display:contents) so brand · nav · who
-   stay direct flex children of .topbar-inner — identical to the non-responsive
-   layout. On narrow screens the hamburger toggles the panel via
-   `.navmenu[open] ~ .navwrap` (media query at the end). */
-.navtoggle {
+/* Nav (desktop: inline; mobile: JS-free checkbox-hack hamburger) */
+.nav {
+  flex: 1;
+  min-width: 0;
+}
+.nav-toggle {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.nav__burger {
   display: none;
-}
-.navmenu {
-  display: none;
-}
-.navwrap {
-  display: contents;
-}
-/* The "Certificates" group flattens on desktop (its links join the flat nav row);
-   the section heading shows only inside the hamburger. */
-.navgroup {
-  display: contents;
-}
-.navhead {
-  display: none;
-}
-
-/* JS-free "Settings" menu (admin config). The items (.menu-items) are a SIBLING of
-   the <details> (not inside it), so a closed <details> can't hide them. Desktop shows
-   them as a click dropdown under the summary (min-width block below); the hamburger
-   shows them always, as an inline list under a "Settings" heading (max-width block). */
-.navsettings {
-  position: relative; /* anchor for the desktop dropdown */
-}
-details.menu > summary {
   cursor: pointer;
-  list-style: none;
-  font-weight: 600;
-  color: var(--fg);
+  margin-left: auto;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--topbar-border);
+  border-radius: var(--r);
+  color: var(--topbar-fg);
 }
-details.menu > summary::-webkit-details-marker {
+.nav__burger:hover {
+  background: var(--topbar-hover);
+}
+.nav-toggle:focus-visible + .nav__burger {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+.nav__panel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.nav__primary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.navlink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 38px;
+  padding: 0 var(--space-3);
+  border-radius: var(--r);
+  color: var(--topbar-fg-muted);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-medium);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.navlink:hover {
+  background: var(--topbar-hover);
+  color: var(--topbar-fg);
+  text-decoration: none;
+}
+.navlink .ico {
+  width: 16px;
+  height: 16px;
+  opacity: 0.9;
+}
+.navlink[aria-current="page"] {
+  color: var(--topbar-active-fg);
+  background: var(--topbar-active);
+  box-shadow: inset 0 -2px 0 var(--topbar-accent);
+}
+
+
+/* Dropdown menus (<details>) */
+.menu {
+  position: relative;
+}
+.menu > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 38px;
+  padding: 0 var(--space-3);
+  list-style: none;
+  cursor: pointer;
+  border-radius: var(--r);
+  color: var(--topbar-fg-muted);
+  font-weight: var(--fw-medium);
+  border: 1px solid transparent;
+}
+.menu > summary::-webkit-details-marker {
   display: none;
 }
-details.menu > summary::after {
-  content: " ▾";
+.menu > summary:hover {
+  background: var(--topbar-hover);
+  color: var(--topbar-fg);
 }
-details.menu[open] > summary::after {
-  content: " ▴";
+.menu[open] > summary {
+  background: var(--topbar-hover);
+  color: var(--topbar-fg);
 }
-.menu-items {
-  display: none; /* shown via the dropdown rule (desktop) or the hamburger rule (mobile) */
+.menu .chev {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.12s ease;
 }
-.menu-items a {
-  padding: 0.4rem 0.6rem;
-  border-radius: var(--radius-sm);
+.menu[open] .chev {
+  transform: rotate(180deg);
 }
-.menu-items a:hover {
-  background: var(--bg);
+.menu__list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 60;
+  min-width: 208px;
+  padding: var(--space-2);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.menu__list a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-weight: var(--fw-medium);
+}
+.menu__list a:hover {
+  background: var(--surface-2);
+  text-decoration: none;
+}
+.menu__list a[aria-current="page"] {
+  color: var(--accent);
+  background: var(--accent-soft-bg);
+}
+.menu__list .ico {
+  width: 16px;
+  height: 16px;
+  color: var(--text-subtle);
 }
 
-/* Desktop only: the Settings items drop down under the summary when open. Visual
-   chrome comes from the .popover class on .menu-items. */
-@media (min-width: 48em) {
-  details.menu[open] ~ .menu-items {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
+/* Settings/account menus right-aligned */
+.topbar-user .menu {
+  flex: none;
+}
+.topbar-user .menu__list {
+  left: auto;
+  right: 0;
+}
+
+/* ---- Main menu (user chip: <details class="menu mainmenu">) ------------- */
+.mainmenu .mainmenu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 40px;
+  padding: 0 10px 0 5px;
+  list-style: none;
+  cursor: pointer;
+  border-radius: var(--r);
+  color: var(--topbar-fg);
+  border: 1px solid var(--topbar-border);
+}
+.mainmenu .mainmenu-trigger::-webkit-details-marker {
+  display: none;
+}
+.mainmenu .mainmenu-trigger:hover,
+.mainmenu[open] .mainmenu-trigger {
+  background: var(--topbar-hover);
+}
+.mainmenu .mainmenu-trigger .chev {
+  color: var(--topbar-fg-muted);
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.02em;
+  color: #06212b;
+  background: var(--brand-grad);
+}
+.mainmenu-id {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  text-align: left;
+}
+.mainmenu-id .uname {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--topbar-fg);
+}
+.mainmenu-id .urole {
+  font-size: var(--fs-xs);
+  color: var(--topbar-fg-muted);
+}
+
+.menu__list.mainmenu-list {
+  min-width: 220px;
+}
+.menu__label {
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-subtle);
+  font-weight: var(--fw-semibold);
+  padding: var(--space-2) var(--space-3) var(--space-1);
+}
+.menu__sep {
+  height: 1px;
+  background: var(--border);
+  margin: var(--space-2) calc(-1 * var(--space-2));
+}
+.menu__list a.menu__logout {
+  color: var(--danger-fg);
+}
+.menu__list a.menu__logout .ico {
+  color: var(--danger-fg);
+}
+.menu__list a.menu__logout:hover {
+  background: var(--danger-bg);
+}
+
+/* The logout button inside menu__list (uses <button> not <a>) */
+.menu__list button.menu__logout {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-sm);
+  color: var(--danger-fg);
+  font-weight: var(--fw-medium);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  font-size: var(--fs-base);
+  text-align: left;
+}
+.menu__list button.menu__logout .ico {
+  color: var(--danger-fg);
+  width: 16px;
+  height: 16px;
+}
+.menu__list button.menu__logout:hover {
+  background: var(--danger-bg);
+}
+
+/* User cluster */
+.topbar-user {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: auto;
+}
+.nav__panel .topbar-user {
+  margin-left: auto;
+}
+
+
+/* ====================================================================== */
+/* Responsive: collapse nav into JS-free hamburger                        */
+/* ====================================================================== */
+@media (max-width: 900px) {
+  .topbar-inner {
+    gap: var(--space-3);
+  }
+  .nav {
+    flex: none;
+    margin-left: auto;
+  }
+  .nav__burger {
+    display: inline-flex;
+  }
+  .nav__panel {
+    display: none;
     position: absolute;
+    top: var(--topbar-h);
+    left: 0;
     right: 0;
-    top: 100%;
-    margin-top: 0.45rem;
-    min-width: 11rem;
-    padding: 0.3rem;
-    z-index: 20;
+    z-index: 55;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding: var(--space-3);
+    background: var(--topbar-bg);
+    border-bottom: 1px solid var(--topbar-border);
+    box-shadow: var(--shadow-pop);
   }
-}
+  .nav-toggle:checked ~ .nav__panel {
+    display: flex;
+  }
 
-/* Narrow screens: collapse the nav + user block behind a hamburger (☰). JS-free:
-   the surrounding <details class="navmenu"> toggles the panel. */
-@media (max-width: 47.99em) {
-  .navmenu {
-    display: block;
-  }
-  .navtoggle {
-    display: block;
-    cursor: pointer;
-    list-style: none;
-    font-size: 1.5rem;
-    line-height: 1;
-    color: var(--fg);
-    user-select: none;
-  }
-  .navtoggle::-webkit-details-marker {
-    display: none;
-  }
-  .navtoggle::after {
-    content: "\2630"; /* ☰ */
-  }
-  .navmenu[open] .navtoggle::after {
-    content: "\2715"; /* ✕ */
-  }
-  /* The nav (.navwrap) is a sibling of the hamburger <details>: hidden until the
-     <details> opens, then shown as a dropdown anchored to the bar's right edge.
-     Visual chrome comes from the .popover class on .navwrap. */
-  .navwrap {
-    display: none;
-  }
-  .navmenu[open] ~ .navwrap {
-    display: flex;
+  .nav__primary {
     flex-direction: column;
     align-items: stretch;
-    gap: 0.4rem;
-    position: absolute;
-    right: 1.25rem;
-    top: calc(100% - 0.2rem);
-    min-width: 12rem;
-    max-width: calc(100vw - 2rem);
-    padding: 0.5rem;
-    z-index: 30;
+    gap: 2px;
   }
-  /* Inside the panel everything stacks in two consistent indent levels: section
-     headings / standalone items at level 0, grouped children at level 1. */
-  nav.mainnav {
+  .navlink {
+    height: 44px;
+    justify-content: flex-start;
+  }
+
+  .nav__panel .topbar-user {
+    margin: var(--space-2) 0 0;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--topbar-border);
+    width: 100%;
     flex-direction: column;
     align-items: stretch;
-    gap: 0.2rem;
+    gap: 2px;
   }
-  /* Level 0: "Audit log" is a standalone link. */
-  nav.mainnav > a {
-    padding: 0.4rem 0.5rem;
-    border-radius: var(--radius-sm);
+
+  .nav__panel .topbar-user .menu {
+    width: 100%;
   }
-  /* Level 0 headings: "Certificates", and "Settings" — whose summary becomes a
-     non-collapsing heading here (caret removed, items always shown below). */
-  .navhead,
-  details.menu > summary {
-    display: block;
-    padding: 0.4rem 0.5rem 0.15rem;
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--muted);
+  .nav__panel .topbar-user .mainmenu {
+    order: 2;
   }
-  details.menu > summary {
-    cursor: default;
+  .nav__panel .menu > summary {
+    width: 100%;
+    height: 44px;
+    justify-content: flex-start;
   }
-  details.menu > summary::after,
-  details.menu[open] > summary::after {
-    content: "";
+  .nav__panel .menu > summary .chev {
+    margin-left: auto;
   }
-  /* Both groups stack their children vertically. */
-  .navgroup,
-  .navsettings .menu-items {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
+  .nav__panel .mainmenu-trigger {
+    width: 100%;
+    min-height: 48px;
   }
-  /* Settings items are always shown inline here (no .popover chrome). */
-  .navsettings .menu-items {
-    margin-top: 0;
-    min-width: 0;
-    padding: 0;
-    background: transparent;
-    border: none;
-    border-radius: 0;
+  .nav__panel .menu > .menu__list {
+    position: static;
+    inset: auto;
+    gap: 2px;
     box-shadow: none;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    min-width: 0;
   }
-  /* Level 1: children of the Certificates group and of Settings, indented equally. */
-  .navgroup a,
-  .menu-items a {
-    margin-left: 0.7rem;
-    padding: 0.4rem 0.5rem;
-    border-radius: var(--radius-sm);
+  .nav__panel .menu .menu__list a {
+    height: 44px;
+    color: var(--topbar-fg-muted);
   }
-  /* User + log-out drop below the links, visually separated. */
-  .who {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.3rem;
-    padding-top: 0.5rem;
-    border-top: 1px solid var(--border);
+  .nav__panel .menu .menu__list a:hover {
+    background: var(--topbar-hover);
+    color: var(--topbar-fg);
+  }
+  .nav__panel .menu .menu__list a .ico {
+    color: var(--topbar-fg-muted);
+  }
+  .nav__panel .menu .menu__list a[aria-current="page"] {
+    color: #fff;
+    background: var(--topbar-active);
+  }
+  .nav__panel .mainmenu .menu__list button.menu__logout,
+  .nav__panel .mainmenu .menu__list button.menu__logout .ico {
+    color: #ff9b9b;
+  }
+  .nav__panel .mainmenu .menu__list button.menu__logout:hover {
+    background: rgba(239, 68, 68, 0.16);
+  }
+
+  .nav__panel .menu__label {
+    color: var(--topbar-fg-muted);
+    padding-left: var(--space-3);
+  }
+  .nav__panel .menu__sep {
+    margin: var(--space-2) 0;
+    background: var(--topbar-border);
+  }
+
+}
+
+@media (min-width: 901px) {
+  .nav__panel {
+    display: flex !important;
+  }
+  .nav-toggle,
+  .nav__burger {
+    display: none !important;
   }
 }
 
+@media (max-width: 560px) {
+  :root {
+    --content-pad: var(--space-4);
+  }
+  .brand-name {
+    display: none;
+  }
+}
+
+/* ---- Main content area -------------------------------------------------- */
+/* Uses --content-max (1180px) to align with the topbar-inner. Page interiors
+   are transitional; they will adopt the new design system component-by-component. */
 main {
-  max-width: var(--content-width);
+  max-width: var(--content-max);
   margin: 2rem auto;
-  padding: 0 1.25rem;
+  padding: 0 var(--content-pad, 1.25rem);
 }
-/* Data-heavy pages (inventory, audit) opt into a wider content column. */
+/* Data-heavy pages (inventory, audit) no longer need a special wide class once
+   the content cap is already 1180px — kept for compatibility during migration. */
 main.wide {
-  max-width: var(--content-width-wide);
+  max-width: var(--content-max);
 }
 
-/* Subtle build-version badge, fixed in the bottom-right corner. Non-interactive and
-   below the dropdowns so it never blocks clicks or overlaps menus. */
+/* Subtle build-version badge */
 .appver {
   position: fixed;
   right: 0.6rem;
@@ -306,11 +582,18 @@ main.wide {
   z-index: 5;
   font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
-  color: var(--muted);
+  color: var(--muted, #6b6b70);
   opacity: 0.6;
   pointer-events: none;
   user-select: none;
 }
+
+/* =========================================================================
+   Legacy page-interior styles
+   These are used by templates not yet ported to the new design system.
+   They intentionally continue to use old --content-width / --muted /
+   --card tokens (mapped via compatibility aliases in tokens.css).
+   ========================================================================= */
 
 .card {
   background: var(--card);
@@ -320,8 +603,7 @@ main.wide {
   margin-bottom: 1.5rem;
 }
 
-/* Floating surface shared by the Settings dropdown and the mobile nav panel.
-   Layout/positioning stays on each consumer; this only carries the chrome. */
+/* Floating surface: Settings dropdown, mobile nav panel chrome */
 .popover {
   background: var(--card);
   border: 1px solid var(--border);
@@ -356,8 +638,8 @@ select {
 button {
   font: inherit;
   padding: 0.45rem 0.9rem;
-  border: 1px solid var(--accent);
-  background: var(--accent);
+  border: 1px solid var(--accent-strong, var(--accent));
+  background: var(--accent-strong, var(--accent));
   color: var(--on-accent);
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -412,7 +694,7 @@ th {
 }
 .flash.info {
   background: var(--info-bg);
-  color: var(--info-fg);
+  color: var(--info-fg, var(--accent));
   border: 1px solid var(--info-border);
 }
 
@@ -420,7 +702,7 @@ th {
   color: var(--muted);
 }
 
-/* ACME copy fields/blocks (spec/0010): a value plus an inline Copy button. */
+/* ACME copy fields/blocks (spec/0010) */
 .copy {
   display: flex;
   gap: 0.4rem;
@@ -434,9 +716,7 @@ th {
 .copy button {
   flex: 0 0 auto;
 }
-.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
+
 label.inline {
   display: inline-flex;
   align-items: center;
@@ -461,20 +741,28 @@ fieldset legend {
   font-size: 0.75rem;
   padding: 0.1rem 0.45rem;
   border-radius: 999px;
-  background: var(--surface-2);
+  background: var(--surface-2, var(--surface-2));
 }
 h1 {
   font-size: 1.4rem;
 }
 
-/* Brand logo badge in the topbar */
-a.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
+/* ---- Print ----------------------------------------------------------- */
+@media print {
+  .topbar,
+  .page-head__actions,
+  .copy-btn {
+    display: none;
+  }
+  body {
+    background: #fff;
+  }
 }
-img.brand-logo {
-  display: block;
-  vertical-align: middle;
-  flex-shrink: 0;
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }

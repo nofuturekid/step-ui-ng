@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign in · step-ui-ng</title>
+  <link rel="icon" href="static/logo.svg" />
+  <link rel="stylesheet" href="css/fonts.css" />
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <main class="authwrap" data-screen-label="Login">
+    <div class="authbrand">
+      <img src="static/logo.svg" alt="" />
+      <div class="wordmark"><span class="b1">Step-CA</span><span class="b2">NextGen UI</span></div>
+      <div class="tagline">Sign in to manage your certificate authority</div>
+    </div>
+
+    <div class="card">
+      <form class="card__body stack-4" method="post" action="inventory.html">
+        <!-- Flash error appears here after a failed attempt (htmx or full reload) -->
+        <div class="field">
+          <label for="username">Username</label>
+          <input class="input" id="username" name="username" autocomplete="username" autofocus />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input class="input" id="password" name="password" type="password" autocomplete="current-password" />
+        </div>
+        <button type="submit" class="btn btn--primary" style="width:100%">Sign in</button>
+      </form>
+    </div>
+
+    <p class="authfoot">step-ui-ng · self-hosted Step-CA admin</p>
+  </main>
+  <script src="js/ui.js"></script>
+</body>
+</html>

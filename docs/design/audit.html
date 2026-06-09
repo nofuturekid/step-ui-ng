@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Audit log · step-ui-ng</title>
+  <link rel="icon" href="static/logo.svg" />
+  <link rel="stylesheet" href="css/fonts.css" />
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="inventory.html" aria-label="Step-CA NextGen UI — home">
+          <img src="static/logo.svg" alt="" />
+          <span class="brand-name"><span class="b1">Step-CA</span><span class="b2">NextGen UI</span></span>
+        </a>
+        <div class="nav">
+          <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation menu" />
+          <label class="nav__burger" for="nav-toggle" title="Menu"><svg class="ico" style="width:20px;height:20px"><use href="icons.svg#i-menu"></use></svg></label>
+          <div class="nav__panel">
+            <nav class="nav__primary" aria-label="Primary">
+              <a class="navlink" href="inventory.html"><svg class="ico"><use href="icons.svg#i-list"></use></svg> Certificates</a>
+              <a class="navlink" href="issue.html"><svg class="ico"><use href="icons.svg#i-file-plus"></use></svg> Issue</a>
+              <a class="navlink" href="sign-csr.html"><svg class="ico"><use href="icons.svg#i-pen"></use></svg> Sign CSR</a>
+            </nav>
+            <div class="topbar-user">
+                            <div class="theme-footer"><span class="theme-label">Theme</span><div class="theme-toggle" role="group" aria-label="Theme (review-mock affordance)">
+                <button type="button" data-theme-set="auto" title="System theme"><svg class="ico"><use href="icons.svg#i-monitor"></use></svg></button>
+                <button type="button" data-theme-set="light" title="Light theme"><svg class="ico"><use href="icons.svg#i-sun"></use></svg></button>
+                <button type="button" data-theme-set="dark" title="Dark theme"><svg class="ico"><use href="icons.svg#i-moon"></use></svg></button>
+              </div></div>
+              <details class="menu mainmenu">
+                <summary class="mainmenu-trigger" aria-label="Main menu">
+                  <span class="avatar" aria-hidden="true">MR</span>
+                  <span class="mainmenu-id">
+                    <span class="uname">m.reyes</span>
+                    <span class="urole">admin</span>
+                  </span>
+                  <svg class="ico chev" style="width:14px;height:14px"><use href="icons.svg#i-chevron-down"></use></svg>
+                </summary>
+                <div class="menu__list mainmenu-list">
+                  <div class="menu__label">App</div>
+                  <a href="users.html"><svg class="ico"><use href="icons.svg#i-users"></use></svg> Users</a>
+                  <a href="ca-settings.html"><svg class="ico"><use href="icons.svg#i-server"></use></svg> CA settings</a>
+                  <div class="menu__label">Step-CA</div>
+                  <a href="provisioners.html"><svg class="ico"><use href="icons.svg#i-key"></use></svg> Provisioners</a>
+                  <a href="acme.html"><svg class="ico"><use href="icons.svg#i-globe"></use></svg> ACME</a>
+                  <div class="menu__sep"></div>
+                  <div class="menu__label">Audit</div>
+                  <a href="audit.html" aria-current="page"><svg class="ico"><use href="icons.svg#i-scroll"></use></svg> Log</a>
+                  <div class="menu__sep"></div>
+                  <a class="menu__logout" href="login.html"><svg class="ico"><use href="icons.svg#i-logout"></use></svg> Log out</a>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content" data-screen-label="Audit log (admin)">
+      <div class="page-head">
+        <h1 class="page-title">Audit log</h1>
+        <p class="page-sub">Every privileged action step-ui-ng performs. Append-only and never contains secret values.</p>
+      </div>
+
+      <div>
+        <form class="filterbar" role="search" aria-label="Filter audit events">
+          <div class="searchbox">
+            <svg class="ico"><use href="icons.svg#i-search"></use></svg>
+            <input class="input" type="search" placeholder="Search actor or target…" />
+          </div>
+          <label class="visually-hidden" for="a-action">Action</label>
+          <select class="select" id="a-action" style="max-width:180px">
+            <option value="">All actions</option>
+            <option>cert.issue</option>
+            <option>cert.revoke</option>
+            <option>csr.sign</option>
+            <option>provisioner.set-active</option>
+            <option>acme.eab.create</option>
+            <option>user.create</option>
+            <option>auth.login</option>
+          </select>
+          <label class="visually-hidden" for="a-range">Range</label>
+          <select class="select" id="a-range" style="max-width:150px"><option>Last 24 hours</option><option selected>Last 7 days</option><option>Last 30 days</option></select>
+          <div class="spacer"></div>
+          <span class="result-count">1,204 events</span>
+        </form>
+
+        <div class="table-wrap table-scroll">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Time (UTC)</th>
+                <th scope="col">Actor</th>
+                <th scope="col">Action</th>
+                <th scope="col">Target</th>
+                <th scope="col">Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="nowrap mono subtle">2026-06-09 10:18:44</td><td class="mono">m.reyes</td><td><span class="tag">cert.issue</span></td><td class="mono cn-cell">grafana.lab.internal</td><td><span class="badge badge--ok"><span class="dot"></span>ok</span></td></tr>
+              <tr><td class="nowrap mono subtle">2026-06-09 10:12:09</td><td class="mono">m.reyes</td><td><span class="tag">acme.eab.create</span></td><td class="mono cn-cell">acme-internal · caddy@edge-01</td><td><span class="badge badge--ok"><span class="dot"></span>ok</span></td></tr>
+              <tr><td class="nowrap mono subtle">2026-06-09 09:47:55</td><td class="mono">a.okafor</td><td><span class="tag">csr.sign</span></td><td class="mono cn-cell">node</td><td><span class="badge badge--ok"><span class="dot"></span>ok</span></td></tr>
+              <tr><td class="nowrap mono subtle">2026-06-09 09:31:20</td><td class="mono">m.reyes</td><td><span class="tag">provisioner.set-active</span></td><td class="mono cn-cell">acme-internal</td><td><span class="badge badge--ok"><span class="dot"></span>ok</span></td></tr>
+              <tr><td class="nowrap mono subtle">2026-06-09 08:58:02</td><td class="mono">a.okafor</td><td><span class="tag">cert.revoke</span></td><td class="mono cn-cell">proxmox.home.arpa</td><td><span class="badge badge--ok"><span class="dot"></span>ok</span></td></tr>
+              <tr><td class="nowrap mono subtle">2026-06-09 08:40:13</td><td class="mono">unknown</td><td><span class="tag">auth.login</span></td><td class="mono cn-cell">from 10.10.0.4</td><td><span class="badge badge--danger"><svg class="ico"><use href="icons.svg#i-x"></use></svg>denied</span></td></tr>
+              <tr><td class="nowrap mono subtle">2026-06-09 08:39:50</td><td class="mono">a.okafor</td><td><span class="tag">auth.login</span></td><td class="mono cn-cell">from 10.10.0.21</td><td><span class="badge badge--ok"><span class="dot"></span>ok</span></td></tr>
+              <tr><td class="nowrap mono subtle">2026-06-08 22:05:31</td><td class="mono">m.reyes</td><td><span class="tag">user.create</span></td><td class="mono cn-cell">grafana-bot (viewer)</td><td><span class="badge badge--ok"><span class="dot"></span>ok</span></td></tr>
+              <tr><td class="nowrap mono subtle">2026-06-08 18:22:10</td><td class="mono">m.reyes</td><td><span class="tag">ca.settings.update</span></td><td class="mono cn-cell">admin-auth: jwk</td><td><span class="badge badge--ok"><span class="dot"></span>ok</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <span>Showing <b>1–9</b> of 1,204</span>
+          <div class="pages">
+            <span class="is-disabled" aria-hidden="true"><svg class="ico"><use href="icons.svg#i-chevron-left"></use></svg></span>
+            <a href="#" aria-current="page">1</a>
+            <a href="#">2</a>
+            <a href="#">3</a>
+            <span>…</span>
+            <a href="#">134</a>
+            <a href="#" aria-label="Next page"><svg class="ico"><use href="icons.svg#i-chevron-right"></use></svg></a>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="js/ui.js"></script>
+</body>
+</html>

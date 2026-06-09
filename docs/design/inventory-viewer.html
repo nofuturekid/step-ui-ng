@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Certificates · step-ui-ng</title>
+  <link rel="icon" href="static/logo.svg" />
+  <link rel="stylesheet" href="css/fonts.css" />
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- VIEWER ROLE: nav shows ONLY Certificates → List. No Issue/Sign/Settings/Audit. -->
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="inventory-viewer.html" aria-label="Step-CA NextGen UI — home">
+          <img src="static/logo.svg" alt="" />
+          <span class="brand-name"><span class="b1">Step-CA</span><span class="b2">NextGen UI</span></span>
+        </a>
+        <div class="nav">
+          <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation menu" />
+          <label class="nav__burger" for="nav-toggle" title="Menu"><svg class="ico" style="width:20px;height:20px"><use href="icons.svg#i-menu"></use></svg></label>
+          <div class="nav__panel">
+            <nav class="nav__primary" aria-label="Primary">
+              <a class="navlink" href="inventory-viewer.html" aria-current="page"><svg class="ico"><use href="icons.svg#i-list"></use></svg> Certificates</a>
+            </nav>
+            <div class="topbar-user">
+              <div class="theme-footer"><span class="theme-label">Theme</span><div class="theme-toggle" role="group" aria-label="Theme (review-mock affordance)">
+                <button type="button" data-theme-set="auto" title="System theme"><svg class="ico"><use href="icons.svg#i-monitor"></use></svg></button>
+                <button type="button" data-theme-set="light" title="Light theme"><svg class="ico"><use href="icons.svg#i-sun"></use></svg></button>
+                <button type="button" data-theme-set="dark" title="Dark theme"><svg class="ico"><use href="icons.svg#i-moon"></use></svg></button>
+              </div></div>
+              <details class="menu mainmenu">
+                <summary class="mainmenu-trigger" aria-label="Main menu">
+                  <span class="avatar" aria-hidden="true">GB</span>
+                  <span class="mainmenu-id">
+                    <span class="uname">grafana-bot</span>
+                    <span class="urole">viewer</span>
+                  </span>
+                  <svg class="ico chev" style="width:14px;height:14px"><use href="icons.svg#i-chevron-down"></use></svg>
+                </summary>
+                <div class="menu__list mainmenu-list">
+                  <a class="menu__logout" href="login.html"><svg class="ico"><use href="icons.svg#i-logout"></use></svg> Log out</a>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content" data-screen-label="Certificate List (viewer — read-only)">
+      <div class="page-head">
+        <div class="page-head__row">
+          <div>
+            <h1 class="page-title">Certificates</h1>
+            <p class="page-sub">Read-only view of issued certificates.</p>
+          </div>
+          <!-- No Issue / Sign CSR buttons for viewers. -->
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="flash flash--info" role="status">
+          <svg class="ico"><use href="icons.svg#i-eye"></use></svg>
+          <div class="flash__body">
+            <strong>You have read-only access.</strong>
+            <p>You can browse certificates and open their details. Issuing, downloading, revoking and settings are not available to your role.</p>
+          </div>
+        </div>
+
+        <div>
+          <form class="filterbar" role="search" aria-label="Filter certificates">
+            <div class="searchbox">
+              <svg class="ico"><use href="icons.svg#i-search"></use></svg>
+              <input class="input" type="search" placeholder="Search common name, SAN or serial…" />
+            </div>
+            <label class="visually-hidden" for="vf-status">Status</label>
+            <select class="select" id="vf-status" style="max-width:170px"><option value="">All statuses</option><option>Valid</option><option>Expiring soon</option><option>Expired</option><option>Revoked</option></select>
+            <div class="spacer"></div>
+            <span class="result-count">128 certificates</span>
+          </form>
+
+          <div class="table-wrap table-scroll">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th scope="col">Common name</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Provisioner</th>
+                  <th scope="col">Expires</th>
+                  <th scope="col"><span class="visually-hidden">Open</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><a class="rowlink cn-cell" href="certificate.html" title="vault.lab.internal">vault.lab.internal</a></td>
+                  <td class="muted">Leaf · server</td>
+                  <td><span class="badge badge--ok"><span class="dot"></span>Valid</span></td>
+                  <td class="muted">admin-jwk</td>
+                  <td class="nowrap">2026-09-02 <span class="subtle">· 85d</span></td>
+                  <td class="col-actions"><a class="iconbtn" href="certificate.html" aria-label="View vault.lab.internal"><svg class="ico"><use href="icons.svg#i-chevron-right"></use></svg></a></td>
+                </tr>
+                <tr>
+                  <td><a class="rowlink cn-cell" href="certificate.html" title="grafana.lab.internal">grafana.lab.internal</a></td>
+                  <td class="muted">Leaf · server</td>
+                  <td><span class="badge badge--warn"><svg class="ico"><use href="icons.svg#i-clock"></use></svg>Expiring</span></td>
+                  <td class="muted">acme-internal</td>
+                  <td class="nowrap text-warn">2026-06-18 <span>· 9d</span></td>
+                  <td class="col-actions"><a class="iconbtn" href="certificate.html" aria-label="View grafana.lab.internal"><svg class="ico"><use href="icons.svg#i-chevron-right"></use></svg></a></td>
+                </tr>
+                <tr>
+                  <td><a class="rowlink cn-cell" href="certificate.html" title="*.svc.cluster.local">*.svc.cluster.local</a></td>
+                  <td class="muted">Leaf · server</td>
+                  <td><span class="badge badge--ok"><span class="dot"></span>Valid</span></td>
+                  <td class="muted">acme-internal</td>
+                  <td class="nowrap">2026-07-30 <span class="subtle">· 51d</span></td>
+                  <td class="col-actions"><a class="iconbtn" href="certificate.html" aria-label="View wildcard svc.cluster.local"><svg class="ico"><use href="icons.svg#i-chevron-right"></use></svg></a></td>
+                </tr>
+                <tr>
+                  <td><a class="rowlink cn-cell" href="certificate.html" title="proxmox.home.arpa">proxmox.home.arpa</a></td>
+                  <td class="muted">Leaf · server</td>
+                  <td><span class="badge badge--danger"><svg class="ico"><use href="icons.svg#i-ban"></use></svg>Revoked</span></td>
+                  <td class="muted">admin-jwk</td>
+                  <td class="nowrap subtle">2026-08-11</td>
+                  <td class="col-actions"><a class="iconbtn" href="certificate.html" aria-label="View proxmox.home.arpa"><svg class="ico"><use href="icons.svg#i-chevron-right"></use></svg></a></td>
+                </tr>
+                <tr>
+                  <td><a class="rowlink cn-cell" href="certificate.html" title="mqtt.home.arpa">mqtt.home.arpa</a></td>
+                  <td class="muted">Leaf · client</td>
+                  <td><span class="badge badge--ok"><span class="dot"></span>Valid</span></td>
+                  <td class="muted">acme-internal</td>
+                  <td class="nowrap">2026-10-14 <span class="subtle">· 127d</span></td>
+                  <td class="col-actions"><a class="iconbtn" href="certificate.html" aria-label="View mqtt.home.arpa"><svg class="ico"><use href="icons.svg#i-chevron-right"></use></svg></a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <span>Showing <b>1–5</b> of 128</span>
+            <div class="pages">
+              <span class="is-disabled" aria-hidden="true"><svg class="ico"><use href="icons.svg#i-chevron-left"></use></svg></span>
+              <a href="#" aria-current="page">1</a>
+              <a href="#">2</a>
+              <a href="#">3</a>
+              <span>…</span>
+              <a href="#">26</a>
+              <a href="#" aria-label="Next page"><svg class="ico"><use href="icons.svg#i-chevron-right"></use></svg></a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="js/ui.js"></script>
+</body>
+</html>

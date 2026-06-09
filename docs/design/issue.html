@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Issue certificate · step-ui-ng</title>
+  <link rel="icon" href="static/logo.svg" />
+  <link rel="stylesheet" href="css/fonts.css" />
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="inventory.html" aria-label="Step-CA NextGen UI — home">
+          <img src="static/logo.svg" alt="" />
+          <span class="brand-name"><span class="b1">Step-CA</span><span class="b2">NextGen UI</span></span>
+        </a>
+        <div class="nav">
+          <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation menu" />
+          <label class="nav__burger" for="nav-toggle" title="Menu"><svg class="ico" style="width:20px;height:20px"><use href="icons.svg#i-menu"></use></svg></label>
+          <div class="nav__panel">
+            <nav class="nav__primary" aria-label="Primary">
+              <a class="navlink" href="inventory.html"><svg class="ico"><use href="icons.svg#i-list"></use></svg> Certificates</a>
+              <a class="navlink" href="issue.html" aria-current="page"><svg class="ico"><use href="icons.svg#i-file-plus"></use></svg> Issue</a>
+              <a class="navlink" href="sign-csr.html"><svg class="ico"><use href="icons.svg#i-pen"></use></svg> Sign CSR</a>
+            </nav>
+            <div class="topbar-user">
+                            <div class="theme-footer"><span class="theme-label">Theme</span><div class="theme-toggle" role="group" aria-label="Theme (review-mock affordance)">
+                <button type="button" data-theme-set="auto" title="System theme"><svg class="ico"><use href="icons.svg#i-monitor"></use></svg></button>
+                <button type="button" data-theme-set="light" title="Light theme"><svg class="ico"><use href="icons.svg#i-sun"></use></svg></button>
+                <button type="button" data-theme-set="dark" title="Dark theme"><svg class="ico"><use href="icons.svg#i-moon"></use></svg></button>
+              </div></div>
+              <details class="menu mainmenu">
+                <summary class="mainmenu-trigger" aria-label="Main menu">
+                  <span class="avatar" aria-hidden="true">MR</span>
+                  <span class="mainmenu-id">
+                    <span class="uname">m.reyes</span>
+                    <span class="urole">admin</span>
+                  </span>
+                  <svg class="ico chev" style="width:14px;height:14px"><use href="icons.svg#i-chevron-down"></use></svg>
+                </summary>
+                <div class="menu__list mainmenu-list">
+                  <div class="menu__label">App</div>
+                  <a href="users.html"><svg class="ico"><use href="icons.svg#i-users"></use></svg> Users</a>
+                  <a href="ca-settings.html"><svg class="ico"><use href="icons.svg#i-server"></use></svg> CA settings</a>
+                  <div class="menu__label">Step-CA</div>
+                  <a href="provisioners.html"><svg class="ico"><use href="icons.svg#i-key"></use></svg> Provisioners</a>
+                  <a href="acme.html"><svg class="ico"><use href="icons.svg#i-globe"></use></svg> ACME</a>
+                  <div class="menu__sep"></div>
+                  <div class="menu__label">Audit</div>
+                  <a href="audit.html"><svg class="ico"><use href="icons.svg#i-scroll"></use></svg> Log</a>
+                  <div class="menu__sep"></div>
+                  <a class="menu__logout" href="login.html"><svg class="ico"><use href="icons.svg#i-logout"></use></svg> Log out</a>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content content--narrow" data-screen-label="Issue certificate (admin)">
+      <div class="page-head">
+        <div class="breadcrumb"><a href="inventory.html">Certificates</a><span class="sep">/</span><span>Issue</span></div>
+        <h1 class="page-title">Issue certificate</h1>
+        <p class="page-sub">step-ui-ng asks the CA to sign a new leaf certificate using the active provisioner.</p>
+      </div>
+
+      <div class="stack">
+        <!-- Issuance requires an active provisioner. Selected -> proceed. -->
+        <div class="flash flash--info">
+          <svg class="ico"><use href="icons.svg#i-key"></use></svg>
+          <div class="flash__body">
+            <strong>Active provisioner: <span class="mono">admin-jwk</span></strong>
+            <p>New certificates are issued through this provisioner. <a href="provisioners.html">Change active provisioner</a></p>
+          </div>
+        </div>
+
+        <!-- ============ STATE A — the form ============ -->
+        <div class="state-flow">
+          <div>
+            <div class="state-label">State 1 · Request</div>
+            <form class="card" method="post" action="#">
+              <div class="card__body stack-4">
+                <div class="form-grid">
+                  <div class="field col-span-2">
+                    <label for="cn">Common name <span class="req" aria-hidden="true">*</span></label>
+                    <input class="input mono" id="cn" name="cn" required placeholder="service.lab.internal" value="grafana.lab.internal" />
+                    <span class="field__hint">The primary identity. Usually also added as the first SAN.</span>
+                  </div>
+
+                  <div class="field col-span-2">
+                    <span class="label">Subject alternative names <span class="opt">(optional)</span></span>
+                    <div class="stack-4" style="--space-4:8px">
+                      <div class="repeat-row">
+                        <input class="input mono" name="san" value="grafana.lab.internal" aria-label="SAN 1" />
+                        <button type="button" class="btn btn--sm" aria-label="Remove SAN 1"><svg class="ico"><use href="icons.svg#i-x"></use></svg></button>
+                      </div>
+                      <div class="repeat-row">
+                        <input class="input mono" name="san" value="10.10.0.31" aria-label="SAN 2" />
+                        <button type="button" class="btn btn--sm" aria-label="Remove SAN 2"><svg class="ico"><use href="icons.svg#i-x"></use></svg></button>
+                      </div>
+                    </div>
+                    <button type="button" class="btn btn--sm" style="align-self:flex-start"><svg class="ico"><use href="icons.svg#i-plus"></use></svg> Add SAN</button>
+                    <span class="field__hint">DNS names or IP addresses. ACME-style validation is not performed for admin issuance.</span>
+                  </div>
+
+                  <div class="field">
+                    <label for="validity">Validity</label>
+                    <select class="select" id="validity" name="validity">
+                      <option>24 hours</option>
+                      <option selected>90 days</option>
+                      <option>1 year</option>
+                      <option>Custom…</option>
+                    </select>
+                    <span class="field__hint">Capped by the provisioner's max duration.</span>
+                  </div>
+
+                  <div class="field">
+                    <label for="keytype">Key type</label>
+                    <select class="select" id="keytype" name="keytype">
+                      <option>ECDSA P-256</option>
+                      <option selected>RSA 2048</option>
+                      <option>RSA 4096</option>
+                      <option>Ed25519</option>
+                    </select>
+                    <span class="field__hint">step-ui-ng generates the key pair and returns the private key once.</span>
+                  </div>
+                </div>
+              </div>
+              <div class="card__footer">
+                <button type="submit" class="btn btn--primary"><svg class="ico"><use href="icons.svg#i-file-plus"></use></svg> Issue certificate</button>
+                <a class="btn btn--ghost" href="inventory.html">Cancel</a>
+              </div>
+            </form>
+          </div>
+
+          <div class="state-arrow">
+            <svg class="ico"><use href="icons.svg#i-arrow-right"></use></svg>
+            <span>htmx: POST /issue → swaps the panel below in place of the form</span>
+          </div>
+
+          <!-- ============ STATE B — success + one-time secret ============ -->
+          <div>
+            <div class="state-label">State 2 · Issued (success swap)</div>
+            <div class="anno">
+              <span class="anno__tag"><svg class="ico"><use href="icons.svg#i-refresh"></use></svg> htmx swap target</span>
+              <div class="stack-4">
+                <div class="flash flash--ok">
+                  <svg class="ico"><use href="icons.svg#i-check-circle"></use></svg>
+                  <div class="flash__body">
+                    <strong>Certificate issued for <span class="mono">grafana.lab.internal</span></strong>
+                    <p>Valid until 2026-09-07. Added to the inventory. <a href="certificate.html">View certificate</a></p>
+                  </div>
+                </div>
+
+                <!-- One-time secret: the private key, shown exactly once -->
+                <div class="onetime">
+                  <div class="onetime__head">
+                    <svg class="ico"><use href="icons.svg#i-alert-triangle"></use></svg>
+                    <div><strong>Copy your private key now</strong> <span>— it is generated in your browser session and will not be shown again.</span></div>
+                  </div>
+                  <div class="onetime__body stack-4">
+                    <div class="codeblock pem pem--open" id="pem-key">
+                      <div class="codeblock__bar">
+                        <svg class="ico"><use href="icons.svg#i-key"></use></svg>
+                        <span class="label">grafana.lab.internal-key.pem</span>
+                        <span class="spacer"></span>
+                        <button type="button" class="copy-btn" data-copy-target="#pem-key-text"><svg class="ico"><use href="icons.svg#i-copy"></use></svg><span class="label">Copy</span><span class="copied"><svg class="ico"><use href="icons.svg#i-check"></use></svg>Copied</span></button>
+                      </div>
+                      <pre id="pem-key-text">-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC8mzx6t7e0r0k2
+gqfk9mJxq2nQ5o5m1tWw5o0Vd0e7n8mE2bV0F3k8mEd1cQ2J0pK0aZl9mO2qg4h
+H3vG7kV1d0e7n8mE2bV0F3k8mEd1cQ2J0pK0aZl9mO2qg4hH3vG7kV1d0e7n8mE
+2bV0F3k8mEd1cQ2J0pK0aZl9mO2qg4hH3vG7kV1d0e7n8mE2bV0F3k8mEd1cQ2J
+0pK0aZl9mO2qg4hH3vG7kV1AgMBAAECggEAGn8mE2bV0F3k8mEd1cQ2J0pK0aZl
+-----END PRIVATE KEY-----</pre>
+                    </div>
+
+                    <div class="form-actions">
+                      <button type="button" class="btn btn--primary"><svg class="ico"><use href="icons.svg#i-download"></use></svg> Download PKCS#12 bundle</button>
+                      <button type="button" class="btn"><svg class="ico"><use href="icons.svg#i-download"></use></svg> Download key + cert (PEM)</button>
+                      <span class="spacer"></span>
+                      <span class="secret-state"><svg class="ico" style="width:14px;height:14px"><use href="icons.svg#i-lock"></use></svg> The PKCS#12 password is shown once on download.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="js/ui.js"></script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign CSR · step-ui-ng</title>
+  <link rel="icon" href="static/logo.svg" />
+  <link rel="stylesheet" href="css/fonts.css" />
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="inventory.html" aria-label="Step-CA NextGen UI — home">
+          <img src="static/logo.svg" alt="" />
+          <span class="brand-name"><span class="b1">Step-CA</span><span class="b2">NextGen UI</span></span>
+        </a>
+        <div class="nav">
+          <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation menu" />
+          <label class="nav__burger" for="nav-toggle" title="Menu"><svg class="ico" style="width:20px;height:20px"><use href="icons.svg#i-menu"></use></svg></label>
+          <div class="nav__panel">
+            <nav class="nav__primary" aria-label="Primary">
+              <a class="navlink" href="inventory.html"><svg class="ico"><use href="icons.svg#i-list"></use></svg> Certificates</a>
+              <a class="navlink" href="issue.html"><svg class="ico"><use href="icons.svg#i-file-plus"></use></svg> Issue</a>
+              <a class="navlink" href="sign-csr.html" aria-current="page"><svg class="ico"><use href="icons.svg#i-pen"></use></svg> Sign CSR</a>
+            </nav>
+            <div class="topbar-user">
+                            <div class="theme-footer"><span class="theme-label">Theme</span><div class="theme-toggle" role="group" aria-label="Theme (review-mock affordance)">
+                <button type="button" data-theme-set="auto" title="System theme"><svg class="ico"><use href="icons.svg#i-monitor"></use></svg></button>
+                <button type="button" data-theme-set="light" title="Light theme"><svg class="ico"><use href="icons.svg#i-sun"></use></svg></button>
+                <button type="button" data-theme-set="dark" title="Dark theme"><svg class="ico"><use href="icons.svg#i-moon"></use></svg></button>
+              </div></div>
+              <details class="menu mainmenu">
+                <summary class="mainmenu-trigger" aria-label="Main menu">
+                  <span class="avatar" aria-hidden="true">MR</span>
+                  <span class="mainmenu-id">
+                    <span class="uname">m.reyes</span>
+                    <span class="urole">admin</span>
+                  </span>
+                  <svg class="ico chev" style="width:14px;height:14px"><use href="icons.svg#i-chevron-down"></use></svg>
+                </summary>
+                <div class="menu__list mainmenu-list">
+                  <div class="menu__label">App</div>
+                  <a href="users.html"><svg class="ico"><use href="icons.svg#i-users"></use></svg> Users</a>
+                  <a href="ca-settings.html"><svg class="ico"><use href="icons.svg#i-server"></use></svg> CA settings</a>
+                  <div class="menu__label">Step-CA</div>
+                  <a href="provisioners.html"><svg class="ico"><use href="icons.svg#i-key"></use></svg> Provisioners</a>
+                  <a href="acme.html"><svg class="ico"><use href="icons.svg#i-globe"></use></svg> ACME</a>
+                  <div class="menu__sep"></div>
+                  <div class="menu__label">Audit</div>
+                  <a href="audit.html"><svg class="ico"><use href="icons.svg#i-scroll"></use></svg> Log</a>
+                  <div class="menu__sep"></div>
+                  <a class="menu__logout" href="login.html"><svg class="ico"><use href="icons.svg#i-logout"></use></svg> Log out</a>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content content--narrow" data-screen-label="Sign CSR (admin)">
+      <div class="page-head">
+        <div class="breadcrumb"><a href="inventory.html">Certificates</a><span class="sep">/</span><span>Sign CSR</span></div>
+        <h1 class="page-title">Sign CSR</h1>
+        <p class="page-sub">Paste a PEM-encoded certificate signing request. step-ui-ng forwards it to the CA using the active provisioner and returns the signed certificate — no private key is involved.</p>
+      </div>
+
+      <div class="stack">
+        <div class="flash flash--info">
+          <svg class="ico"><use href="icons.svg#i-key"></use></svg>
+          <div class="flash__body">
+            <strong>Active provisioner: <span class="mono">admin-jwk</span></strong>
+            <p>The CSR is signed through this provisioner. <a href="provisioners.html">Change</a></p>
+          </div>
+        </div>
+
+        <div class="state-flow">
+          <div>
+            <div class="state-label">State 1 · Paste CSR</div>
+            <form class="card" method="post" action="#">
+              <div class="card__body stack-4">
+                <div class="field">
+                  <label for="csr">Certificate signing request (PEM)</label>
+                  <textarea class="textarea mono" id="csr" rows="8" placeholder="-----BEGIN CERTIFICATE REQUEST-----&#10;…&#10;-----END CERTIFICATE REQUEST-----">-----BEGIN CERTIFICATE REQUEST-----
+MIICVDCCATwCAQAwDzENMAsGA1UEAxMEbm9kZTCCASIwDQYJKoZIhvcNAQEBBQAD
+ggEPADCCAQoCggEBAL0e7n8mE2bV0F3k8mEd1cQ2J0pK0aZl9mO2qg4hH3vG7kV1
+d0e7n8mE2bV0F3k8mEd1cQ2J0pK0aZl9mO2qg4hH3vG7kV1d0e7n8mE2bV0F3k8
+-----END CERTIFICATE REQUEST-----</textarea>
+                </div>
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="csr-validity">Validity</label>
+                    <select class="select" id="csr-validity"><option>24 hours</option><option selected>90 days</option><option>1 year</option></select>
+                  </div>
+                </div>
+              </div>
+              <div class="card__footer">
+                <button type="submit" class="btn btn--primary"><svg class="ico"><use href="icons.svg#i-pen"></use></svg> Sign request</button>
+                <a class="btn btn--ghost" href="inventory.html">Cancel</a>
+              </div>
+            </form>
+          </div>
+
+          <div class="state-arrow">
+            <svg class="ico"><use href="icons.svg#i-arrow-right"></use></svg>
+            <span>htmx: POST /sign → swaps in the signed certificate</span>
+          </div>
+
+          <div>
+            <div class="state-label">State 2 · Signed</div>
+            <div class="anno">
+              <span class="anno__tag"><svg class="ico"><use href="icons.svg#i-refresh"></use></svg> htmx swap target</span>
+              <div class="stack-4">
+                <div class="flash flash--ok">
+                  <svg class="ico"><use href="icons.svg#i-check-circle"></use></svg>
+                  <div class="flash__body"><strong>CSR signed for <span class="mono">node</span></strong><p>Valid until 2026-09-07. Added to the inventory.</p></div>
+                </div>
+                <div class="codeblock pem pem--open" id="pem-signed">
+                  <div class="codeblock__bar">
+                    <svg class="ico"><use href="icons.svg#i-file-text"></use></svg><span class="label">signed-certificate.pem</span>
+                    <span class="spacer"></span>
+                    <button type="button" class="copy-btn" data-copy-target="#pem-signed-text"><svg class="ico"><use href="icons.svg#i-copy"></use></svg><span class="label">Copy</span><span class="copied"><svg class="ico"><use href="icons.svg#i-check"></use></svg>Copied</span></button>
+                  </div>
+                  <pre id="pem-signed-text">-----BEGIN CERTIFICATE-----
+MIIDcjCCAlqgAwIBAgIQ Z1d0e7n8mE2bV0F3k8mEdDANBgkqhkiG9w0BAQsFADAk
+MSIwIAYDVQQDExlIb21lbGFiIFJvb3QgQ2VydGlmaWNhdGUwHhcNMjYwNjA5MTAx
+NTAwWhcNMjYwOTA3MTAxNTAwWjAPMQ0wCwYDVQQDEwRub2RlMIIBIjANBgkqhkiG
+9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvJs8ere3tK9JNoKn5PZicatp0OaOZtbVsOaN
+-----END CERTIFICATE-----</pre>
+                </div>
+                <div class="form-actions">
+                  <button type="button" class="btn btn--primary"><svg class="ico"><use href="icons.svg#i-download"></use></svg> Download certificate</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="js/ui.js"></script>
+</body>
+</html>

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CA settings · step-ui-ng</title>
+  <link rel="icon" href="static/logo.svg" />
+  <link rel="stylesheet" href="css/fonts.css" />
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="inventory.html" aria-label="Step-CA NextGen UI — home">
+          <img src="static/logo.svg" alt="" />
+          <span class="brand-name"><span class="b1">Step-CA</span><span class="b2">NextGen UI</span></span>
+        </a>
+        <div class="nav">
+          <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation menu" />
+          <label class="nav__burger" for="nav-toggle" title="Menu"><svg class="ico" style="width:20px;height:20px"><use href="icons.svg#i-menu"></use></svg></label>
+          <div class="nav__panel">
+            <nav class="nav__primary" aria-label="Primary">
+              <a class="navlink" href="inventory.html"><svg class="ico"><use href="icons.svg#i-list"></use></svg> Certificates</a>
+              <a class="navlink" href="issue.html"><svg class="ico"><use href="icons.svg#i-file-plus"></use></svg> Issue</a>
+              <a class="navlink" href="sign-csr.html"><svg class="ico"><use href="icons.svg#i-pen"></use></svg> Sign CSR</a>
+            </nav>
+            <div class="topbar-user">
+                            <div class="theme-footer"><span class="theme-label">Theme</span><div class="theme-toggle" role="group" aria-label="Theme (review-mock affordance)">
+                <button type="button" data-theme-set="auto" title="System theme"><svg class="ico"><use href="icons.svg#i-monitor"></use></svg></button>
+                <button type="button" data-theme-set="light" title="Light theme"><svg class="ico"><use href="icons.svg#i-sun"></use></svg></button>
+                <button type="button" data-theme-set="dark" title="Dark theme"><svg class="ico"><use href="icons.svg#i-moon"></use></svg></button>
+              </div></div>
+              <details class="menu mainmenu">
+                <summary class="mainmenu-trigger" aria-label="Main menu">
+                  <span class="avatar" aria-hidden="true">MR</span>
+                  <span class="mainmenu-id">
+                    <span class="uname">m.reyes</span>
+                    <span class="urole">admin</span>
+                  </span>
+                  <svg class="ico chev" style="width:14px;height:14px"><use href="icons.svg#i-chevron-down"></use></svg>
+                </summary>
+                <div class="menu__list mainmenu-list">
+                  <div class="menu__label">App</div>
+                  <a href="users.html"><svg class="ico"><use href="icons.svg#i-users"></use></svg> Users</a>
+                  <a href="ca-settings.html" aria-current="page"><svg class="ico"><use href="icons.svg#i-server"></use></svg> CA settings</a>
+                  <div class="menu__label">Step-CA</div>
+                  <a href="provisioners.html"><svg class="ico"><use href="icons.svg#i-key"></use></svg> Provisioners</a>
+                  <a href="acme.html"><svg class="ico"><use href="icons.svg#i-globe"></use></svg> ACME</a>
+                  <div class="menu__sep"></div>
+                  <div class="menu__label">Audit</div>
+                  <a href="audit.html"><svg class="ico"><use href="icons.svg#i-scroll"></use></svg> Log</a>
+                  <div class="menu__sep"></div>
+                  <a class="menu__logout" href="login.html"><svg class="ico"><use href="icons.svg#i-logout"></use></svg> Log out</a>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content content--narrow" data-screen-label="CA settings (admin)">
+      <div class="page-head">
+        <div class="breadcrumb"><a href="#">Settings</a><span class="sep">/</span><span>CA settings</span></div>
+        <h1 class="page-title">CA settings</h1>
+        <p class="page-sub">Connect step-ui-ng to your Step-CA instance and configure the admin credentials used for privileged operations.</p>
+      </div>
+
+      <div class="stack">
+        <!-- ============ CARD 1 — CA connection ============ -->
+        <div class="card">
+          <div class="card__header">
+            <div>
+              <h2 class="card__title">CA connection</h2>
+              <p class="card__desc">How step-ui-ng reaches the CA's HTTP API. The root fingerprint pins the CA's identity.</p>
+            </div>
+          </div>
+          <form class="card__body stack-4" method="post" action="#">
+            <div class="form-grid">
+              <div class="field col-span-2">
+                <label for="ca-url">CA URL <span class="req" aria-hidden="true">*</span></label>
+                <input class="input mono" id="ca-url" name="ca_url" value="https://ca.lab.internal:9000" />
+              </div>
+              <div class="field col-span-2">
+                <label for="ca-fp">Root fingerprint <span class="opt">(SHA-256, hex)</span></label>
+                <input class="input mono" id="ca-fp" name="root_fp" value="7d4f9a2c0b18e6a3559012fe774a3d9ce16088210bcd745590e71b24af33c0d1" />
+                <span class="field__hint">From <code>step certificate fingerprint root_ca.crt</code>. Pins the root so a swapped CA is rejected.</span>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn--primary">Save connection</button>
+              <button type="button" class="btn"><svg class="ico"><use href="icons.svg#i-refresh"></use></svg> Test connection</button>
+            </div>
+
+            <!-- htmx: "Test connection" replaces just this region with the result -->
+            <div class="state-flow" style="margin-top:var(--space-2)">
+              <div class="anno">
+                <span class="anno__tag"><svg class="ico"><use href="icons.svg#i-refresh"></use></svg> htmx target — Test connection result</span>
+                <div class="state-flow">
+                  <div>
+                    <div class="state-label">Result A · reachable</div>
+                    <div class="flash flash--ok">
+                      <svg class="ico"><use href="icons.svg#i-check-circle"></use></svg>
+                      <div class="flash__body">
+                        <strong>Connected to Step-CA</strong>
+                        <p>Root fingerprint matches. CA version <span class="mono">v0.27.4</span> · responded in 42&nbsp;ms.</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="state-label">Result B · unreachable / mismatch</div>
+                    <div class="flash flash--error">
+                      <svg class="ico"><use href="icons.svg#i-alert-circle"></use></svg>
+                      <div class="flash__body">
+                        <strong>Could not verify the CA</strong>
+                        <p>Connection refused at <span class="mono">ca.lab.internal:9000</span>, or the root fingerprint does not match. Nothing was saved.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <!-- ============ CARD 2 — Admin authentication ============ -->
+        <div class="card">
+          <div class="card__header">
+            <div>
+              <h2 class="card__title">Admin authentication</h2>
+              <p class="card__desc">Credentials step-ui-ng uses for privileged CA operations (creating/deleting provisioners, ACME management). All secrets are write-only.</p>
+            </div>
+            <div class="card__actions"><span class="badge badge--info"><span class="dot"></span>Active: jwk</span></div>
+          </div>
+          <form class="card__body" method="post" action="#">
+            <!-- The method selector reveals one conditional group. Live via CSS :has();
+                 in the production app this reveal is an htmx swap. -->
+            <fieldset class="method-fieldset">
+              <legend class="label" style="margin-bottom:var(--space-3)">Method</legend>
+              <div class="seg" role="radiogroup" aria-label="Admin authentication method">
+                <label>
+                  <input type="radio" name="auth_method" id="m-none" value="none" />
+                  <span class="seg__name"><span class="mono">none</span></span>
+                  <span class="seg__desc">No stored admin credentials.</span>
+                  <svg class="ico check"><use href="icons.svg#i-check-circle"></use></svg>
+                </label>
+                <label>
+                  <input type="radio" name="auth_method" id="m-x5c" value="x5c" />
+                  <span class="seg__name"><span class="mono">x5c</span></span>
+                  <span class="seg__desc">Admin certificate + key (PEM).</span>
+                  <svg class="ico check"><use href="icons.svg#i-check-circle"></use></svg>
+                </label>
+                <label>
+                  <input type="radio" name="auth_method" id="m-jwk" value="jwk" checked />
+                  <span class="seg__name"><span class="mono">jwk</span></span>
+                  <span class="seg__desc">Subject + provisioner password.</span>
+                  <svg class="ico check"><use href="icons.svg#i-check-circle"></use></svg>
+                </label>
+              </div>
+
+              <!-- none -->
+              <div class="method-group mg-none">
+                <div class="flash flash--warn">
+                  <svg class="ico"><use href="icons.svg#i-info"></use></svg>
+                  <div class="flash__body">
+                    <strong>No admin credentials stored.</strong>
+                    <p>Browsing the inventory and issuing through an active provisioner still work, but creating or deleting provisioners and managing ACME are disabled.</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- x5c -->
+              <div class="method-group mg-x5c">
+                <div class="method-group__title"><svg class="ico" style="width:14px;height:14px"><use href="icons.svg#i-file-text"></use></svg> x5c credentials <span class="badge badge--none" style="margin-left:auto"><span class="dot"></span>none</span></div>
+                <div class="stack-4">
+                  <div class="field">
+                    <label for="x5c-cert">Admin certificate chain (PEM)</label>
+                    <textarea class="textarea mono" id="x5c-cert" rows="4" placeholder="-----BEGIN CERTIFICATE-----&#10;…&#10;-----END CERTIFICATE-----"></textarea>
+                  </div>
+                  <div class="field">
+                    <label for="x5c-key">Admin private key (PEM) <span class="opt">— write-only</span></label>
+                    <textarea class="textarea mono" id="x5c-key" rows="4" placeholder="-----BEGIN PRIVATE KEY-----&#10;…&#10;-----END PRIVATE KEY-----"></textarea>
+                    <span class="field__hint">Stored encrypted and never rendered back. Leave blank to keep the current value.</span>
+                  </div>
+                  <div class="codeblock codeblock--cmd">
+                    <div class="codeblock__bar">
+                      <svg class="ico"><use href="icons.svg#i-terminal"></use></svg><span class="label">Get an admin cert from the CA</span>
+                      <span class="spacer"></span>
+                      <button type="button" class="copy-btn" data-copy-target="#cmd-x5c"><svg class="ico"><use href="icons.svg#i-copy"></use></svg><span class="label">Copy</span><span class="copied"><svg class="ico"><use href="icons.svg#i-check"></use></svg>Copied</span></button>
+                    </div>
+                    <pre id="cmd-x5c">step ca admin list \
+  --admin-cert admin.crt --admin-key admin_key \
+  --ca-url https://ca.lab.internal:9000</pre>
+                  </div>
+                </div>
+              </div>
+
+              <!-- jwk (active) -->
+              <div class="method-group mg-jwk">
+                <div class="method-group__title"><svg class="ico" style="width:14px;height:14px"><use href="icons.svg#i-key"></use></svg> jwk credentials <span class="badge badge--set" style="margin-left:auto"><span class="dot"></span>set</span></div>
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="jwk-subject">Admin subject</label>
+                    <input class="input mono" id="jwk-subject" name="jwk_subject" value="m.reyes@lab.internal" />
+                  </div>
+                  <div class="field">
+                    <label for="jwk-prov">Provisioner name</label>
+                    <input class="input mono" id="jwk-prov" name="jwk_provisioner" value="admin-jwk" />
+                  </div>
+                  <div class="field col-span-2 secret-field">
+                    <label for="jwk-pw">Provisioner password <span class="opt">— write-only</span></label>
+                    <div class="secret-row">
+                      <input class="input" id="jwk-pw" name="jwk_password" type="password" placeholder="•••••••• (unchanged)" />
+                      <span class="secret-state"><span class="badge badge--set"><span class="dot"></span>set</span></span>
+                    </div>
+                    <span class="field__hint">A value is stored. Leave blank to keep it; type to replace it. The stored value is never displayed.</span>
+                  </div>
+                </div>
+              </div>
+            </fieldset>
+
+            <div class="form-actions" style="margin-top:var(--space-6)">
+              <button type="submit" class="btn btn--primary">Save authentication</button>
+              <a class="btn btn--ghost" href="provisioners.html">Go to provisioners</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="js/ui.js"></script>
+</body>
+</html>

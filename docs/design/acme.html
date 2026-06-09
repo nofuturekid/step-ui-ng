@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ACME · step-ui-ng</title>
+  <link rel="icon" href="static/logo.svg" />
+  <link rel="stylesheet" href="css/fonts.css" />
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="inventory.html" aria-label="Step-CA NextGen UI — home">
+          <img src="static/logo.svg" alt="" />
+          <span class="brand-name"><span class="b1">Step-CA</span><span class="b2">NextGen UI</span></span>
+        </a>
+        <div class="nav">
+          <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation menu" />
+          <label class="nav__burger" for="nav-toggle" title="Menu"><svg class="ico" style="width:20px;height:20px"><use href="icons.svg#i-menu"></use></svg></label>
+          <div class="nav__panel">
+            <nav class="nav__primary" aria-label="Primary">
+              <a class="navlink" href="inventory.html"><svg class="ico"><use href="icons.svg#i-list"></use></svg> Certificates</a>
+              <a class="navlink" href="issue.html"><svg class="ico"><use href="icons.svg#i-file-plus"></use></svg> Issue</a>
+              <a class="navlink" href="sign-csr.html"><svg class="ico"><use href="icons.svg#i-pen"></use></svg> Sign CSR</a>
+            </nav>
+            <div class="topbar-user">
+                            <div class="theme-footer"><span class="theme-label">Theme</span><div class="theme-toggle" role="group" aria-label="Theme (review-mock affordance)">
+                <button type="button" data-theme-set="auto" title="System theme"><svg class="ico"><use href="icons.svg#i-monitor"></use></svg></button>
+                <button type="button" data-theme-set="light" title="Light theme"><svg class="ico"><use href="icons.svg#i-sun"></use></svg></button>
+                <button type="button" data-theme-set="dark" title="Dark theme"><svg class="ico"><use href="icons.svg#i-moon"></use></svg></button>
+              </div></div>
+              <details class="menu mainmenu">
+                <summary class="mainmenu-trigger" aria-label="Main menu">
+                  <span class="avatar" aria-hidden="true">MR</span>
+                  <span class="mainmenu-id">
+                    <span class="uname">m.reyes</span>
+                    <span class="urole">admin</span>
+                  </span>
+                  <svg class="ico chev" style="width:14px;height:14px"><use href="icons.svg#i-chevron-down"></use></svg>
+                </summary>
+                <div class="menu__list mainmenu-list">
+                  <div class="menu__label">App</div>
+                  <a href="users.html"><svg class="ico"><use href="icons.svg#i-users"></use></svg> Users</a>
+                  <a href="ca-settings.html"><svg class="ico"><use href="icons.svg#i-server"></use></svg> CA settings</a>
+                  <div class="menu__label">Step-CA</div>
+                  <a href="provisioners.html"><svg class="ico"><use href="icons.svg#i-key"></use></svg> Provisioners</a>
+                  <a href="acme.html" aria-current="page"><svg class="ico"><use href="icons.svg#i-globe"></use></svg> ACME</a>
+                  <div class="menu__sep"></div>
+                  <div class="menu__label">Audit</div>
+                  <a href="audit.html"><svg class="ico"><use href="icons.svg#i-scroll"></use></svg> Log</a>
+                  <div class="menu__sep"></div>
+                  <a class="menu__logout" href="login.html"><svg class="ico"><use href="icons.svg#i-logout"></use></svg> Log out</a>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content" data-screen-label="ACME + EAB (admin)">
+      <div class="page-head">
+        <div class="breadcrumb"><a href="#">Settings</a><span class="sep">/</span><span>ACME</span></div>
+        <h1 class="page-title">ACME</h1>
+        <p class="page-sub">ACME provisioners let clients (certbot, acme.sh, lego, Caddy) request certificates automatically. External Account Binding ties each client to a key you issue here.</p>
+      </div>
+
+      <div class="stack">
+        <!-- ACME provisioners (live from CA) -->
+        <div>
+          <h2 class="section-title">ACME provisioners <span class="badge badge--neutral" style="vertical-align:middle">2 from CA</span></h2>
+          <div class="table-wrap table-scroll">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">EAB</th>
+                  <th scope="col">Challenges</th>
+                  <th scope="col">Accounts</th>
+                  <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="mono">acme-internal</td>
+                  <td><span class="badge badge--ok"><span class="dot"></span>Required</span></td>
+                  <td class="muted">http-01, dns-01</td>
+                  <td class="num">3</td>
+                  <td class="col-actions"><span class="badge badge--info" style="margin-right:var(--space-2)">Managing</span></td>
+                </tr>
+                <tr>
+                  <td class="mono">acme-public</td>
+                  <td><span class="badge badge--neutral"><span class="dot"></span>Off</span></td>
+                  <td class="muted">http-01</td>
+                  <td class="num">7</td>
+                  <td class="col-actions"><button type="button" class="btn btn--sm">Manage EAB</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- EAB management for the selected provisioner -->
+        <div class="card">
+          <div class="card__header">
+            <div>
+              <h2 class="card__title">External Account Binding — <span class="mono">acme-internal</span></h2>
+              <p class="card__desc">Each EAB key authorises one ACME client to bind a new account. The HMAC secret is shown once at creation and stored only as a hash.</p>
+            </div>
+            <div class="card__actions">
+              <button type="button" class="btn btn--primary"><svg class="ico"><use href="icons.svg#i-plus"></use></svg> Create EAB key</button>
+            </div>
+          </div>
+
+          <div class="card__body stack">
+            <!-- Create flow as before/after static states -->
+            <div class="state-flow">
+              <div>
+                <div class="state-label">State 1 · Create</div>
+                <form class="grid-2" method="post" action="#" style="align-items:end">
+                  <div class="field">
+                    <label for="eab-ref">Reference <span class="opt">(your label for this key)</span></label>
+                    <input class="input mono" id="eab-ref" placeholder="caddy@edge-01" />
+                  </div>
+                  <div class="form-actions" style="margin:0">
+                    <button type="submit" class="btn btn--primary"><svg class="ico"><use href="icons.svg#i-plus"></use></svg> Generate key</button>
+                  </div>
+                </form>
+              </div>
+
+              <div class="state-arrow">
+                <svg class="ico"><use href="icons.svg#i-arrow-right"></use></svg>
+                <span>htmx: POST /acme/eab → swaps in the one-time secret below</span>
+              </div>
+
+              <div>
+                <div class="state-label">State 2 · Created (HMAC shown once)</div>
+                <div class="anno">
+                  <span class="anno__tag"><svg class="ico"><use href="icons.svg#i-refresh"></use></svg> htmx swap target</span>
+                  <div class="onetime">
+                    <div class="onetime__head">
+                      <svg class="ico"><use href="icons.svg#i-alert-triangle"></use></svg>
+                      <div><strong>Copy this HMAC key now</strong> <span>— step-ui-ng stores only its hash and will never show it again.</span></div>
+                    </div>
+                    <div class="onetime__body stack-4">
+                      <div class="field">
+                        <span class="label">EAB Key ID</span>
+                        <div class="copyline">
+                          <span class="mono" id="kid">eab_3Nf9Qa2LzKpV7tWmYsB1cR</span>
+                          <button type="button" class="copy-btn" data-copy-target="#kid" aria-label="Copy key id"><svg class="ico"><use href="icons.svg#i-copy"></use></svg><span class="label">Copy</span><span class="copied"><svg class="ico"><use href="icons.svg#i-check"></use></svg>Copied</span></button>
+                        </div>
+                      </div>
+                      <div class="field">
+                        <span class="label">HMAC key <span class="opt">(base64url)</span></span>
+                        <div class="copyline">
+                          <span class="mono" id="hmac">zWnT8sQpL4mB2vRxK9dYfH6gJ3cN0aUe7iO5lP1tZbVx</span>
+                          <button type="button" class="copy-btn" data-copy-target="#hmac" aria-label="Copy HMAC key"><svg class="ico"><use href="icons.svg#i-copy"></use></svg><span class="label">Copy</span><span class="copied"><svg class="ico"><use href="icons.svg#i-check"></use></svg>Copied</span></button>
+                        </div>
+                      </div>
+
+                      <div class="codeblock codeblock--cmd">
+                        <div class="codeblock__bar">
+                          <svg class="ico"><use href="icons.svg#i-terminal"></use></svg><span class="label">certbot</span>
+                          <span class="spacer"></span>
+                          <button type="button" class="copy-btn" data-copy-target="#snip-certbot"><svg class="ico"><use href="icons.svg#i-copy"></use></svg><span class="label">Copy</span><span class="copied"><svg class="ico"><use href="icons.svg#i-check"></use></svg>Copied</span></button>
+                        </div>
+                        <pre id="snip-certbot">certbot certonly --server https://ca.lab.internal:9000/acme/acme-internal/directory \
+  --eab-kid eab_3Nf9Qa2LzKpV7tWmYsB1cR \
+  --eab-hmac-key zWnT8sQpL4mB2vRxK9dYfH6gJ3cN0aUe7iO5lP1tZbVx \
+  -d edge-01.lab.internal</pre>
+                      </div>
+
+                      <div class="codeblock codeblock--cmd">
+                        <div class="codeblock__bar">
+                          <svg class="ico"><use href="icons.svg#i-terminal"></use></svg><span class="label">acme.sh</span>
+                          <span class="spacer"></span>
+                          <button type="button" class="copy-btn" data-copy-target="#snip-acmesh"><svg class="ico"><use href="icons.svg#i-copy"></use></svg><span class="label">Copy</span><span class="copied"><svg class="ico"><use href="icons.svg#i-check"></use></svg>Copied</span></button>
+                        </div>
+                        <pre id="snip-acmesh">acme.sh --register-account \
+  --server https://ca.lab.internal:9000/acme/acme-internal/directory \
+  --eab-kid eab_3Nf9Qa2LzKpV7tWmYsB1cR \
+  --eab-hmac-key zWnT8sQpL4mB2vRxK9dYfH6gJ3cN0aUe7iO5lP1tZbVx</pre>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <hr class="hr" />
+
+            <!-- Existing EAB keys -->
+            <div>
+              <h3 class="section-title" style="font-size:var(--fs-md)">Existing EAB keys</h3>
+              <div class="table-wrap table-scroll">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Key ID</th>
+                      <th scope="col">Reference</th>
+                      <th scope="col">Bound account</th>
+                      <th scope="col">Created</th>
+                      <th scope="col">Status</th>
+                      <th scope="col"><span class="visually-hidden">Actions</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><span class="mono subtle">eab_8Kd…Wm2</span></td>
+                      <td class="mono">caddy@edge-01</td>
+                      <td class="mono muted">acct_5f…a1</td>
+                      <td class="nowrap muted">2026-05-30</td>
+                      <td><span class="badge badge--ok"><span class="dot"></span>Bound</span></td>
+                      <td class="col-actions"><div class="rowact"><button class="iconbtn" title="Revoke EAB key" aria-label="Revoke EAB key eab_8Kd…Wm2"><svg class="ico"><use href="icons.svg#i-ban"></use></svg></button></div></td>
+                    </tr>
+                    <tr>
+                      <td><span class="mono subtle">eab_2Qp…tZ9</span></td>
+                      <td class="mono">traefik@lab</td>
+                      <td class="mono muted">acct_7c…b4</td>
+                      <td class="nowrap muted">2026-06-02</td>
+                      <td><span class="badge badge--ok"><span class="dot"></span>Bound</span></td>
+                      <td class="col-actions"><div class="rowact"><button class="iconbtn" title="Revoke EAB key" aria-label="Revoke EAB key eab_2Qp…tZ9"><svg class="ico"><use href="icons.svg#i-ban"></use></svg></button></div></td>
+                    </tr>
+                    <tr>
+                      <td><span class="mono subtle">eab_9Lr…xC0</span></td>
+                      <td class="mono">k8s-cert-manager</td>
+                      <td class="muted subtle">— not yet used</td>
+                      <td class="nowrap muted">2026-06-08</td>
+                      <td><span class="badge badge--warn"><svg class="ico"><use href="icons.svg#i-clock"></use></svg>Pending</span></td>
+                      <td class="col-actions"><div class="rowact"><button class="iconbtn" title="Revoke EAB key" aria-label="Revoke EAB key eab_9Lr…xC0"><svg class="ico"><use href="icons.svg#i-ban"></use></svg></button></div></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="js/ui.js"></script>
+</body>
+</html>
