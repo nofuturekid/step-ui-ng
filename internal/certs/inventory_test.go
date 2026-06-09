@@ -535,6 +535,187 @@ func mustParseKey(t *testing.T, pemBytes []byte) any {
 	return nil
 }
 
+// --- Provisioner capture & filter (backlog item ②) --------------------------
+
+// TestIssueRecordsProvisionerName asserts that Issue writes the provisioner
+// name into the DB row. Without this the column stays NULL for newly issued
+// certs, which defeats the purpose of the feature.
+func TestIssueRecordsProvisionerName(t *testing.T) {
+	svc, db, _, _ := testService(t)
+	cert, err := svc.Issue(context.Background(), certs.IssueParams{
+		Actor: "alice", ProvisionerName: "my-jwk-prov", Password: "x",
+		CAURL: "https://ca.test", Fingerprint: "fp",
+		CN: "prov-issue.test", ValidityDays: 30, Format: certs.FormatPEM,
+	})
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+
+	var prov sql.NullString
+	if err := db.QueryRow(`SELECT provisioner FROM certificates WHERE id=?`, cert.ID).Scan(&prov); err != nil {
+		t.Fatalf("read provisioner: %v", err)
+	}
+	if !prov.Valid || prov.String != "my-jwk-prov" {
+		t.Fatalf("Issue: stored provisioner = %v, want 'my-jwk-prov'", prov)
+	}
+}
+
+// TestSignRecordsProvisionerName asserts that Sign (CSR path) also writes the
+// provisioner name into the DB row.
+func TestSignRecordsProvisionerName(t *testing.T) {
+	svc, db, _, _ := testService(t)
+	csrPEM := buildClientCSR(t, "prov-sign.test", nil, nil, nil, nil)
+	cert, err := svc.Sign(context.Background(), certs.SignParams{
+		Actor: "bob", ProvisionerName: "my-csr-prov", Password: "x",
+		CAURL: "https://ca.test", Fingerprint: "fp",
+		CSRPEM: csrPEM, ValidityDays: 10,
+	})
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+
+	var prov sql.NullString
+	if err := db.QueryRow(`SELECT provisioner FROM certificates WHERE id=?`, cert.ID).Scan(&prov); err != nil {
+		t.Fatalf("read provisioner: %v", err)
+	}
+	if !prov.Valid || prov.String != "my-csr-prov" {
+		t.Fatalf("Sign: stored provisioner = %v, want 'my-csr-prov'", prov)
+	}
+}
+
+// TestListProvisionerFieldPopulated asserts that List returns the Provisioner
+// field from the DB row; non-NULL rows carry the value, NULL rows carry "".
+func TestListProvisionerFieldPopulated(t *testing.T) {
+	svc, db, _, _ := testService(t)
+	now := time.Now()
+	idWith := seedCertWithProvisioner(t, db, "with-prov.test", "valid", now.Add(30*24*time.Hour).Unix(), "acme-prov")
+	idNull := seedCert(t, db, "null-prov.test", `["null-prov.test"]`, "valid", now.Add(30*24*time.Hour).Unix())
+
+	list, err := svc.List(context.Background(), certs.ListFilter{})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	m := make(map[int64]string)
+	for _, it := range list {
+		m[it.ID] = it.Provisioner
+	}
+	if m[idWith] != "acme-prov" {
+		t.Errorf("Provisioner for idWith = %q, want acme-prov", m[idWith])
+	}
+	if m[idNull] != "" {
+		t.Errorf("Provisioner for idNull = %q, want empty string (NULL maps to \"\")", m[idNull])
+	}
+}
+
+// TestListFilterByProvisioner asserts that ListFilter.Provisioner restricts
+// results to rows with that provisioner, and that empty Provisioner shows all rows
+// including those with NULL provisioner.
+func TestListFilterByProvisioner(t *testing.T) {
+	svc, db, _, _ := testService(t)
+	now := time.Now()
+
+	seedCertWithProvisioner(t, db, "prov-alpha.test", "valid", now.Add(30*24*time.Hour).Unix(), "alpha-prov")
+	seedCertWithProvisioner(t, db, "prov-beta.test", "valid", now.Add(30*24*time.Hour).Unix(), "beta-prov")
+	seedCert(t, db, "prov-null.test", `["prov-null.test"]`, "valid", now.Add(30*24*time.Hour).Unix())
+
+	// No provisioner filter → all three rows returned.
+	all, err := svc.List(context.Background(), certs.ListFilter{})
+	if err != nil {
+		t.Fatalf("List all: %v", err)
+	}
+	if len(all) < 3 {
+		t.Fatalf("List all: got %d rows, want ≥ 3", len(all))
+	}
+
+	// Filter by "alpha-prov" → only prov-alpha.test.
+	alpha, err := svc.List(context.Background(), certs.ListFilter{Provisioner: "alpha-prov"})
+	if err != nil {
+		t.Fatalf("List alpha: %v", err)
+	}
+	if len(alpha) != 1 || alpha[0].CN != "prov-alpha.test" {
+		t.Errorf("List alpha: got %v, want [prov-alpha.test]", cnList(alpha))
+	}
+
+	// Filter by "beta-prov" → only prov-beta.test.
+	beta, err := svc.List(context.Background(), certs.ListFilter{Provisioner: "beta-prov"})
+	if err != nil {
+		t.Fatalf("List beta: %v", err)
+	}
+	if len(beta) != 1 || beta[0].CN != "prov-beta.test" {
+		t.Errorf("List beta: got %v, want [prov-beta.test]", cnList(beta))
+	}
+
+	// Filter by "beta-prov" must NOT include NULL-provisioner rows.
+	for _, it := range beta {
+		if it.CN == "prov-null.test" {
+			t.Error("provisioner filter 'beta-prov' must not include NULL-provisioner row")
+		}
+	}
+}
+
+// TestListFiltersCompose asserts that status, provisioner, and search filters
+// all apply together (AND semantics). This would fail if any filter was
+// short-circuiting the others.
+func TestListFiltersCompose(t *testing.T) {
+	svc, db, _, _ := testService(t)
+	now := time.Now()
+
+	// active + alpha-prov + "compose" in CN
+	seedCertWithProvisioner(t, db, "compose-alpha.test", "valid", now.Add(30*24*time.Hour).Unix(), "alpha-prov")
+	// active + beta-prov + "compose" in CN
+	seedCertWithProvisioner(t, db, "compose-beta.test", "valid", now.Add(30*24*time.Hour).Unix(), "beta-prov")
+	// expired + alpha-prov + "compose" in CN
+	seedCertWithProvisioner(t, db, "compose-expired.test", "valid", now.Add(-24*time.Hour).Unix(), "alpha-prov")
+
+	result, err := svc.List(context.Background(), certs.ListFilter{
+		Status:      "active",
+		Provisioner: "alpha-prov",
+		Search:      "compose",
+	})
+	if err != nil {
+		t.Fatalf("List compose: %v", err)
+	}
+	if len(result) != 1 || result[0].CN != "compose-alpha.test" {
+		t.Errorf("compose filter: got %v, want [compose-alpha.test]", cnList(result))
+	}
+}
+
+// TestListDistinctProvisioners asserts that ListProvisioners returns the
+// distinct non-NULL provisioner names present in the DB, sorted, with no
+// duplicates. NULL rows must be excluded (they are not selectable filter values).
+func TestListDistinctProvisioners(t *testing.T) {
+	svc, db, _, _ := testService(t)
+	now := time.Now()
+
+	seedCertWithProvisioner(t, db, "dp-a1.test", "valid", now.Add(30*24*time.Hour).Unix(), "acme")
+	seedCertWithProvisioner(t, db, "dp-a2.test", "valid", now.Add(30*24*time.Hour).Unix(), "acme")
+	seedCertWithProvisioner(t, db, "dp-b.test", "valid", now.Add(30*24*time.Hour).Unix(), "jwk")
+	seedCert(t, db, "dp-null.test", `["dp-null.test"]`, "valid", now.Add(30*24*time.Hour).Unix())
+
+	provs, err := svc.ListProvisioners(context.Background())
+	if err != nil {
+		t.Fatalf("ListProvisioners: %v", err)
+	}
+
+	// Must contain "acme" and "jwk" exactly once each.
+	seen := make(map[string]int)
+	for _, p := range provs {
+		seen[p]++
+	}
+	if seen["acme"] != 1 {
+		t.Errorf("ListProvisioners: 'acme' appears %d times, want 1; got %v", seen["acme"], provs)
+	}
+	if seen["jwk"] != 1 {
+		t.Errorf("ListProvisioners: 'jwk' appears %d times, want 1; got %v", seen["jwk"], provs)
+	}
+	// NULL provisioner must not appear in the list.
+	for _, p := range provs {
+		if p == "" {
+			t.Error("ListProvisioners: empty string (NULL) must not appear in distinct list")
+		}
+	}
+}
+
 // seedCert inserts a minimal certificate row directly into the DB (bypasses the
 // CA signer) so filter tests can control status / not_after precisely.
 func seedCert(t *testing.T, db *sql.DB, cn, sansJSON, status string, notAfter int64) int64 {
@@ -550,6 +731,32 @@ func seedCert(t *testing.T, db *sql.DB, cn, sansJSON, status string, notAfter in
 	}
 	id, _ := res.LastInsertId()
 	return id
+}
+
+// seedCertWithProvisioner inserts a minimal cert row with a provisioner name set.
+func seedCertWithProvisioner(t *testing.T, db *sql.DB, cn, status string, notAfter int64, provisioner string) int64 {
+	t.Helper()
+	ts := time.Now().Unix()
+	sansJSON := `["` + cn + `"]`
+	res, err := db.Exec(`INSERT INTO certificates
+		(cn, sans_json, serial, not_before, not_after, status, key_strategy,
+		 cert_pem, chain_pem, fullchain_pem, privkey_sealed, created_by, created_at, updated_at, provisioner)
+		VALUES (?, ?, ?, ?, ?, ?, 'csr', 'certpem', 'chainpem', 'fullchainpem', NULL, 'test', ?, ?, ?)`,
+		cn, sansJSON, "serial-"+cn, ts, notAfter, status, ts, ts, provisioner)
+	if err != nil {
+		t.Fatalf("seedCertWithProvisioner %s: %v", cn, err)
+	}
+	id, _ := res.LastInsertId()
+	return id
+}
+
+// cnList returns a slice of CN strings from InventoryItems for diagnostic output.
+func cnList(items []certs.InventoryItem) []string {
+	out := make([]string, len(items))
+	for i, it := range items {
+		out[i] = it.CN
+	}
+	return out
 }
 
 // keys returns the keys of a bool map for diagnostic output.

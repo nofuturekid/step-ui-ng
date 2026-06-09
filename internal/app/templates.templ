@@ -1354,6 +1354,13 @@ templ inventoryPage(d pageData, v inventoryView) {
 							@invStatusOption("expired", "Expired", v.Filter.Status)
 							@invStatusOption("revoked", "Revoked", v.Filter.Status)
 						</select>
+						<label class="visually-hidden" for="inv-provisioner">Provisioner</label>
+						<select class="select" id="inv-provisioner" name="provisioner" style="max-width:200px">
+							@invProvisionerOption("", "All provisioners", v.Filter.Provisioner)
+							for _, p := range v.Provisioners {
+								@invProvisionerOption(p, p, v.Filter.Provisioner)
+							}
+						</select>
 					</form>
 					<div id="inventory-table">
 						@inventoryTable(d, v)
@@ -1372,15 +1379,22 @@ templ invStatusOption(val, label, current string) {
 	}
 }
 
+templ invProvisionerOption(val, label, current string) {
+	if val == current {
+		<option value={ val } selected>{ label }</option>
+	} else {
+		<option value={ val }>{ label }</option>
+	}
+}
+
 // inventoryTable is the htmx-swappable table partial for the inventory list.
 // It is the hx-target="#inventory-table" swap target; it must be renderable
-// standalone (no surrounding layout).  Columns: Common name, Status, Expires,
-// Serial, Actions.
+// standalone (no surrounding layout).  Columns: Common name, Provisioner,
+// Status, Expires, Serial, Actions.
 //
 // Columns present in the mock but not yet backed by our data model are omitted
 // (see FLAGS in the implementation report):
 //   - Type (Leaf · server/client)  — FLAG: no field in InventoryItem
-//   - Provisioner                  — FLAG: no field in InventoryItem
 //   - Fingerprint (truncated hex)  — FLAG: no field in InventoryItem
 templ inventoryTable(d pageData, v inventoryView) {
 	if len(v.Items) == 0 {
@@ -1391,6 +1405,7 @@ templ inventoryTable(d pageData, v inventoryView) {
 				<thead>
 					<tr>
 						<th scope="col">Common name</th>
+						<th scope="col">Provisioner</th>
 						<th scope="col">Status</th>
 						<th scope="col">Expires</th>
 						<th scope="col">Serial</th>
@@ -1409,10 +1424,19 @@ templ inventoryTable(d pageData, v inventoryView) {
 
 // inventoryRow renders a single inventory row.
 // The link on the CN and the chevron-right icon both navigate to the detail page.
+// The Provisioner cell shows the recorded provisioner name, or a muted "—" for
+// pre-migration rows (NULL provisioner).
 templ inventoryRow(d pageData, item certs.InventoryItem) {
 	<tr>
 		<td>
 			<a class="rowlink cn-cell" href={ templ.SafeURL("/certificates/" + strconv.FormatInt(item.ID, 10)) } title={ item.CN }>{ item.CN }</a>
+		</td>
+		<td>
+			if item.Provisioner != "" {
+				<span class="mono">{ item.Provisioner }</span>
+			} else {
+				<span class="muted">—</span>
+			}
 		</td>
 		<td>@statusBadge(item.Status, item.DaysLeft)</td>
 		<td class="nowrap">@expiryCell(item.NotAfter, item.DaysLeft, item.Status)</td>

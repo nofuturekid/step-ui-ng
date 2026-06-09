@@ -29,15 +29,23 @@ import (
 //
 //	?status=active|expired|revoked  — derives status from not_after + DB status.
 //	?q=<text>                       — substring search over CN/SAN.
+//	?provisioner=<name>             — exact match on recorded provisioner name.
 //
 // htmx: when the request carries HX-Request the response replaces only the
 // table partial (hx-target="#inventory-table"), keeping the layout intact.
 func (s *server) getInventory(w http.ResponseWriter, r *http.Request) {
 	filter := certs.ListFilter{
-		Status: r.URL.Query().Get("status"),
-		Search: r.URL.Query().Get("q"),
+		Status:      r.URL.Query().Get("status"),
+		Search:      r.URL.Query().Get("q"),
+		Provisioner: r.URL.Query().Get("provisioner"),
 	}
 	list, err := s.certs.List(r.Context(), filter)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	provisioners, err := s.certs.ListProvisioners(r.Context())
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -46,7 +54,7 @@ func (s *server) getInventory(w http.ResponseWriter, r *http.Request) {
 	d := s.page(r, "Certificates")
 	d.Wide = true // data-heavy table: render at the wider content width
 	d.ActiveSection = "/inventory"
-	v := inventoryView{Filter: filter, Items: list}
+	v := inventoryView{Filter: filter, Items: list, Provisioners: provisioners}
 
 	if r.Header.Get("HX-Request") == "true" {
 		// htmx live-filter: replace only the table partial.
@@ -148,8 +156,9 @@ func (s *server) postCertDownload(w http.ResponseWriter, r *http.Request) {
 
 // inventoryView carries the data for the inventory page.
 type inventoryView struct {
-	Filter certs.ListFilter
-	Items  []certs.InventoryItem
+	Filter       certs.ListFilter
+	Items        []certs.InventoryItem
+	Provisioners []string // distinct provisioner names for the filter dropdown
 }
 
 // registerInventoryRoutes wires the inventory routes into mux. Separated so

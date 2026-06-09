@@ -43,6 +43,10 @@ type ListFilter struct {
 	// Search restricts results to rows where cn or sans_json contains the
 	// substring (case-insensitive).  Empty means no filter.
 	Search string
+	// Provisioner restricts results to certs issued/signed by this provisioner
+	// name (exact match against the stored provisioner column).  Empty means
+	// no filter (all rows including NULL provisioner).
+	Provisioner string
 }
 
 // InventoryItem is the projected row returned by List (a subset of Certificate
@@ -57,6 +61,7 @@ type InventoryItem struct {
 	Status       string // derived: active | expired | revoked
 	DaysLeft     int    // positive = days until expiry; negative = days past expiry
 	KeyStrategy  string
+	Provisioner  string // empty for pre-migration rows (NULL in DB)
 }
 
 // DeriveStatus derives the display status and days-until-expiry from the
@@ -89,18 +94,15 @@ func DeriveStatus(storedStatus string, notAfter int64) (status string, daysLeft 
 // Status filtering is performed in Go (not SQL) because it mixes DB state with
 // derived status (expired = not_after in the past, which is not stored in the
 // DB status column — spec/0008 will update status on revoke but not on expiry).
+// Provisioner filtering is pushed into SQL (exact match) for efficiency.
 func (s *Service) List(ctx context.Context, f ListFilter) ([]InventoryItem, error) {
-	// Base query: all rows, optional CN/SAN substring filter (case-insensitive).
-	// SQLite LIKE is case-insensitive for ASCII by default.
+	// Build WHERE clauses dynamically. We always select provisioner.
 	var (
-		rows *sql.Rows
-		err  error
+		clauses []string
+		args    []any
 	)
-	if f.Search == "" {
-		rows, err = s.db.QueryContext(ctx,
-			`SELECT id, cn, sans_json, serial, not_after, status, key_strategy
-			   FROM certificates ORDER BY created_at DESC`)
-	} else {
+
+	if f.Search != "" {
 		// Escape the LIKE special characters in the search term so they are
 		// treated as literals. The ESCAPE clause uses '\' as the escape
 		// character, so we must also escape any literal '\' in the input.
@@ -109,13 +111,23 @@ func (s *Service) List(ctx context.Context, f ListFilter) ([]InventoryItem, erro
 		escaped = strings.ReplaceAll(escaped, `%`, `\%`)
 		escaped = strings.ReplaceAll(escaped, `_`, `\_`)
 		like := "%" + escaped + "%"
-		rows, err = s.db.QueryContext(ctx,
-			`SELECT id, cn, sans_json, serial, not_after, status, key_strategy
-			   FROM certificates
-			  WHERE cn LIKE ? ESCAPE '\' OR sans_json LIKE ? ESCAPE '\'
-			  ORDER BY created_at DESC`,
-			like, like)
+		clauses = append(clauses, `(cn LIKE ? ESCAPE '\' OR sans_json LIKE ? ESCAPE '\')`)
+		args = append(args, like, like)
 	}
+
+	if f.Provisioner != "" {
+		clauses = append(clauses, `provisioner = ?`)
+		args = append(args, f.Provisioner)
+	}
+
+	query := `SELECT id, cn, sans_json, serial, not_after, status, key_strategy, provisioner
+	            FROM certificates`
+	if len(clauses) > 0 {
+		query += ` WHERE ` + strings.Join(clauses, ` AND `)
+	}
+	query += ` ORDER BY created_at DESC`
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("certs: list: %w", err)
 	}
@@ -125,12 +137,16 @@ func (s *Service) List(ctx context.Context, f ListFilter) ([]InventoryItem, erro
 	for rows.Next() {
 		var it InventoryItem
 		var sansJSON string
+		var provNullable sql.NullString
 		if err := rows.Scan(&it.ID, &it.CN, &sansJSON, &it.Serial,
-			&it.NotAfter, &it.StoredStatus, &it.KeyStrategy); err != nil {
+			&it.NotAfter, &it.StoredStatus, &it.KeyStrategy, &provNullable); err != nil {
 			return nil, fmt.Errorf("certs: list scan: %w", err)
 		}
 		_ = json.Unmarshal([]byte(sansJSON), &it.SANs)
 		it.Status, it.DaysLeft = DeriveStatus(it.StoredStatus, it.NotAfter)
+		if provNullable.Valid {
+			it.Provisioner = provNullable.String
+		}
 
 		// Apply status filter (derived, not stored).
 		// "expiring" is a display-only sub-status: active certs with DaysLeft ≤
@@ -152,6 +168,33 @@ func (s *Service) List(ctx context.Context, f ListFilter) ([]InventoryItem, erro
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("certs: list rows: %w", err)
+	}
+	return out, nil
+}
+
+// ListProvisioners returns the distinct non-NULL provisioner names recorded in
+// the certificates table, sorted alphabetically. NULL rows are excluded (they
+// represent pre-migration certs and are not selectable as filter values).
+func (s *Service) ListProvisioners(ctx context.Context) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT DISTINCT provisioner FROM certificates
+		  WHERE provisioner IS NOT NULL AND provisioner != ''
+		  ORDER BY provisioner`)
+	if err != nil {
+		return nil, fmt.Errorf("certs: list provisioners: %w", err)
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			return nil, fmt.Errorf("certs: list provisioners scan: %w", err)
+		}
+		out = append(out, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("certs: list provisioners rows: %w", err)
 	}
 	return out, nil
 }

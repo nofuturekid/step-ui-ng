@@ -177,7 +177,8 @@ const certsSchema = `CREATE TABLE certificates (
 	key_strategy TEXT NOT NULL CHECK (key_strategy IN ('server','csr')),
 	cert_pem TEXT NOT NULL, chain_pem TEXT NOT NULL, fullchain_pem TEXT NOT NULL,
 	privkey_sealed TEXT, created_by TEXT NOT NULL,
-	created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+	created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+	provisioner TEXT
 ) STRICT;`
 
 const auditSchema = `CREATE TABLE audit_events (
