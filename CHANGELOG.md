@@ -55,6 +55,17 @@ Versions are bumped only when a release is cut; in-progress work lives under
   save) — matching the admin secret's "leave blank to keep"; switching to a _different_
   provisioner with a blank secret still clears it.
 
+### Removed
+
+- **Vestigial CA-settings admin fields** (`admin_provisioner`, `admin_subject`,
+  `admin_secret_sealed`) removed from `ca_settings`. Nothing in the codebase read
+  these columns: certificate issuance uses the selected provisioner (spec/0005) and
+  admin-API authentication uses the admin-authentication methods (spec/0012). Migration
+  `0007_drop_unused_admin_fields.sql` drops the three columns; the CA-connection form
+  no longer shows the admin-secret inputs. The CA-URL input is now styled consistently
+  with other text fields (`input[type="url"]` added to the shared input rule in
+  `app.css`).
+
 ### Changed
 
 - Corrected spec 0012 (dual admin auth) and recorded **ADR-0018** after verifying against

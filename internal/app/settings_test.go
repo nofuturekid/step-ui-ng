@@ -29,50 +29,6 @@ import (
 // A valid 64-hex placeholder used where the value must NOT match a real CA.
 const fakeFP = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 
-// --- Acceptance: secret is write-only and never sent to the browser (FR-5) ---
-
-// Saving an admin secret, then reloading, shows the field as "set" and the
-// plaintext value never appears in the response body.
-func TestSettingsSecretNeverSentToBrowser(t *testing.T) {
-	e := newTestEnv(t)
-	e.completeSetup(t, "root")
-	const secret = "top-secret-admin-password-9876"
-
-	token := e.csrfToken(t, "/settings")
-	resp := e.post(t, "/settings", url.Values{
-		"csrf_token":       {token},
-		"ca_url":           {"https://ca.example:9000"},
-		"root_fingerprint": {fakeFP},
-		"admin_secret":     {secret},
-	})
-	if resp.StatusCode != http.StatusSeeOther {
-		t.Fatalf("save status = %d, want 303", resp.StatusCode)
-	}
-
-	// Reload: secret shows as "set", and the plaintext is absent from the page.
-	r2, body := e.get(t, "/settings")
-	if r2.StatusCode != http.StatusOK {
-		t.Fatalf("GET /settings = %d, want 200", r2.StatusCode)
-	}
-	if strings.Contains(body, secret) {
-		t.Fatal("the plaintext admin secret leaked into the /settings page")
-	}
-	// The "set" indicator must be present (it follows the Admin secret label).
-	if !strings.Contains(body, "set") {
-		t.Fatal("expected a 'set' indicator for the stored secret")
-	}
-
-	// Defence in depth: the stored column must be sealed, not plaintext.
-	var sealed string
-	if err := e.db.QueryRowContext(context.Background(),
-		"SELECT admin_secret_sealed FROM ca_settings WHERE id = 1").Scan(&sealed); err != nil {
-		t.Fatalf("read sealed: %v", err)
-	}
-	if sealed == "" || sealed == secret {
-		t.Fatalf("admin secret not sealed at rest (got %q)", sealed)
-	}
-}
-
 // --- Acceptance: invalid CA URL → validation rejects (FR-4) ------------------
 
 func TestSettingsInvalidURLRejected(t *testing.T) {

@@ -266,24 +266,6 @@ templ settingsPage(d pageData, v settings.View) {
 				<input id="ca_url" name="ca_url" type="url" inputmode="url" required placeholder="https://ca.example:9000" value={ v.CAURL }/>
 				<label for="root_fingerprint">Root fingerprint (SHA-256 hex)</label>
 				<input id="root_fingerprint" name="root_fingerprint" type="text" required minlength="40" maxlength="64" pattern="[0-9a-fA-F]{40,64}" value={ v.RootFingerprint }/>
-				<label for="admin_provisioner">Admin provisioner (optional)</label>
-				<input id="admin_provisioner" name="admin_provisioner" type="text" value={ v.AdminProvisioner }/>
-				<label for="admin_subject">Admin subject (optional)</label>
-				<input id="admin_subject" name="admin_subject" type="text" value={ v.AdminSubject }/>
-				<label for="admin_secret">
-					Admin secret
-					if v.HasAdminSecret {
-						<span class="badge">set</span>
-					} else {
-						<span class="badge">empty</span>
-					}
-				</label>
-				<input id="admin_secret" name="admin_secret" type="password" autocomplete="new-password" placeholder="leave blank to keep the current secret"/>
-				if v.HasAdminSecret {
-					<p class="muted">A secret is stored — leave blank to keep it, or type a new one to replace it.</p>
-				} else {
-					<p class="muted">No secret stored yet.</p>
-				}
 				<button type="submit">Save</button>
 			</form>
 		</div>

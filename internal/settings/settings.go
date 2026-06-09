@@ -1,10 +1,12 @@
 // Package settings owns the single-row CA connection configuration (spec/0004):
-// the CA URL, root fingerprint, optional admin identity and the admin secret.
+// the CA URL and root fingerprint, plus the selected provisioner (0005) and the
+// admin-authentication material (0012), all in one row.
 //
-// The admin secret is sealed with internal/crypto (AES-256-GCM, ADR-0006) before
-// storage and is NEVER decrypted toward the client: callers read a View, which
-// carries only a HasAdminSecret bool, never the plaintext (FR-5). All validation
-// (URL scheme, fingerprint shape; FR-4) lives here so handlers stay thin.
+// Secrets (provisioner password, admin private key, JWK password) are sealed with
+// internal/crypto (AES-256-GCM, ADR-0006) before storage and are NEVER decrypted
+// toward the client: callers read a View, which carries only Has* bools for
+// secrets, never the plaintext (FR-5). All validation (URL scheme, fingerprint
+// shape; FR-4) lives here so handlers stay thin.
 package settings
 
 import (
@@ -26,15 +28,12 @@ var (
 	ErrInvalidFingerprint = errors.New("settings: root_fingerprint must be 40–64 hex chars")
 )
 
-// Input is the write model: it carries the plaintext admin secret (optional).
-// An empty AdminSecret on Save leaves the existing sealed value unchanged
-// (write-only field semantics, FR-5).
+// Input is the write model for the CA connection (CA URL + root fingerprint).
+// Admin identity lives elsewhere: issuance uses the selected provisioner (0005),
+// admin-API auth uses the admin-authentication methods (0012).
 type Input struct {
-	CAURL            string
-	RootFingerprint  string
-	AdminProvisioner string
-	AdminSubject     string
-	AdminSecret      string // plaintext; sealed before storage, never persisted as-is
+	CAURL           string
+	RootFingerprint string
 }
 
 // AdminAuthMethod is the configured admin-authentication method (spec/0012 FR-1).
@@ -57,11 +56,8 @@ const (
 // (FR-5 of 0004; spec/0005). The admin certificate chain is public, so it is
 // carried verbatim; the admin private key is never exposed, only HasAdminKey.
 type View struct {
-	CAURL            string
-	RootFingerprint  string
-	AdminProvisioner string
-	AdminSubject     string
-	HasAdminSecret   bool
+	CAURL           string
+	RootFingerprint string
 	// Provisioner management (spec/0005).
 	SelectedProvisioner string
 	HasSelectedSecret   bool
@@ -96,9 +92,6 @@ var now = func() int64 { return time.Now().Unix() }
 func (r *Repo) Get(ctx context.Context) (View, bool, error) {
 	var (
 		v           View
-		sealed      sql.NullString
-		prov        sql.NullString
-		subj        sql.NullString
 		selProv     sql.NullString
 		selSecret   sql.NullString
 		adminCert   sql.NullString
@@ -109,14 +102,13 @@ func (r *Repo) Get(ctx context.Context) (View, bool, error) {
 		jwkPassword sql.NullString
 	)
 	err := r.db.QueryRowContext(ctx,
-		`SELECT ca_url, root_fingerprint, admin_provisioner, admin_subject,
-		        admin_secret_sealed, selected_provisioner,
+		`SELECT ca_url, root_fingerprint, selected_provisioner,
 		        selected_provisioner_secret_sealed, admin_cert_pem, admin_key_sealed,
 		        admin_auth_method, admin_jwk_subject, admin_jwk_provisioner,
 		        admin_jwk_password_sealed,
 		        created_at, updated_at
 		 FROM ca_settings WHERE id = 1`).
-		Scan(&v.CAURL, &v.RootFingerprint, &prov, &subj, &sealed,
+		Scan(&v.CAURL, &v.RootFingerprint,
 			&selProv, &selSecret, &adminCert, &adminKey,
 			&authMethod, &jwkSubject, &jwkProv, &jwkPassword,
 			&v.CreatedAt, &v.UpdatedAt)
@@ -126,9 +118,6 @@ func (r *Repo) Get(ctx context.Context) (View, bool, error) {
 	if err != nil {
 		return View{}, false, fmt.Errorf("settings: get: %w", err)
 	}
-	v.AdminProvisioner = prov.String
-	v.AdminSubject = subj.String
-	v.HasAdminSecret = sealed.Valid && sealed.String != ""
 	v.SelectedProvisioner = selProv.String
 	v.HasSelectedSecret = selSecret.Valid && selSecret.String != ""
 	v.AdminCertPEM = adminCert.String
@@ -146,9 +135,10 @@ func (r *Repo) Get(ctx context.Context) (View, bool, error) {
 	return v, true, nil
 }
 
-// Save validates and upserts the single settings row. The admin secret is sealed
-// before storage; an empty AdminSecret preserves the existing sealed value
-// (FR-5). The upsert targets the fixed id=1, so there is only ever one row.
+// Save validates and upserts the single settings row (CA URL + root
+// fingerprint). The upsert targets the fixed id=1, so there is only ever one
+// row; created_at is preserved on update, and provisioner/admin-auth state in
+// other columns is left untouched.
 func (r *Repo) Save(ctx context.Context, in Input) error {
 	caURL, err := validateURL(in.CAURL)
 	if err != nil {
@@ -159,34 +149,15 @@ func (r *Repo) Save(ctx context.Context, in Input) error {
 		return err
 	}
 
-	var sealed sql.NullString
-	if in.AdminSecret != "" {
-		s, err := r.box.Seal([]byte(in.AdminSecret))
-		if err != nil {
-			return fmt.Errorf("settings: seal admin secret: %w", err)
-		}
-		sealed = sql.NullString{String: s, Valid: true}
-	}
-
 	ts := now()
-	// Upsert on the fixed primary key. On conflict we update the non-secret
-	// fields always, but only overwrite the sealed secret when a new one was
-	// supplied (excluded.admin_secret_sealed is NULL otherwise) — COALESCE keeps
-	// the existing value. created_at is preserved on update.
 	_, err = r.db.ExecContext(ctx,
-		`INSERT INTO ca_settings
-		   (id, ca_url, root_fingerprint, admin_provisioner, admin_subject,
-		    admin_secret_sealed, created_at, updated_at)
-		 VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO ca_settings (id, ca_url, root_fingerprint, created_at, updated_at)
+		 VALUES (1, ?, ?, ?, ?)
 		 ON CONFLICT(id) DO UPDATE SET
-		   ca_url              = excluded.ca_url,
-		   root_fingerprint    = excluded.root_fingerprint,
-		   admin_provisioner   = excluded.admin_provisioner,
-		   admin_subject       = excluded.admin_subject,
-		   admin_secret_sealed = COALESCE(excluded.admin_secret_sealed, ca_settings.admin_secret_sealed),
-		   updated_at          = excluded.updated_at`,
-		caURL, fp, nullable(in.AdminProvisioner), nullable(in.AdminSubject),
-		sealed, ts, ts)
+		   ca_url           = excluded.ca_url,
+		   root_fingerprint = excluded.root_fingerprint,
+		   updated_at       = excluded.updated_at`,
+		caURL, fp, ts, ts)
 	if err != nil {
 		return fmt.Errorf("settings: save: %w", err)
 	}
@@ -457,14 +428,4 @@ func validateFingerprint(raw string) (string, error) {
 		return "", ErrInvalidFingerprint
 	}
 	return fp, nil
-}
-
-// nullable maps an empty string to a NULL column value, keeping optional fields
-// truly absent rather than empty strings.
-func nullable(s string) sql.NullString {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return sql.NullString{}
-	}
-	return sql.NullString{String: s, Valid: true}
 }
