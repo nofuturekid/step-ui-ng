@@ -23,9 +23,7 @@ Versions are bumped only when a release is cut; in-progress work lives under
   request is a genuine filter call (`HX-Request` without `HX-Boosted`).
 - **Navigation no longer flashes/reloads the whole page.** The authenticated
   layout opts into htmx boosting (`hx-boost`), so same-origin links and forms
-  swap the page body instead of doing a full reload. A subtle top progress bar
-  (`#top-progress`, pure CSS via htmx's `hx-indicator`, respecting
-  `prefers-reduced-motion`) shows during navigation. No custom JS; pre-auth
+  swap the page body instead of doing a full reload. No custom JS; pre-auth
   pages stay unboosted.
 
 - **Layout: narrow pages are now centered and the column no longer shifts
@@ -36,6 +34,11 @@ Versions are bumped only when a release is cut; in-progress work lives under
   scrollbar width when moving between short and tall pages.
 
 ### Changed
+
+- **Top navigation progress indicator removed.** The `#top-progress` bar and its
+  `.progress-bar` CSS rules added alongside the htmx-boosting fix have been
+  removed; the indicator was found too visually distracting. `hx-boost` remains
+  active — navigation still swaps the body without a full reload.
 
 - **Internal cleanup** (backlog ⑤): removed the unused issue key-type field,
   the dead "Settings" breadcrumb link, and the compatibility alias CSS tokens
