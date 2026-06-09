@@ -8,6 +8,30 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+### Fixed
+
+- **Issue / Sign CSR errors are now visible when the CA rejects a request.**
+  Previously, `renderIssueError` / `renderSignError` set `d.Error` (rendered by
+  the layout, outside the `#issue-panel` / `#sign-panel` swap target) and
+  returned HTTP 400. htmx does not swap non-2xx responses by default, and
+  `hx-select` would not include a layout-level error anyway, so the rejection
+  message was silently discarded. The error is now stored in `issueView.Error` /
+  `signView.Error` and rendered inside the panel as a `flash--error` banner; the
+  response is HTTP 200 so htmx swaps it correctly. The no-JS full-page path is
+  also fixed because the error is now in the repopulated form, not in the header.
+- **File downloads no longer fail when navigating a boosted page.** The
+  `hx-boost="true"` attribute on `<body>` (added in v0.4.0-beta.1) intercepted
+  file-download forms and data-URI anchors, routing them through XHR so the
+  browser never received a file. Added `hx-boost="false"` to: the cert-detail
+  "Download bundle" `<form>`, the issue-success "Download private key" `<a>`,
+  and the issue-success "Download PKCS#12 bundle" `<a>`.
+- **Cert-detail private-key description is now accurate for both key strategies.**
+  The previous copy ("The private key is never stored or displayed by NextGen UI")
+  was false for `key_strategy=server` certificates, where the key is sealed at
+  rest and included in the downloadable bundle. The description now branches on
+  `c.KeyStrategy`: server certs state the key is sealed and in the bundle; CSR
+  certs state the UI never held the private key.
+
 ## [0.4.0-beta.1] - 2026-06-09
 
 ### Fixed

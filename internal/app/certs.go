@@ -22,6 +22,7 @@ type issueView struct {
 	Format            string
 	ActiveProvisioner string // empty when none is selected
 	Result            *certs.Certificate
+	Error             string // non-empty when the CA or validation rejected the request
 }
 
 // signView carries the sign-csr form's prior input and the result.
@@ -30,6 +31,7 @@ type signView struct {
 	Validity          string
 	ActiveProvisioner string // empty when none is selected
 	Result            *certs.Certificate
+	Error             string // non-empty when the CA or validation rejected the request
 }
 
 // getIssue renders the issue form (admin+).
@@ -174,8 +176,8 @@ type issuanceConn struct {
 }
 
 // issuanceConn resolves CA settings + the selected provisioner secret, rendering
-// a clear 400 on the issue page if anything is missing (FR-5). ok is false when
-// the caller should stop.
+// a clear in-panel error on the issue page if anything is missing (FR-5). ok is
+// false when the caller should stop.
 func (s *server) issuanceConn(w http.ResponseWriter, r *http.Request, view *issueView) (issuanceConn, bool) {
 	conn, msg := s.resolveConn(r)
 	if msg != "" {
@@ -224,20 +226,24 @@ func (s *server) resolveConn(r *http.Request) (issuanceConn, string) {
 	}, ""
 }
 
-// renderIssueError re-renders the issue form with the prior input and an error.
+// renderIssueError re-renders the issue form with the prior input and an
+// in-panel error. The response is HTTP 200 so htmx swaps the panel
+// (htmx does not swap non-2xx by default). The error is in view.Error so
+// it is rendered inside #issue-panel, not in the layout-level d.Error.
 func (s *server) renderIssueError(w http.ResponseWriter, r *http.Request, view issueView, msg string) {
 	d := s.page(r, "Issue certificate")
 	d.ActiveSection = "/issue"
-	d.Error = msg
-	s.render(w, r, http.StatusBadRequest, issuePage(d, view))
+	view.Error = msg
+	s.render(w, r, http.StatusOK, issuePage(d, view))
 }
 
-// renderSignError re-renders the sign form with the prior input and an error.
+// renderSignError re-renders the sign form with the prior input and an
+// in-panel error. The response is HTTP 200 so htmx swaps the panel.
 func (s *server) renderSignError(w http.ResponseWriter, r *http.Request, view signView, msg string) {
 	d := s.page(r, "Sign CSR")
 	d.ActiveSection = "/sign-csr"
-	d.Error = msg
-	s.render(w, r, http.StatusBadRequest, signCSRPage(d, view))
+	view.Error = msg
+	s.render(w, r, http.StatusOK, signCSRPage(d, view))
 }
 
 // parseValidity parses a positive day count; 0/empty is rejected so the request
