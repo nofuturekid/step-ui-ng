@@ -10,6 +10,12 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Fixed
 
+- **Inventory no longer collapses to the "no certificates match" line when
+  navigated to via boosted links.** A boosted navigation sends `HX-Request`
+  _and_ `HX-Boosted`; the handler treated any `HX-Request` as a live-filter
+  call and returned only the table fragment, so the boosted body swap replaced
+  the whole page with the bare table. It now returns the full page unless the
+  request is a genuine filter call (`HX-Request` without `HX-Boosted`).
 - **Navigation no longer flashes/reloads the whole page.** The authenticated
   layout opts into htmx boosting (`hx-boost`), so same-origin links and forms
   swap the page body instead of doing a full reload. A subtle top progress bar

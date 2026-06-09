@@ -109,9 +109,13 @@ func (s *server) getInventory(w http.ResponseWriter, r *http.Request) {
 		RangeTo:      rangeTo,
 	}
 
-	if r.Header.Get("HX-Request") == "true" {
-		// htmx live-filter: replace only the table partial (which includes the
-		// pagination footer so the footer also refreshes on filter changes).
+	// Return the table partial ONLY for a live-filter request from the filter
+	// form (HX-Request). A boosted full-page navigation (hx-boost) also sends
+	// HX-Request but additionally sets HX-Boosted — that must receive the whole
+	// page, not just the table fragment, otherwise the boosted body swap would
+	// replace the entire page with a bare table (or the "no certificates match"
+	// line). See the filter form's hx-target="#inventory-table".
+	if r.Header.Get("HX-Request") == "true" && r.Header.Get("HX-Boosted") != "true" {
 		s.render(w, r, http.StatusOK, inventoryTable(d, v))
 		return
 	}

@@ -289,6 +289,38 @@ func TestInventoryHTMXPartial(t *testing.T) {
 	}
 }
 
+// TestInventoryBoostedNavReturnsFullPage guards the hx-boost regression: a
+// boosted navigation sends HX-Request:true AND HX-Boosted:true. Unlike the
+// live-filter request (HX-Request only, which returns the bare table partial),
+// a boosted nav must receive the FULL page — otherwise htmx swaps the whole
+// <body> with just the table fragment (e.g. the "no certificates match" line),
+// destroying the topbar and filter bar.
+func TestInventoryBoostedNavReturnsFullPage(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	req, err := http.NewRequest(http.MethodGet, e.srv.URL+"/inventory", nil)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("HX-Boosted", "true")
+	resp, err := e.client.Do(req)
+	if err != nil {
+		t.Fatalf("GET /inventory (boosted): %v", err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	body := string(b)
+	// A boosted response must carry the full chrome, not just the table.
+	if !strings.Contains(body, `class="topbar"`) {
+		t.Error("boosted nav: response is missing the topbar (returned only the partial)")
+	}
+	if !strings.Contains(body, `class="filterbar"`) {
+		t.Error("boosted nav: response is missing the filter bar (returned only the partial)")
+	}
+}
+
 // TestCertDetailPageHead verifies the cert detail page renders the new
 // page-head with breadcrumb, page-title (the CN), and the status badge.
 func TestCertDetailPageHead(t *testing.T) {
