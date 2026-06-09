@@ -54,10 +54,24 @@ are bumped only at releases — ADR-0011).
 
 ### Unraid
 
-An Unraid Community-Applications template is provided at
-[`deploy/unraid/step-ui-ng.xml`](deploy/unraid/step-ui-ng.xml).
+Two Unraid Community-Applications templates are provided — the full stack:
 
-Key settings:
+- [`deploy/unraid/step-ui-ng.xml`](deploy/unraid/step-ui-ng.xml) — this web UI.
+- [`deploy/unraid/step-ca.xml`](deploy/unraid/step-ca.xml) — the Smallstep **Step-CA**
+  itself, so you can run the CA and its UI from one source.
+
+To install a single template, copy the `.xml` into
+`/boot/config/plugins/dockerMan/templates-user/` on your Unraid box, then
+**Docker → Add Container** and pick it from the template list.
+
+To use this repository as a **template source** (so both templates appear and stay
+update-tracked), add it as a private template repository — in Community Applications:
+_Settings → Manage repositories_ (or drop the repo URL into
+`/boot/config/plugins/dockerMan/template-repos`). CA scans the repo for `.xml`
+templates; each template's `<TemplateURL>` points back at its raw GitHub path, so edits
+pushed to `main` show up as updates.
+
+#### step-ui-ng — key settings
 
 - **Data path** — map `/data` to an appdata location (e.g. `/mnt/user/appdata/step-ui-ng`).
   This directory holds the SQLite database **and** the master encryption key (`secret.key`).
@@ -80,6 +94,23 @@ changes between betas. See ADR-0015.
 
 App icon URL (resolves once merged to main):
 `https://raw.githubusercontent.com/nofuturekid/step-ui-ng/main/internal/app/static/icon-256.png`
+
+#### step-ca — key settings
+
+- **First-run init** — the `Init: …` variables apply **only** on the first start (empty
+  appdata); they are ignored once the CA is initialized. After the first start, read the
+  admin username/password from `docker logs step-ca` (save them — shown once) and the
+  root fingerprint via `docker exec step-ca step certificate fingerprint certs/root_ca.crt`.
+- **DNS Names** — add your Unraid host IP/hostname to `Init: DNS Names`; these become the
+  CA's TLS SANs, and clients (including step-ui-ng) can only verify names listed there.
+  Keep `localhost,127.0.0.1` so the image's built-in healthcheck stays green.
+- **Remote Management** — left `true` so the Admin API is enabled (a JWK super-admin with
+  a password); required to manage provisioners at runtime.
+- **Appdata** — map `/home/step` to an appdata location (e.g. `/mnt/user/appdata/step-ca`).
+  It holds the root/intermediate keys and config; back it up. Deleting it forces a reinit
+  with a **new root**, invalidating all previously issued certificates.
+
+Point step-ui-ng at the CA with its URL (`https://HOST:9000`) and the root fingerprint.
 
 ## License
 
