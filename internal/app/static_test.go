@@ -194,20 +194,42 @@ func TestNoEmptyAriaCurrent(t *testing.T) {
 	}
 }
 
-// TestBrandWordmarkSingleLine verifies the topbar brand renders the single-line
-// "step-ui-ng" wordmark inside .b1, and that no two-line b2 subtitle appears.
-// The spec calls for a single-line wordmark; the mock's two-line variant is wrong.
-func TestBrandWordmarkSingleLine(t *testing.T) {
+// TestBrandWordmarkTwoLine verifies the topbar brand renders the two-line
+// wordmark: .b1 contains "Step-CA" and .b2 contains "NextGen UI". The brand
+// link must target /inventory and carry the correct aria-label. The old
+// single-line "step-ui-ng" text must be absent.
+func TestBrandWordmarkTwoLine(t *testing.T) {
 	e := newTestEnv(t)
 	e.completeSetup(t, "root")
 
 	_, body := e.get(t, "/inventory")
 
-	// The .b1 span must contain "step-ui-ng".
+	// Brand link must point to /inventory with the correct aria-label.
+	if !strings.Contains(body, `href="/inventory" class="brand"`) {
+		t.Fatalf("topbar: brand link href=\"/inventory\" not found; body:\n%s", body)
+	}
+	if !strings.Contains(body, `aria-label="Step-CA NextGen UI — home"`) {
+		t.Fatalf("topbar: aria-label \"Step-CA NextGen UI — home\" not found; body:\n%s", body)
+	}
+
+	// .b1 must contain "Step-CA".
 	if !strings.Contains(body, `class="b1"`) {
 		t.Fatalf("topbar: missing span with class=\"b1\"; body:\n%s", body)
 	}
-	if !strings.Contains(body, "step-ui-ng") {
-		t.Fatalf("topbar: wordmark \"step-ui-ng\" not found; body:\n%s", body)
+	if !strings.Contains(body, `class="b1">Step-CA`) {
+		t.Fatalf("topbar: .b1 does not contain \"Step-CA\"; body:\n%s", body)
+	}
+
+	// .b2 must contain "NextGen UI".
+	if !strings.Contains(body, `class="b2"`) {
+		t.Fatalf("topbar: missing span with class=\"b2\"; body:\n%s", body)
+	}
+	if !strings.Contains(body, `class="b2">NextGen UI`) {
+		t.Fatalf("topbar: .b2 does not contain \"NextGen UI\"; body:\n%s", body)
+	}
+
+	// The old single-line identifier must be gone.
+	if strings.Contains(body, `class="b1">step-ui-ng`) {
+		t.Fatalf("topbar: old single-line wordmark \"step-ui-ng\" still present; body:\n%s", body)
 	}
 }

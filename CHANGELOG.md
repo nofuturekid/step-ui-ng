@@ -8,6 +8,13 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+### Changed
+
+- **Topbar brand wordmark** updated to the two-line design: `.b1` shows "Step-CA"
+  and `.b2` shows "NextGen UI" (rendered uppercase via existing CSS `text-transform`).
+  The brand link target (`/inventory`) and `aria-label` ("Step-CA NextGen UI — home")
+  are updated to match.
+
 ### Added
 
 - **Users + Audit log pages redesign** (PR G): ports `GET /users` and `GET /audit`
