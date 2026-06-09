@@ -96,6 +96,20 @@ templ layout(d pageData) {
 						navigator.clipboard.writeText(text).then(done, function() { done(); });
 					} else { done(); }
 				});
+				// Progressive enhancement: close details.menu dropdowns on outside click or
+				// Escape. The menu works without JS (native <details> toggle); these handlers
+				// only add click-away and Escape-close. Bound to document (not body) so they
+				// survive hx-boost body swaps.
+				document.addEventListener("click", function(e) {
+					document.querySelectorAll("details.menu[open]").forEach(function(d) {
+						if (!d.contains(e.target)) { d.open = false; }
+					});
+				});
+				document.addEventListener("keydown", function(e) {
+					if (e.key === "Escape") {
+						document.querySelectorAll("details.menu[open]").forEach(function(d) { d.open = false; });
+					}
+				});
 			</script>
 		</head>
 		<body hx-boost="true" hx-indicator="#top-progress">

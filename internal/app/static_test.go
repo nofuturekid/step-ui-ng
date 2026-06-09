@@ -235,6 +235,33 @@ func TestNoEmptyAriaCurrent(t *testing.T) {
 	}
 }
 
+// TestDropdownCloseHandlers verifies that the authenticated layout injects the
+// progressive-enhancement JS handlers that close the main-menu dropdown when
+// the user clicks outside it or presses Escape.
+//
+// The behaviour is NOT unit-testable in Go (it is client-side JS), so this test
+// guards against accidental removal of the handler by asserting the two key
+// fingerprints are present in the served page HTML:
+//
+//   - "details.menu[open]" — the CSS selector that scopes the handler to only the
+//     menu <details>, leaving unrelated <details> untouched.
+//   - "Escape" — the keydown branch that closes the menu on the Escape key.
+//
+// If either marker is absent the progressive-enhancement layer has been removed
+// and click-away / Escape-close will silently regress.
+func TestDropdownCloseHandlers(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+	_, body := e.get(t, "/inventory")
+
+	if !strings.Contains(body, "details.menu[open]") {
+		t.Error("layout <head> script: missing \"details.menu[open]\" selector — click-outside close handler is absent")
+	}
+	if !strings.Contains(body, `"Escape"`) {
+		t.Error("layout <head> script: missing \"Escape\" branch — keydown close handler is absent")
+	}
+}
+
 // TestBrandWordmarkTwoLine verifies the topbar brand renders the two-line
 // wordmark: .b1 contains "Step-CA" and .b2 contains "NextGen UI". The brand
 // link must target /inventory and carry the correct aria-label. The old

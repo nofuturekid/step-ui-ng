@@ -10,6 +10,11 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Fixed
 
+- **The topbar main-menu dropdown now closes on an outside click or Escape.**
+  Native `<details>` only toggles via its summary; a small progressive-enhancement
+  handler (on `document`, so it survives htmx swaps) closes any open
+  `details.menu` when clicking away or pressing Escape. The menu still works
+  without JS.
 - **Inventory no longer collapses to the "no certificates match" line when
   navigated to via boosted links.** A boosted navigation sends `HX-Request`
   _and_ `HX-Boosted`; the handler treated any `HX-Request` as a live-filter
