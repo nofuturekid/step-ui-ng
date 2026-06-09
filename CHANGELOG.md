@@ -10,6 +10,15 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Changed
 
+- **Login and Setup pages redesign** (PR H): `GET /login` and `GET /setup` now
+  use the centered pre-auth layout from the design mock (`docs/design/login.html`,
+  `docs/design/setup.html`). Both pages render their own minimal HTML shell
+  (`authShell`) — no topbar. Auth-layout CSS (`.authwrap`, `.authbrand`,
+  `.authbrand .wordmark .b1/.b2`, `.authbrand .tagline`, `.authfoot`) ported into
+  `internal/app/static/app.css`. No behavior change to handlers, routes, field
+  names (`username`/`password` for login; `username`/`password`/`password_confirm`
+  for setup), validation, CSRF, or first-run gating.
+
 - **Topbar brand wordmark** updated to the two-line design: `.b1` shows "Step-CA"
   and `.b2` shows "NextGen UI" (rendered uppercase via existing CSS `text-transform`).
   The brand link target (`/inventory`) and `aria-label` ("Step-CA NextGen UI — home")
