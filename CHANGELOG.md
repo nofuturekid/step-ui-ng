@@ -10,6 +10,10 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Changed
 
+- **Internal cleanup** (backlog ⑤): removed the unused issue key-type field,
+  the dead "Settings" breadcrumb link, and the compatibility alias CSS tokens
+  left over from the design-system migration (no visual change).
+
 - **Body copy uses the "NextGen UI" brand name** (backlog ⑥): user-facing prose,
   page titles, the setup/login footer, and the certificate-bundle header now read
   "NextGen UI" instead of "step-ui-ng". The header wordmark remains the full

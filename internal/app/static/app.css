@@ -579,7 +579,7 @@ main.wide {
   z-index: 5;
   font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
-  color: var(--muted, #6b6b70);
+  color: var(--text-muted);
   opacity: 0.6;
   pointer-events: none;
   user-select: none;
@@ -1573,7 +1573,7 @@ table.table {
 /* ---- ACME/EAB: one-time HMAC reveal panel -------------------------------- */
 .onetime {
   border: 2px solid var(--warn-border);
-  border-radius: var(--radius);
+  border-radius: var(--r-md);
   background: var(--warn-bg);
   padding: var(--space-4);
 }
@@ -1592,32 +1592,29 @@ table.table {
   color: var(--warn-fg);
 }
 .onetime__body {
-  background: var(--card);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   padding: var(--space-4);
 }
 
 /* =========================================================================
-   Legacy page-interior styles
-   These are used by templates not yet ported to the new design system.
-   They intentionally continue to use old --content-width / --muted /
-   --card tokens (mapped via compatibility aliases in tokens.css).
+   Page-interior styles: cards, definition lists, etc.
    ========================================================================= */
 
 .card {
-  background: var(--card);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--r-md);
   padding: 1.5rem;
   margin-bottom: 1.5rem;
 }
 
 /* Floating surface: Settings dropdown, mobile nav panel chrome */
 .popover {
-  background: var(--card);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--r-md);
   box-shadow: var(--shadow);
 }
 
@@ -1634,9 +1631,9 @@ select {
   width: 100%;
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--r);
   font: inherit;
-  color: var(--fg);
+  color: var(--text);
   background: var(--input-bg);
 }
 
@@ -1646,13 +1643,13 @@ button {
   border: 1px solid var(--accent-strong, var(--accent));
   background: var(--accent-strong, var(--accent));
   color: var(--on-accent);
-  border-radius: var(--radius-sm);
+  border-radius: var(--r);
   cursor: pointer;
 }
 
 button.secondary {
-  background: var(--card);
-  color: var(--fg);
+  background: var(--surface);
+  color: var(--text);
   border-color: var(--border);
 }
 button.danger {
@@ -1675,7 +1672,7 @@ th {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 .actions {
@@ -1689,7 +1686,7 @@ th {
 
 .flash {
   padding: 0.6rem 0.8rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r);
   margin-bottom: 1rem;
 }
 .flash.error {
@@ -1704,7 +1701,7 @@ th {
 }
 
 .muted {
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 /* ACME copy fields/blocks (spec/0010) */

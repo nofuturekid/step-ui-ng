@@ -20,7 +20,6 @@ type issueView struct {
 	SANs              string
 	Validity          string
 	Format            string
-	KeyType           string
 	ActiveProvisioner string // empty when none is selected
 	Result            *certs.Certificate
 }
@@ -37,7 +36,7 @@ type signView struct {
 func (s *server) getIssue(w http.ResponseWriter, r *http.Request) {
 	d := s.page(r, "Issue certificate")
 	d.ActiveSection = "/issue"
-	v := issueView{Validity: "90", Format: "pem", KeyType: "ECDSA P-256"}
+	v := issueView{Validity: "90", Format: "pem"}
 	v.ActiveProvisioner = s.loadActiveProvisioner(r)
 	s.render(w, r, http.StatusOK, issuePage(d, v))
 }
@@ -53,7 +52,6 @@ func (s *server) postIssue(w http.ResponseWriter, r *http.Request) {
 		SANs:              r.PostFormValue("sans"),
 		Validity:          r.PostFormValue("validity"),
 		Format:            r.PostFormValue("format"),
-		KeyType:           r.PostFormValue("keytype"),
 		ActiveProvisioner: s.loadActiveProvisioner(r),
 	}
 
