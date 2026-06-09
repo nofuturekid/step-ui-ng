@@ -10,6 +10,13 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Fixed
 
+- **Navigation no longer flashes/reloads the whole page.** The authenticated
+  layout opts into htmx boosting (`hx-boost`), so same-origin links and forms
+  swap the page body instead of doing a full reload. A subtle top progress bar
+  (`#top-progress`, pure CSS via htmx's `hx-indicator`, respecting
+  `prefers-reduced-motion`) shows during navigation. No custom JS; pre-auth
+  pages stay unboosted.
+
 - **Layout: narrow pages are now centered and the column no longer shifts
   horizontally between pages.** `.content--narrow` (forms: users, CA settings,
   provisioners, issue, sign CSR, ACME) was left-aligned within the centered main
