@@ -8,6 +8,15 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+### Fixed
+
+- **Layout: narrow pages are now centered and the column no longer shifts
+  horizontally between pages.** `.content--narrow` (forms: users, CA settings,
+  provisioners, issue, sign CSR, ACME) was left-aligned within the centered main
+  column; it now centers (`margin-inline: auto`), matching the design mock.
+  Added `scrollbar-gutter: stable` so the centered layout doesn't jump by the
+  scrollbar width when moving between short and tall pages.
+
 ### Changed
 
 - **Internal cleanup** (backlog ⑤): removed the unused issue key-type field,
