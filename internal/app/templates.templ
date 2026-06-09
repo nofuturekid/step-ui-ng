@@ -1867,6 +1867,7 @@ templ auditPage(d pageData, v auditView) {
 									<th scope="col">Action</th>
 									<th scope="col">Target</th>
 									<th scope="col">Details</th>
+									<th scope="col">Result</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -1877,6 +1878,11 @@ templ auditPage(d pageData, v auditView) {
 										<td><span class="tag">{ e.Action }</span></td>
 										<td class="mono cn-cell">{ e.Target }</td>
 										<td class="mono subtle">{ e.Details }</td>
+										if e.Result == "denied" {
+											<td><span class="badge badge--danger"><svg class="ico"><use href="icons.svg#i-x"></use></svg>denied</span></td>
+										} else {
+											<td><span class="badge badge--ok"><span class="dot"></span>ok</span></td>
+										}
 									</tr>
 								}
 							</tbody>

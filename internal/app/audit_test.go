@@ -565,6 +565,102 @@ func TestAuditPageURLEscaping(t *testing.T) {
 	}
 }
 
+// --- Backlog ④: failed login audit recording ------------------------------------
+
+// TestFailedLoginAuditDenied verifies that a POST /login with wrong credentials
+// writes an audit row with action="login", result="denied", actor=attempted username,
+// and target starting "from ". This FAILS if the postLogin handler omits the
+// RecordDenied call or uses the wrong field values.
+func TestFailedLoginAuditDenied(t *testing.T) {
+	e := newTestEnv(t)
+	if _, err := e.repo.Create(context.Background(), "alice", testPassword, users.RoleViewer); err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+
+	token := e.csrfToken(t, "/login")
+	resp := e.post(t, "/login", url.Values{
+		"csrf_token": {token},
+		"username":   {"alice"},
+		"password":   {"wrong-password-xyz"},
+	})
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", resp.StatusCode)
+	}
+
+	ev := e.latestAuditEvent(t, "login")
+	if ev.Result != "denied" {
+		t.Fatalf("failed login audit result = %q, want \"denied\"", ev.Result)
+	}
+	if ev.Who != "alice" {
+		t.Fatalf("failed login audit who = %q, want \"alice\" (attempted username)", ev.Who)
+	}
+	if !strings.HasPrefix(ev.Target, "from ") {
+		t.Fatalf("failed login audit target = %q, want prefix \"from \" (source IP)", ev.Target)
+	}
+	// The password MUST NOT appear anywhere in the event — security invariant.
+	if strings.Contains(ev.Details, "wrong-password") || strings.Contains(ev.Target, "wrong-password") {
+		t.Fatal("SECURITY: password must never be recorded in the audit log")
+	}
+}
+
+// TestFailedLoginAuditUnknownActor verifies that when the submitted username is
+// blank, the audit actor is "unknown" (not empty string). The "unknown" label
+// protects against silently attributing events to an empty who.
+func TestFailedLoginAuditUnknownActor(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root") // need at least one user so first-run gating passes
+
+	// completeSetup leaves us logged in; log out so we can access /login.
+	logoutToken := e.csrfToken(t, "/users")
+	e.post(t, "/logout", url.Values{"csrf_token": {logoutToken}})
+
+	token := e.csrfToken(t, "/login")
+	resp := e.post(t, "/login", url.Values{
+		"csrf_token": {token},
+		"username":   {""},
+		"password":   {"anything"},
+	})
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", resp.StatusCode)
+	}
+
+	// The most recent login-denied event must use "unknown" as actor.
+	events, err := e.auditRec.List(context.Background(), audit.Filter{Action: "login", Limit: 10})
+	if err != nil {
+		t.Fatalf("list audit events: %v", err)
+	}
+	var found bool
+	for _, ev := range events {
+		if ev.Result == "denied" && ev.Who == "unknown" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("no login-denied audit event with who=\"unknown\" found after blank-username attempt")
+	}
+}
+
+// TestSuccessfulLoginAuditResultOK verifies that a successful login still records
+// result="ok" — no regression from the failed-login feature addition.
+func TestSuccessfulLoginAuditResultOK(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+	// completeSetup leaves us logged in via /setup; log out and log back in explicitly
+	// so the /login path records a clean login event.
+	logoutToken := e.csrfToken(t, "/users")
+	e.post(t, "/logout", url.Values{"csrf_token": {logoutToken}})
+	e.loginAs(t, "root")
+
+	ev := e.latestAuditEvent(t, "login")
+	if ev.Who != "root" {
+		t.Fatalf("successful login audit who = %q, want \"root\"", ev.Who)
+	}
+	if ev.Result != "ok" {
+		t.Fatalf("successful login audit result = %q, want \"ok\" (regression guard)", ev.Result)
+	}
+}
+
 // --- LOW: HasMore pagination off-by-one ----------------------------------------
 
 // TestAuditHasMoreBoundary verifies that:

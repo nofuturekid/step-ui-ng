@@ -8,9 +8,9 @@ package app_test
 //   - Filter bar: class="filterbar", action <select> (named "action"), and
 //     the "N events" count display.
 //   - The auditActionOption set includes relevant action values.
-//   - Table: class="table" with Time (UTC)/Actor/Action/Target/Details columns.
-//     There is NO Result column (audit.Event has no Result field; only successful
-//     actions are stored — failures return 4xx without an audit row).
+//   - Table: class="table" with Time (UTC)/Actor/Action/Target/Details/Result
+//     columns. Result renders a badge--ok ("ok") or badge--danger ("denied")
+//     cell; denied rows come from recorded failed login attempts (backlog ④).
 //   - Time column uses UTC format.
 //   - Action column uses a badge/tag element (not plain text).
 //   - Details column renders e.Details (operator context: keyID=…, role=…, etc.).
@@ -103,9 +103,9 @@ func TestAuditDesignFilterBarActionOptions(t *testing.T) {
 }
 
 // TestAuditDesignTableStructure verifies the audit table uses class="table"
-// with the correct column headers: Time (UTC), Actor, Action, Target, Details.
-// There is NO Result column — audit.Event has no Result field, and only
-// successful actions are recorded, so a static badge would be a faked signal.
+// with the correct column headers: Time (UTC), Actor, Action, Target, Details, Result.
+// The Result column carries a real badge (ok/denied) backed by the result field on
+// audit.Event — added in backlog ④ when failed logins began being recorded.
 func TestAuditDesignTableStructure(t *testing.T) {
 	e := newTestEnv(t)
 	e.completeSetup(t, "root")
@@ -118,8 +118,8 @@ func TestAuditDesignTableStructure(t *testing.T) {
 	if !strings.Contains(body, `class="table"`) {
 		t.Error("audit: missing class=\"table\" on audit log table")
 	}
-	// Column headers per the final spec: Time/Actor/Action/Target/Details.
-	for _, col := range []string{"Time", "Actor", "Action", "Target", "Details"} {
+	// Column headers per spec: Time/Actor/Action/Target/Details/Result.
+	for _, col := range []string{"Time", "Actor", "Action", "Target", "Details", "Result"} {
 		if !strings.Contains(body, col) {
 			t.Errorf("audit: missing %q column header", col)
 		}
@@ -128,14 +128,45 @@ func TestAuditDesignTableStructure(t *testing.T) {
 	if !strings.Contains(body, "UTC") {
 		t.Error("audit: Time column header must include UTC designation")
 	}
-	// There must be NO Result column: audit.Event has no Result field; only
-	// successful events are stored, so a static "ok" badge is a faked signal.
-	// A real Result would require recording failures + a schema field (future work).
-	if strings.Contains(body, "<th") && strings.Contains(body, ">Result<") {
-		t.Error("audit: table must NOT have a Result column header (no backing data; see CHANGELOG future work)")
+	// The Result column must render a badge for the seeded 'ok' event.
+	if !strings.Contains(body, "badge--ok") {
+		t.Error("audit: Result column must render badge--ok for successful events")
 	}
-	if strings.Contains(body, "badge--ok") {
-		t.Error("audit: table must NOT render badge--ok Result badges (faked signal; no Result field on audit.Event)")
+}
+
+// TestAuditDesignResultColumnBadges verifies that the Result column renders
+// the correct badge markup for ok and denied events.
+// — ok events: badge--ok with a dot span.
+// — denied events: badge--danger with the i-x SVG icon.
+// This encodes the WHY: the Result column communicates security posture at a glance;
+// a denied badge must be visually distinct from ok to surface failed login attempts.
+func TestAuditDesignResultColumnBadges(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	// Seed a known successful event and a denied event.
+	_ = e.auditRec.Record(context.Background(), "root", "login", "root", "")
+	_ = e.auditRec.RecordDenied(context.Background(), "attacker", "login", "from 192.0.2.1", "")
+
+	_, body := e.get(t, "/audit")
+
+	// The ok badge markup must be present.
+	if !strings.Contains(body, `badge--ok`) {
+		t.Error("audit: Result column must render badge--ok for successful events")
+	}
+	if !strings.Contains(body, `>ok<`) {
+		t.Error("audit: badge--ok must contain 'ok' text")
+	}
+	// The denied badge markup must be present.
+	if !strings.Contains(body, `badge--danger`) {
+		t.Error("audit: Result column must render badge--danger for denied events")
+	}
+	if !strings.Contains(body, `>denied<`) {
+		t.Error("audit: badge--danger must contain 'denied' text")
+	}
+	// The denied badge must use the i-x icon (per mock).
+	if !strings.Contains(body, `i-x`) {
+		t.Error("audit: denied badge must include the i-x icon reference")
 	}
 }
 

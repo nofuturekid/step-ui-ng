@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 
@@ -105,13 +106,21 @@ func (s *server) getLogin(w http.ResponseWriter, r *http.Request) {
 
 // postLogin authenticates and, on success, renews the session token and stores
 // the user id (FR-3, FR-7). An audit event is recorded with the authenticated
-// user as actor (spec/0009 FR-2).
+// user as actor (spec/0009 FR-2). Failed attempts are also recorded (backlog ④)
+// with result="denied"; the actor is the attempted (untrusted) username.
 func (s *server) postLogin(w http.ResponseWriter, r *http.Request) {
 	username := r.PostFormValue("username")
 	password := r.PostFormValue("password")
 
 	u, err := s.users.Authenticate(r.Context(), username, password)
 	if err != nil {
+		// Record a denied audit event. The actor is the attempted username; RecordDenied
+		// substitutes "unknown" when username is empty. Details are intentionally empty
+		// regardless of failure reason to avoid user-enumeration leakage in the log.
+		// NOTE: clientIP uses r.RemoteAddr (direct TCP peer). Behind a reverse proxy
+		// this records the proxy IP, not the end-client IP — acceptable; we deliberately
+		// do not trust X-Forwarded-For as it can be spoofed.
+		_ = s.audit.RecordDenied(r.Context(), username, "login", "from "+clientIP(r), "")
 		d := s.page(r, "Log in")
 		d.Error = loginErrorMessage(err)
 		s.render(w, r, http.StatusUnauthorized, loginPage(d))
@@ -125,6 +134,17 @@ func (s *server) postLogin(w http.ResponseWriter, r *http.Request) {
 	// Record after a successful login; the actor is the authenticated user.
 	_ = s.audit.Record(r.Context(), u.Username, "login", u.Username, "")
 	http.Redirect(w, r, "/inventory", http.StatusSeeOther)
+}
+
+// clientIP extracts the host from r.RemoteAddr. If net.SplitHostPort fails
+// (e.g. RemoteAddr has no port, which is unusual but possible), it returns the
+// raw RemoteAddr unchanged. X-Forwarded-For is not trusted.
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 // login renews the session token (prevents fixation) and records the user id.

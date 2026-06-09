@@ -5,7 +5,9 @@
 //
 // The actor (who) is always the authenticated session user — never "system"
 // (spec/0009 Tests). Record rejects an empty actor so a caller cannot silently
-// drop attribution.
+// drop attribution. Exception: RecordDenied (backlog ④) accepts an empty actor
+// because a failed authentication attempt has no authenticated session user; the
+// who field carries the attempted (untrusted) identity instead.
 package audit
 
 import (
@@ -36,6 +38,8 @@ var now = func() int64 { return time.Now().Unix() }
 // action is a short verb (e.g. "issue", "sign"); target identifies the affected
 // resource (e.g. the CN or serial); details carries extra free-form context.
 // The table is append-only — there is no update or delete path.
+// The result column is set to 'ok' explicitly (not relying on the DEFAULT) so
+// the value is never implicit in application code.
 func (r *Recorder) Record(ctx context.Context, who, action, target, details string) error {
 	if r == nil || r.db == nil {
 		return nil
@@ -44,10 +48,33 @@ func (r *Recorder) Record(ctx context.Context, who, action, target, details stri
 		return ErrNoActor
 	}
 	if _, err := r.db.ExecContext(ctx,
-		`INSERT INTO audit_events (who, action, target, details, created_at)
-		 VALUES (?, ?, ?, ?, ?)`,
+		`INSERT INTO audit_events (who, action, target, details, result, created_at)
+		 VALUES (?, ?, ?, ?, 'ok', ?)`,
 		who, action, target, details, now()); err != nil {
 		return fmt.Errorf("audit: record: %w", err)
+	}
+	return nil
+}
+
+// RecordDenied appends an audit event with result='denied'. It is intended for
+// authentication failures where no authenticated session user exists. Unlike
+// Record, it does NOT enforce the ErrNoActor guard: the ErrNoActor guard prevents
+// silently dropping attribution on authenticated actions; a denied auth attempt
+// legitimately has no authenticated session user — the who carries the attempted
+// (untrusted) identity. If who is empty, "unknown" is substituted automatically.
+func (r *Recorder) RecordDenied(ctx context.Context, who, action, target, details string) error {
+	if r == nil || r.db == nil {
+		return nil
+	}
+	actor := who
+	if actor == "" {
+		actor = "unknown"
+	}
+	if _, err := r.db.ExecContext(ctx,
+		`INSERT INTO audit_events (who, action, target, details, result, created_at)
+		 VALUES (?, ?, ?, ?, 'denied', ?)`,
+		actor, action, target, details, now()); err != nil {
+		return fmt.Errorf("audit: record denied: %w", err)
 	}
 	return nil
 }
@@ -70,7 +97,8 @@ type Event struct {
 	Action    string
 	Target    string
 	Details   string
-	CreatedAt int64 // Unix timestamp
+	Result    string // "ok" or "denied" (backlog ④)
+	CreatedAt int64  // Unix timestamp
 }
 
 // defaultLimit is used when Filter.Limit is zero.
@@ -108,7 +136,7 @@ func (r *Recorder) List(ctx context.Context, f Filter) ([]Event, error) {
 		args = append(args, f.To)
 	}
 
-	q := "SELECT id, who, action, target, details, created_at FROM audit_events"
+	q := "SELECT id, who, action, target, details, result, created_at FROM audit_events"
 	if len(where) > 0 {
 		q += " WHERE " + strings.Join(where, " AND ")
 	}
@@ -124,7 +152,7 @@ func (r *Recorder) List(ctx context.Context, f Filter) ([]Event, error) {
 	var events []Event
 	for rows.Next() {
 		var e Event
-		if err := rows.Scan(&e.ID, &e.Who, &e.Action, &e.Target, &e.Details, &e.CreatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.Who, &e.Action, &e.Target, &e.Details, &e.Result, &e.CreatedAt); err != nil {
 			return nil, fmt.Errorf("audit: list scan: %w", err)
 		}
 		events = append(events, e)
