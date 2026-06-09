@@ -102,6 +102,46 @@ a:hover {
   flex-direction: column;
 }
 
+/* ---- Top progress bar (htmx boosted navigation) ------------------------- */
+/* A thin "fake-progress" bar at the very top, driven entirely by the
+   htmx-request class htmx adds to the hx-indicator target (#top-progress).
+   At rest it is invisible (opacity 0, zero-width fill). During a request the
+   fill eases toward 90% — slowing down so it never "completes" until the
+   response settles — then fades out. No custom JS. */
+.progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease 0.1s; /* slight delay so fast swaps don't flash */
+}
+.progress-bar::before {
+  content: "";
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent-strong);
+  box-shadow: 0 0 8px var(--accent-strong);
+}
+.progress-bar.htmx-request {
+  opacity: 1;
+  transition: opacity 0.1s ease;
+}
+.progress-bar.htmx-request::before {
+  width: 90%;
+  transition: width 8s cubic-bezier(0.06, 0.7, 0.1, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress-bar.htmx-request::before {
+    transition: none;
+    width: 100%;
+  }
+}
+
 /* ---- Topbar ------------------------------------------------------------- */
 .topbar {
   position: sticky;
