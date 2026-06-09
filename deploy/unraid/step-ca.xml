@@ -39,7 +39,13 @@
   <WebUI/>
   <TemplateURL>https://raw.githubusercontent.com/nofuturekid/step-ui-ng/main/deploy/unraid/step-ca.xml</TemplateURL>
   <Icon>https://github.com/smallstep.png</Icon>
-  <ExtraParams/>
+  <!-- Run as Unraid's nobody:users (99:100) so the appdata bind mount (owned 99:100)
+       is writable. The image's default user is "step" (uid 1000), which cannot write a
+       99:100-owned host dir — without this the first-run init fails to write the
+       generated password ("Permission denied"). The appdata directory must be owned
+       99:100 (chown -R 99:100 <appdata>); a freshly created bind-mount dir is root:root
+       and needs chown'ing once. -->
+  <ExtraParams>--user 99:100</ExtraParams>
   <PostArgs/>
   <CPUset/>
   <DateInstalled/>
@@ -65,7 +71,7 @@
     Target="/home/step"
     Default="/mnt/user/appdata/step-ca"
     Mode="rw"
-    Description="Persistent storage (bind mount): root/intermediate keys, certs, config/ca.json, secrets/password and the CA database. BACK THIS UP and restrict access. Deleting this directory means a full reinit — a NEW root CA, invalidating every certificate issued so far."
+    Description="Persistent storage (bind mount): root/intermediate keys, certs, config/ca.json, secrets/password and the CA database. Must be owned by 99:100 to match the container user set in Extra Parameters (chown -R 99:100 this dir once — a fresh bind-mount dir is root:root). BACK THIS UP and restrict access. Deleting this directory means a full reinit — a NEW root CA, invalidating every certificate issued so far."
     Type="Path"
     Display="always"
     Required="true"
