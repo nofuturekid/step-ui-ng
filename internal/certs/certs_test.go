@@ -183,7 +183,8 @@ const certsSchema = `CREATE TABLE certificates (
 
 const auditSchema = `CREATE TABLE audit_events (
 	id INTEGER PRIMARY KEY AUTOINCREMENT, who TEXT NOT NULL, action TEXT NOT NULL,
-	target TEXT NOT NULL, details TEXT NOT NULL, created_at INTEGER NOT NULL
+	target TEXT NOT NULL, details TEXT NOT NULL, result TEXT NOT NULL DEFAULT 'ok',
+	created_at INTEGER NOT NULL
 ) STRICT;`
 
 // --- Acceptance: Issue for example.test + a SAN → stored (FR-1) -------------

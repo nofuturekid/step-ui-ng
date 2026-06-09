@@ -10,6 +10,19 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- **Audit log records failed login attempts** (backlog ④): the audit log now
+  captures denied authentication events alongside successful ones.
+  - Migration `0009` adds a `result TEXT NOT NULL DEFAULT 'ok'` column to
+    `audit_events`; existing rows default to `'ok'` (all were successful actions).
+  - `audit.Recorder` gains `RecordDenied` for denied events; `audit.Event` gains
+    a `Result` field (`"ok"` or `"denied"`). The `ErrNoActor` guard is relaxed
+    only for `RecordDenied` — a failed login has no authenticated session user.
+  - `POST /login` on failure records actor = attempted username (`"unknown"` when
+    blank), action = `"login"`, target = `"from <IP>"`, details = `""` (uniform,
+    regardless of failure reason — no user-enumeration leakage in the log).
+  - The Audit page gains a **Result** column (6th column) showing
+    `badge--ok / badge--danger` badges for ok / denied events respectively.
+
 - **Provisioner column + filter in inventory** (backlog ②): the inventory table
   now records and displays the provisioner name used at issuance/signing.
   - Migration `0008` adds a nullable `provisioner` column to `certificates`;

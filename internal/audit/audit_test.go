@@ -3,6 +3,7 @@ package audit_test
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -27,6 +28,7 @@ func newDB(t *testing.T) *sql.DB {
 		action     TEXT    NOT NULL,
 		target     TEXT    NOT NULL,
 		details    TEXT    NOT NULL,
+		result     TEXT    NOT NULL DEFAULT 'ok',
 		created_at INTEGER NOT NULL
 	) STRICT;`); err != nil {
 		t.Fatalf("create table: %v", err)
@@ -262,6 +264,99 @@ func TestListPagination(t *testing.T) {
 				t.Fatalf("page0 id %d < page1 id %d: not newest-first", e0.ID, e1.ID)
 			}
 		}
+	}
+}
+
+// --- Result field (backlog ④) ------------------------------------------------
+
+// Record now yields Result=="ok" so that existing successful actions round-trip
+// the result column correctly via List.
+func TestRecordYieldsResultOK(t *testing.T) {
+	db := newDB(t)
+	rec := audit.NewRecorder(db)
+
+	if err := rec.Record(context.Background(), "alice", "login", "alice", ""); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+
+	events, err := rec.List(context.Background(), audit.Filter{Limit: 1})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(events) == 0 {
+		t.Fatal("no events returned")
+	}
+	if events[0].Result != "ok" {
+		t.Fatalf("Record result = %q, want \"ok\" (successful actions must always be marked ok)", events[0].Result)
+	}
+}
+
+// RecordDenied yields Result=="denied" and List returns it correctly.
+func TestRecordDeniedYieldsResultDenied(t *testing.T) {
+	db := newDB(t)
+	rec := audit.NewRecorder(db)
+
+	if err := rec.RecordDenied(context.Background(), "mallory", "login", "from 192.0.2.1", ""); err != nil {
+		t.Fatalf("RecordDenied: %v", err)
+	}
+
+	events, err := rec.List(context.Background(), audit.Filter{Limit: 1})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(events) == 0 {
+		t.Fatal("no events returned from RecordDenied")
+	}
+	if events[0].Result != "denied" {
+		t.Fatalf("RecordDenied result = %q, want \"denied\"", events[0].Result)
+	}
+	if events[0].Action != "login" {
+		t.Fatalf("RecordDenied action = %q, want \"login\"", events[0].Action)
+	}
+	if events[0].Who != "mallory" {
+		t.Fatalf("RecordDenied who = %q, want \"mallory\"", events[0].Who)
+	}
+}
+
+// RecordDenied with an empty actor must SUCCEED — a failed login has no
+// authenticated actor; the who is the attempted, untrusted identity.
+// The ErrNoActor guard exists to prevent silently dropping attribution on
+// authenticated actions; denied-auth attempts legitimately have no session user.
+func TestRecordDeniedAllowsEmptyActor(t *testing.T) {
+	db := newDB(t)
+	rec := audit.NewRecorder(db)
+
+	// Empty who: represents a login attempt with no username supplied.
+	if err := rec.RecordDenied(context.Background(), "", "login", "from 192.0.2.1", ""); err != nil {
+		t.Fatalf("RecordDenied with empty who = %v, want nil (empty actor is allowed for denied events)", err)
+	}
+
+	events, err := rec.List(context.Background(), audit.Filter{Limit: 1})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(events) == 0 {
+		t.Fatal("RecordDenied with empty who: no event persisted")
+	}
+	if events[0].Who != "unknown" {
+		t.Fatalf("RecordDenied with empty who: event.Who = %q, want \"unknown\" (caller must substitute 'unknown')", events[0].Who)
+	}
+	if events[0].Result != "denied" {
+		t.Fatalf("RecordDenied with empty who: result = %q, want \"denied\"", events[0].Result)
+	}
+}
+
+// Record with empty actor must STILL return ErrNoActor — the relaxation applies
+// only to RecordDenied. This verifies the invariant is not accidentally broken.
+func TestRecordStillRejectsEmptyActorAfterRecordDeniedAdded(t *testing.T) {
+	db := newDB(t)
+	rec := audit.NewRecorder(db)
+	err := rec.Record(context.Background(), "", "login", "t", "d")
+	if err == nil {
+		t.Fatal("Record with empty actor: expected ErrNoActor, got nil")
+	}
+	if !errors.Is(err, audit.ErrNoActor) {
+		t.Fatalf("Record with empty actor: got %v, want ErrNoActor", err)
 	}
 }
 
