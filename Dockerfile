@@ -31,4 +31,8 @@ USER nonroot:nonroot
 VOLUME ["/data"]
 ENV DATA_DIR=/data PORT=8080
 EXPOSE 8080
+# Liveness via the auth-exempt /healthz endpoint (busybox wget ships in alpine).
+# Shell form so ${PORT} expands at runtime if the port is overridden.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget -q -O /dev/null "http://127.0.0.1:${PORT:-8080}/healthz" || exit 1
 ENTRYPOINT ["/app/stepui"]
