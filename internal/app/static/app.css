@@ -15,6 +15,13 @@
   box-sizing: border-box;
 }
 
+/* Always reserve the scrollbar gutter so the centered layout does not shift
+   horizontally when navigating between short (no scrollbar) and tall (scrollbar)
+   pages. */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   font-family: var(
@@ -1247,7 +1254,8 @@ table.table {
 .content--narrow {
   padding-top: var(--space-8);
   padding-bottom: var(--space-16);
-  max-width: 780px;
+  max-width: 760px;
+  margin-inline: auto; /* center the narrow column within main (matches the mock) */
 }
 
 /* Required / optional field markers */
