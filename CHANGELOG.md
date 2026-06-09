@@ -10,6 +10,43 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- **Users + Audit log pages redesign** (PR G): ports `GET /users` and `GET /audit`
+  to the approved design mocks (`docs/design/users.html`, `docs/design/audit.html`).
+  No behaviour change to handlers, routes, field names, validation, htmx wiring,
+  RBAC, or the superadmin protections.
+  - **Users page** (`usersPage`/`userRow`): `content--narrow` wrapper, `page-head`
+    with breadcrumb (`Settings / Users`), `page-title` "Users", `page-sub` with
+    role hierarchy copy. Create-user card (`card__header` / `card__title` /
+    `card__desc`) with a self-limit note derived from the actor's role (e.g. an admin
+    sees "You're an admin, so you can create viewers and admins, but not
+    superadmins"). Role `<select>` in the create form filtered by `CanAssign`: a
+    non-superadmin actor gets the superadmin option rendered as `disabled` (with
+    "requires superadmin" copy), never as a plain selectable option. User list uses
+    `class="table"` with Username/Role/Status/Actions columns; role rendered as a
+    badge (`badge--info` for superadmin, `badge--role` otherwise); Enabled/Disabled
+    as `badge--ok`/`badge--neutral`. Per-row actions: role-change `<select>`
+    (options capped by `CanAssign`), enable/disable and delete icon buttons — all
+    wrapped in CSRF forms. Superadmin protection: when `CanManage(target.Role)` is
+    false the actions cell shows the guard notice "admins can't manage superadmins"
+    instead of controls, mirroring the server-side guard. Self-row: delete button is
+    `disabled`/`aria-disabled`. "Last remaining superadmin can't be deleted or
+    demoted" hint rendered below the table.
+  - **Audit log page** (`auditPage`): `page-head` with `page-title` "Audit log" and
+    `page-sub` "Every privileged action step-ui-ng performs. Append-only and never
+    contains secret values." Filter bar (`class="filterbar"` GET form) with action
+    `<select>` (all existing `auditActionOption` values preserved), actor text input,
+    from/to date inputs, Filter/Clear buttons, and an event count badge. Table
+    (`class="table"`) with columns **Time (UTC) · Actor · Action · Target · Details**;
+    Action rendered as `<span class="tag">`; Details rendered as `mono subtle` text,
+    surfacing operator context such as `keyID=…`, `role=admin`, `action=set_role role=…`
+    that admins rely on. Pagination uses `class="pagination"` with Newer/Older links.
+  - **Result column intentionally omitted**: `audit.Event` has no `Result` field and
+    only successful actions are ever recorded (failures return HTTP 4xx/5xx without an
+    audit row), so a static green "ok" badge on every row would be a faked signal
+    implying a result dimension that does not exist. A real Result column would require
+    recording failures and adding an `audit_events.result` schema field — noted as
+    future work for a dedicated spec.
+
 - **Issue certificate + Sign CSR pages redesign** (PR F): ports `GET /issue` and
   `GET /sign-csr` to the approved design mock (`docs/design/issue.html`,
   `docs/design/sign-csr.html`). No behaviour change to handlers, routes, field

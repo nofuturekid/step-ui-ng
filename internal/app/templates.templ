@@ -250,89 +250,228 @@ templ loginPage(d pageData) {
 	}
 }
 
+// usersCreateRoleDesc returns the self-limit note for the create-user card based
+// on the actor's role. It explains what roles the actor may assign.
+func usersCreateRoleDesc(actorRole users.Role) string {
+	switch actorRole {
+	case users.RoleSuperadmin:
+		return "You're a superadmin, so you can create users with any role."
+	case users.RoleAdmin:
+		return "You're an admin, so you can create viewers and admins, but not superadmins."
+	default:
+		return "You can create viewers only."
+	}
+}
+
 // usersPage lists users with per-row actions and a create form (admin+).
+// Layout follows docs/design/users.html.
 templ usersPage(d pageData, list []users.User) {
 	@layout(d) {
-		<div class="card">
-			<h1>Users</h1>
-			<table>
-				<thead>
-					<tr>
-						<th>ID</th><th>Username</th><th>Role</th><th>Status</th><th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					for _, u := range list {
-						@userRow(d, u)
-					}
-				</tbody>
-			</table>
-		</div>
-		<div class="card">
-			<h1>Create user</h1>
-			<form method="post" action="/users">
-				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-				<label for="new-username">Username</label>
-				<input id="new-username" name="username" type="text" required minlength="3" maxlength="64"/>
-				<label for="new-password">Password (min 12 characters)</label>
-				<input id="new-password" name="password" type="password" required minlength="12"/>
-				<label for="new-password-confirm">Confirm password</label>
-				<input id="new-password-confirm" name="password_confirm" type="password" required/>
-				<label for="new-role">Role</label>
-				<select id="new-role" name="role">
-					<option value="viewer">viewer</option>
-					<option value="admin">admin</option>
-					<option value="superadmin">superadmin</option>
-				</select>
-				<p></p>
-				<button type="submit">Create</button>
-			</form>
+		<div class="content--narrow">
+			<!-- Page header -->
+			<div class="page-head">
+				<div class="breadcrumb"><a href="#">Settings</a><span class="sep">/</span><span>Users</span></div>
+				<h1 class="page-title">Users</h1>
+				<p class="page-sub">Local accounts that can sign in to step-ui-ng. Roles: viewer &lt; admin &lt; superadmin.</p>
+			</div>
+			<div class="stack">
+				<!-- Create user card -->
+				<div class="card">
+					<div class="card__header">
+						<div>
+							<h2 class="card__title">Create user</h2>
+							<p class="card__desc">
+								if d.User != nil {
+									{ usersCreateRoleDesc(d.User.Role) }
+								}
+							</p>
+						</div>
+					</div>
+					<form class="card__body" method="post" action="/users">
+						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+						<div class="form-grid">
+							<div class="field">
+								<label for="nu-name">Username <span class="req" aria-hidden="true">*</span></label>
+								<input class="input mono" id="nu-name" name="username" placeholder="j.doe"/>
+							</div>
+							<div class="field">
+								<label for="nu-role">Role</label>
+								<select class="select" id="nu-role" name="role">
+									@createRoleOptions(d)
+								</select>
+								if d.User != nil && !d.User.Role.AtLeast(users.RoleSuperadmin) {
+									<span class="field__hint">You can&#39;t assign a role higher than your own.</span>
+								}
+							</div>
+							<div class="field col-span-2">
+								<label for="nu-pw">Password <span class="req" aria-hidden="true">*</span></label>
+								<input class="input" id="nu-pw" name="password" type="password" placeholder="min 12 characters" required minlength="12"/>
+							</div>
+							<div class="field col-span-2">
+								<label for="nu-pw-confirm">Confirm password <span class="req" aria-hidden="true">*</span></label>
+								<input class="input" id="nu-pw-confirm" name="password_confirm" type="password" required/>
+							</div>
+						</div>
+						<div class="form-actions" style="margin-top:var(--space-5)">
+							<button type="submit" class="btn btn--primary"><svg class="ico"><use href="/static/icons.svg#i-plus"></use></svg> Create user</button>
+						</div>
+					</form>
+				</div>
+
+				<!-- User list -->
+				<div>
+					<h2 class="section-title">All users</h2>
+					<div class="table-wrap table-scroll">
+						<table class="table">
+							<thead>
+								<tr>
+									<th scope="col">Username</th>
+									<th scope="col">Role</th>
+									<th scope="col">Status</th>
+									<th scope="col"><span class="visually-hidden">Actions</span></th>
+								</tr>
+							</thead>
+							<tbody>
+								for _, u := range list {
+									@userRow(d, u)
+								}
+							</tbody>
+						</table>
+					</div>
+					<p class="field__hint" style="margin-top:var(--space-3)">
+						<svg class="ico" style="width:13px;height:13px;vertical-align:-2px"><use href="/static/icons.svg#i-info"></use></svg>
+						The last remaining superadmin can&#39;t be deleted or demoted.
+					</p>
+				</div>
+			</div>
 		</div>
 	}
 }
 
-// userRow renders a single user with role/disable/delete controls.
+// createRoleOptions renders the role <select> options for the create-user form,
+// filtered by the actor's CanAssign ceiling. Non-superadmin actors see the
+// superadmin option rendered as disabled (with an explanatory label) so the UI
+// mirrors the server-side guard without offering superadmin as a selectable choice.
+// Superadmin actors see all three roles as enabled options.
+templ createRoleOptions(d pageData) {
+	if d.User == nil {
+		<!-- No actor — render nothing (guard) -->
+	} else if d.User.Role.AtLeast(users.RoleSuperadmin) {
+		<option value="viewer">viewer</option>
+		<option value="admin">admin</option>
+		<option value="superadmin">superadmin</option>
+	} else {
+		<!-- Admin or viewer actor: superadmin is above their ceiling -->
+		<option value="viewer">viewer</option>
+		<option value="admin">admin</option>
+		<option value="superadmin" disabled>superadmin — requires superadmin</option>
+	}
+}
+
+// userRow renders a single user row in the user list table.
+// Per-row actions (role change, enable/disable, delete) are only shown when the
+// actor's CanManage(target.Role) is true. When a non-superadmin actor views a
+// superadmin row, the actions cell shows a guard notice instead of controls,
+// mirroring the server-side CanManage check.
 templ userRow(d pageData, u users.User) {
+	{{ isSelf := d.User != nil && d.User.ID == u.ID }}
+	{{ canManage := d.User != nil && d.User.Role.CanManage(u.Role) }}
+	{{ userPath := "/users/" + strconv.FormatInt(u.ID, 10) }}
 	<tr>
-		<td>{ strconv.FormatInt(u.ID, 10) }</td>
-		<td>{ u.Username }</td>
-		<td>{ string(u.Role) }</td>
-		<td>
-			if u.Disabled {
-				<span class="badge">disabled</span>
-			} else {
-				<span class="badge">active</span>
+		<td class="mono">
+			{ u.Username }
+			if isSelf {
+				<span class="tag" style="margin-left:6px">you</span>
 			}
 		</td>
+		<td>@userRoleBadge(u.Role)</td>
 		<td>
-			<div class="actions">
-				<form method="post" action={ templ.SafeURL("/users/" + strconv.FormatInt(u.ID, 10)) }>
-					<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-					<input type="hidden" name="action" value="set_role"/>
-					<select name="role" onchange="this.form.submit()" aria-label="role">
-						@roleOption(users.RoleViewer, u.Role)
-						@roleOption(users.RoleAdmin, u.Role)
-						@roleOption(users.RoleSuperadmin, u.Role)
-					</select>
-				</form>
-				<form method="post" action={ templ.SafeURL("/users/" + strconv.FormatInt(u.ID, 10)) }>
-					<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-					if u.Disabled {
-						<input type="hidden" name="action" value="enable"/>
-						<button class="secondary" type="submit">Enable</button>
-					} else {
-						<input type="hidden" name="action" value="disable"/>
-						<button class="secondary" type="submit">Disable</button>
-					}
-				</form>
-				<form method="post" action={ templ.SafeURL("/users/" + strconv.FormatInt(u.ID, 10)) }>
-					<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-					<input type="hidden" name="action" value="delete"/>
-					<button class="danger" type="submit">Delete</button>
-				</form>
+			if u.Disabled {
+				<span class="badge badge--neutral"><span class="dot"></span>Disabled</span>
+			} else {
+				<span class="badge badge--ok"><span class="dot"></span>Enabled</span>
+			}
+		</td>
+		<td class="col-actions">
+			<div class="rowact">
+				if !canManage {
+					<!-- Actor cannot manage this user (superadmin protection or insufficient role) -->
+					<span class="inline-icon subtle" style="font-size:var(--fs-xs)">
+						<svg class="ico" style="width:13px;height:13px"><use href="/static/icons.svg#i-lock"></use></svg>
+						admins can&#39;t manage superadmins
+					</span>
+				} else {
+					<!-- Role change select -->
+					<form method="post" action={ templ.SafeURL(userPath) } style="display:contents">
+						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+						<input type="hidden" name="action" value="set_role"/>
+						<label class="visually-hidden" for={ "r-" + u.Username }>Role for { u.Username }</label>
+						<select class="select" id={ "r-" + u.Username } name="role" style="height:30px;max-width:140px" onchange="this.form.submit()">
+							@managedRoleOptions(d, u.Role)
+						</select>
+					</form>
+					<!-- Enable/Disable toggle -->
+					<form method="post" action={ templ.SafeURL(userPath) } style="display:contents">
+						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+						if u.Disabled {
+							<input type="hidden" name="action" value="enable"/>
+							<button class="iconbtn" type="submit" title={ "Enable " + u.Username } aria-label={ "Enable " + u.Username }>
+								<svg class="ico"><use href="/static/icons.svg#i-lock-open"></use></svg>
+							</button>
+						} else {
+							<input type="hidden" name="action" value="disable"/>
+							<button class="iconbtn" type="submit" title={ "Disable " + u.Username } aria-label={ "Disable " + u.Username }>
+								<svg class="ico"><use href="/static/icons.svg#i-lock"></use></svg>
+							</button>
+						}
+					</form>
+					<!-- Delete -->
+					<form method="post" action={ templ.SafeURL(userPath) } style="display:contents">
+						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+						<input type="hidden" name="action" value="delete"/>
+						if isSelf {
+							<button class="iconbtn" aria-disabled="true" disabled title="You can&#39;t delete your own account">
+								<svg class="ico"><use href="/static/icons.svg#i-trash"></use></svg>
+							</button>
+						} else {
+							<button class="iconbtn" type="submit" title={ "Delete " + u.Username } aria-label={ "Delete " + u.Username }>
+								<svg class="ico"><use href="/static/icons.svg#i-trash"></use></svg>
+							</button>
+						}
+					</form>
+				}
 			</div>
 		</td>
 	</tr>
+}
+
+// managedRoleOptions renders role options in the per-user role-change select,
+// restricted to roles the actor can assign (ceiling = actor's own role). This
+// mirrors the server-side CanAssign check so the UI never offers roles above
+// the actor's ceiling.
+templ managedRoleOptions(d pageData, current users.Role) {
+	if d.User == nil {
+		<!-- No actor -->
+	} else if d.User.Role.AtLeast(users.RoleSuperadmin) {
+		// Superadmin sees all three roles.
+		@roleOption(users.RoleViewer, current)
+		@roleOption(users.RoleAdmin, current)
+		@roleOption(users.RoleSuperadmin, current)
+	} else {
+		// Admin/viewer ceiling: viewer + admin only.
+		@roleOption(users.RoleViewer, current)
+		@roleOption(users.RoleAdmin, current)
+	}
+}
+
+// userRoleBadge renders a role badge with appropriate styling.
+// superadmin uses badge--info, admin/viewer use badge--role.
+templ userRoleBadge(role users.Role) {
+	if role == users.RoleSuperadmin {
+		<span class="badge badge--info"><span class="dot"></span>{ string(role) }</span>
+	} else {
+		<span class="badge badge--role">{ string(role) }</span>
+	}
 }
 
 templ roleOption(opt users.Role, current users.Role) {
@@ -1524,80 +1663,120 @@ func certFilename(cn string) string {
 }
 
 // auditPage renders the audit log with a filter form and a paginated table
-// (spec/0009 FR-3, admin+). ACME-specific filter options are reserved for
-// spec/0010; the table is already future-proof because it shows raw action names.
+// (spec/0009 FR-3, admin+). Layout follows docs/design/audit.html.
+// The table never renders any secret values — the audit data already excludes
+// them (only action/target/details are stored, never credentials).
 templ auditPage(d pageData, v auditView) {
 	@layout(d) {
-		<div class="card">
-			<h1>Audit log</h1>
-			<p class="muted">Security-relevant events, newest first. Actor is always the authenticated session user.</p>
-			<form method="get" action="/audit">
-				<label for="audit-action">Action</label>
-				<select id="audit-action" name="action" onchange="this.form.submit()">
-					<option value="">All actions</option>
-					@auditActionOption("login", v.Filter.Action)
-					@auditActionOption("logout", v.Filter.Action)
-					@auditActionOption("user.create", v.Filter.Action)
-					@auditActionOption("user.update", v.Filter.Action)
-					@auditActionOption("user.delete", v.Filter.Action)
-					@auditActionOption("settings.update", v.Filter.Action)
-					@auditActionOption("provisioner.create", v.Filter.Action)
-					@auditActionOption("provisioner.select", v.Filter.Action)
-					@auditActionOption("provisioner.delete", v.Filter.Action)
-					@auditActionOption("issue", v.Filter.Action)
-					@auditActionOption("sign", v.Filter.Action)
-					@auditActionOption("revoke", v.Filter.Action)
-					@auditActionOption("renew", v.Filter.Action)
-					@auditActionOption("acme.provisioner.create", v.Filter.Action)
-					@auditActionOption("acme.provisioner.update", v.Filter.Action)
-					@auditActionOption("acme.provisioner.delete", v.Filter.Action)
-					@auditActionOption("acme.eab.create", v.Filter.Action)
-					@auditActionOption("acme.eab.revoke", v.Filter.Action)
-				</select>
-				<label for="audit-who">User</label>
-				<input id="audit-who" name="who" type="text" value={ v.Filter.Who } placeholder="username"/>
-				<label for="audit-from">From (date)</label>
-				<input id="audit-from" name="from" type="date" value={ v.Filter.From }/>
-				<label for="audit-to">To (date)</label>
-				<input id="audit-to" name="to" type="date" value={ v.Filter.To }/>
-				<p></p>
-				<button type="submit">Filter</button>
-				<a class="button secondary" href="/audit">Clear filters</a>
-			</form>
-		</div>
-		<div class="card">
-			if len(v.Events) == 0 {
-				<p class="muted">No events match the current filter.</p>
-			} else {
-				<table>
-					<thead>
-						<tr>
-							<th>When</th><th>Who</th><th>Action</th><th>Target</th><th>Details</th>
-						</tr>
-					</thead>
-					<tbody>
-						for _, e := range v.Events {
-							<tr>
-								<td class="mono">{ fmtUnix(e.CreatedAt) }</td>
-								<td>{ e.Who }</td>
-								<td>{ e.Action }</td>
-								<td>{ e.Target }</td>
-								<td>{ e.Details }</td>
-							</tr>
+		<div class="content">
+			<!-- Page header -->
+			<div class="page-head">
+				<h1 class="page-title">Audit log</h1>
+				<p class="page-sub">Every privileged action step-ui-ng performs. Append-only and never contains secret values.</p>
+			</div>
+
+			<div>
+				<!-- Filter bar -->
+				<form class="filterbar" role="search" aria-label="Filter audit events" method="get" action="/audit">
+					<label class="visually-hidden" for="a-action">Action</label>
+					<select class="select" id="a-action" name="action" style="max-width:220px">
+						if v.Filter.Action == "" {
+							<option value="" selected>All actions</option>
+						} else {
+							<option value="">All actions</option>
 						}
-					</tbody>
-				</table>
-				<div class="actions">
-					if v.Page > 0 {
-						<a class="button secondary" href={ auditPageURL(v.Filter, v.PrevPage) }>← Newer</a>
+						@auditActionOption("login", v.Filter.Action)
+						@auditActionOption("logout", v.Filter.Action)
+						@auditActionOption("user.create", v.Filter.Action)
+						@auditActionOption("user.update", v.Filter.Action)
+						@auditActionOption("user.delete", v.Filter.Action)
+						@auditActionOption("settings.update", v.Filter.Action)
+						@auditActionOption("provisioner.create", v.Filter.Action)
+						@auditActionOption("provisioner.select", v.Filter.Action)
+						@auditActionOption("provisioner.delete", v.Filter.Action)
+						@auditActionOption("issue", v.Filter.Action)
+						@auditActionOption("sign", v.Filter.Action)
+						@auditActionOption("revoke", v.Filter.Action)
+						@auditActionOption("renew", v.Filter.Action)
+						@auditActionOption("acme.provisioner.create", v.Filter.Action)
+						@auditActionOption("acme.provisioner.update", v.Filter.Action)
+						@auditActionOption("acme.provisioner.delete", v.Filter.Action)
+						@auditActionOption("acme.eab.create", v.Filter.Action)
+						@auditActionOption("acme.eab.revoke", v.Filter.Action)
+					</select>
+					<label class="visually-hidden" for="a-who">Actor</label>
+					<input class="input" id="a-who" name="who" type="text" value={ v.Filter.Who } placeholder="Actor…" style="max-width:180px"/>
+					<label class="visually-hidden" for="a-from">From date</label>
+					<input class="input" id="a-from" name="from" type="date" value={ v.Filter.From }/>
+					<label class="visually-hidden" for="a-to">To date</label>
+					<input class="input" id="a-to" name="to" type="date" value={ v.Filter.To }/>
+					<button type="submit" class="btn">Filter</button>
+					if v.Filter.Action != "" || v.Filter.Who != "" || v.Filter.From != "" || v.Filter.To != "" {
+						<a class="btn btn--ghost" href="/audit">Clear</a>
 					}
-					if v.HasMore {
-						<a class="button secondary" href={ auditPageURL(v.Filter, v.NextPage) }>Older →</a>
-					}
-				</div>
-			}
+					<div class="spacer"></div>
+					<span class="result-count">{ strconv.Itoa(len(v.Events)) } event{ auditEventPlural(len(v.Events)) }</span>
+				</form>
+
+				if len(v.Events) == 0 {
+					<p class="muted">No events match the current filter.</p>
+				} else {
+					<div class="table-wrap table-scroll">
+						<table class="table">
+							<thead>
+								<tr>
+									<th scope="col">Time (UTC)</th>
+									<th scope="col">Actor</th>
+									<th scope="col">Action</th>
+									<th scope="col">Target</th>
+									<th scope="col">Details</th>
+								</tr>
+							</thead>
+							<tbody>
+								for _, e := range v.Events {
+									<tr>
+										<td class="nowrap mono subtle">{ fmtUnix(e.CreatedAt) }</td>
+										<td class="mono">{ e.Who }</td>
+										<td><span class="tag">{ e.Action }</span></td>
+										<td class="mono cn-cell">{ e.Target }</td>
+										<td class="mono subtle">{ e.Details }</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+
+					<div class="pagination">
+						<span>
+							if v.Page == 0 && !v.HasMore {
+								Showing all { strconv.Itoa(len(v.Events)) } event{ auditEventPlural(len(v.Events)) }
+							} else {
+								Page { strconv.Itoa(v.Page + 1) }
+							}
+						</span>
+						<div class="pages">
+							if v.Page > 0 {
+								<a href={ auditPageURL(v.Filter, v.PrevPage) } aria-label="Newer events">← Newer</a>
+							} else {
+								<span class="is-disabled" aria-hidden="true">← Newer</span>
+							}
+							if v.HasMore {
+								<a href={ auditPageURL(v.Filter, v.NextPage) }>Older →</a>
+							}
+						</div>
+					</div>
+				}
+			</div>
 		</div>
 	}
+}
+
+// auditEventPlural returns "s" for plural event counts, empty for singular.
+func auditEventPlural(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
 }
 
 // auditActionOption renders a select option for the action filter.
