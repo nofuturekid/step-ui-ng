@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -45,7 +46,7 @@ func (s *server) getProvisioners(w http.ResponseWriter, r *http.Request) {
 	pv := provisionersView{
 		Selected:          view.SelectedProvisioner,
 		HasSelectedSecret: view.HasSelectedSecret,
-		HasAdminCred:      view.HasAdminKey,
+		HasAdminCred:      viewHasAdminAuth(view),
 		CASettings:        ok,
 	}
 	if !ok {
@@ -99,14 +100,20 @@ func (s *server) postProvisioners(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cred, credOK, err := s.adminCredential(r)
+	auth, authOK, err := s.adminAuth(r.Context(), view)
 	if err != nil {
 		s.sessions.Put(r.Context(), errorKey, "Could not load the admin credential.")
 		http.Redirect(w, r, "/provisioners", http.StatusSeeOther)
 		return
 	}
-	if !credOK {
-		s.sessions.Put(r.Context(), errorKey, "No admin credential configured — add an admin certificate and key to manage provisioners.")
+	if !authOK {
+		s.sessions.Put(r.Context(), errorKey, adminAuthMissingMessage())
+		http.Redirect(w, r, "/provisioners", http.StatusSeeOther)
+		return
+	}
+	cred, err := auth.Credential(r.Context())
+	if err != nil {
+		s.sessions.Put(r.Context(), errorKey, provisionerCreateErrorMessage(err))
 		http.Redirect(w, r, "/provisioners", http.StatusSeeOther)
 		return
 	}
@@ -156,14 +163,20 @@ func (s *server) postProvisioner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cred, credOK, err := s.adminCredential(r)
+	auth, authOK, err := s.adminAuth(r.Context(), view)
 	if err != nil {
 		s.sessions.Put(r.Context(), errorKey, "Could not load the admin credential.")
 		http.Redirect(w, r, "/provisioners", http.StatusSeeOther)
 		return
 	}
-	if !credOK {
-		s.sessions.Put(r.Context(), errorKey, "No admin credential configured — add an admin certificate and key to manage provisioners.")
+	if !authOK {
+		s.sessions.Put(r.Context(), errorKey, adminAuthMissingMessage())
+		http.Redirect(w, r, "/provisioners", http.StatusSeeOther)
+		return
+	}
+	cred, err := auth.Credential(r.Context())
+	if err != nil {
+		s.sessions.Put(r.Context(), errorKey, provisionerCreateErrorMessage(err))
 		http.Redirect(w, r, "/provisioners", http.StatusSeeOther)
 		return
 	}
@@ -178,19 +191,67 @@ func (s *server) postProvisioner(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/provisioners", http.StatusSeeOther)
 }
 
-// adminCredential loads the stored admin credential and parses it into a
-// ca.AdminCredential ready for signing. ok is false when none is configured. The
-// plaintext key never leaves this function except inside the AdminCredential.
-func (s *server) adminCredential(r *http.Request) (ca.AdminCredential, bool, error) {
-	certPEM, keyPEM, ok, err := s.settings.AdminCredential(r.Context())
-	if err != nil || !ok {
-		return ca.AdminCredential{}, false, err
+// adminAuth builds an ca.AdminAuth from the configured admin-auth method.
+// ok is false when no admin auth is configured (method=none or not set).
+// The plaintext key/password never escapes this function except inside the
+// returned AdminAuth.
+func (s *server) adminAuth(ctx context.Context, view settings.View) (ca.AdminAuth, bool, error) {
+	switch view.AdminAuthMethod {
+	case settings.AdminAuthX5C:
+		certPEM, keyPEM, ok, err := s.settings.AdminCredential(ctx)
+		if err != nil {
+			return nil, false, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		cred, err := ca.NewAdminCredential([]byte(certPEM), []byte(keyPEM))
+		if err != nil {
+			return nil, false, err
+		}
+		return ca.X5CStored(cred), true, nil
+
+	case settings.AdminAuthJWK:
+		password, ok, err := s.settings.AdminJWKPassword(ctx)
+		if err != nil {
+			return nil, false, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		return ca.JWKMinted(ca.JWKMintedParams{
+			CAURL:           view.CAURL,
+			Fingerprint:     view.RootFingerprint,
+			ProvisionerName: view.AdminJWKProvisioner,
+			Password:        password, // plaintext; never logged
+			Subject:         view.AdminJWKSubject,
+		}), true, nil
+
+	default:
+		return nil, false, nil
 	}
-	cred, err := ca.NewAdminCredential([]byte(certPEM), []byte(keyPEM))
-	if err != nil {
-		return ca.AdminCredential{}, false, err
+}
+
+// viewHasAdminAuth reports whether the View has a *usable* admin-auth method —
+// the method is set AND its secret material is present. This drives the
+// HasAdminCred gate in all pages. Gating on the method label alone would render
+// the controls enabled for, e.g., method=jwk with no stored password, while
+// every action then fails closed (a confusing footgun).
+func viewHasAdminAuth(v settings.View) bool {
+	switch v.AdminAuthMethod {
+	case settings.AdminAuthX5C:
+		return v.HasAdminKey
+	case settings.AdminAuthJWK:
+		return v.HasAdminJWK
+	default:
+		return false
 	}
-	return cred, true, nil
+}
+
+// adminAuthMissingMessage returns the honest FR-6 hint when no admin auth is
+// configured, naming both options and the CLI alternative.
+func adminAuthMissingMessage() string {
+	return "No admin authentication configured — configure it on the CA settings page (x5c or JWK), or use the Step CLI directly."
 }
 
 // provisionerListErrorMessage maps a list failure to a clear, secret-free
@@ -227,6 +288,8 @@ func provisionerCreateErrorMessage(err error) string {
 		return "The CA rejected the admin credential (unauthorized). Check the admin certificate and key."
 	case errors.Is(err, ca.ErrInvalidAdminCredential):
 		return "The stored admin credential is invalid."
+	case errors.Is(err, ca.ErrProvisionerKey):
+		return "Could not decrypt the JWK provisioner key — check the admin password."
 	case errors.Is(err, ca.ErrFingerprintMismatch):
 		return "The CA's root certificate does not match the configured fingerprint."
 	case errors.Is(err, ca.ErrUnreachable):

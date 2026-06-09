@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/nofuturekid/step-ui-ng/internal/ca"
 	"github.com/nofuturekid/step-ui-ng/internal/settings"
@@ -65,6 +66,62 @@ func (s *server) postSettingsTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.render(w, r, http.StatusOK, testSuccess(len(roots)))
+}
+
+// postAdminAuth saves the admin-authentication method and its material
+// (spec/0012 FR-1/FR-3). The method field selects "none", "x5c", or "jwk".
+// For "jwk": subject, provisioner, and an optional password (leave blank to
+// keep). For "none": clears all admin credential material. The "x5c" method
+// is selected but upload is deferred to PR 2 (FR-2 guided upload out of scope
+// for this PR). An audit event is recorded on success — never with secrets.
+func (s *server) postAdminAuth(w http.ResponseWriter, r *http.Request) {
+	actor := userFromContext(r.Context())
+	method := strings.TrimSpace(r.PostFormValue("admin_auth_method"))
+
+	var saveErr error
+	switch settings.AdminAuthMethod(method) {
+	case settings.AdminAuthJWK:
+		subject := r.PostFormValue("admin_jwk_subject")
+		provisioner := r.PostFormValue("admin_jwk_provisioner")
+		password := r.PostFormValue("admin_jwk_password")
+		saveErr = s.settings.SaveAdminJWK(r.Context(), subject, provisioner, password)
+		if saveErr == nil {
+			s.sessions.Put(r.Context(), flashKey, "Admin authentication saved (JWK).")
+			// Password is write-only and never logged; only subject/prov are recorded.
+			_ = s.audit.Record(r.Context(), actor.Username, "settings.admin_auth", "admin_auth",
+				"method=jwk subject="+subject+" provisioner="+provisioner)
+		}
+	case settings.AdminAuthNone:
+		saveErr = s.settings.SetAdminAuthNone(r.Context())
+		if saveErr == nil {
+			s.sessions.Put(r.Context(), flashKey, "Admin authentication cleared.")
+			_ = s.audit.Record(r.Context(), actor.Username, "settings.admin_auth", "admin_auth", "method=none")
+		}
+	default:
+		// "x5c" selected: method is noted but upload UI (FR-2) is out of scope.
+		// For now treat it as a no-op; the operator can use SaveAdminCredential
+		// once the upload form is added in the next PR.
+		s.sessions.Put(r.Context(), flashKey, "Admin authentication method noted. Upload the x5c certificate and key once the upload form is available.")
+		http.Redirect(w, r, "/settings", http.StatusSeeOther)
+		return
+	}
+
+	if saveErr != nil {
+		s.sessions.Put(r.Context(), errorKey, adminAuthErrorMessage(saveErr))
+	}
+	http.Redirect(w, r, "/settings", http.StatusSeeOther)
+}
+
+// adminAuthErrorMessage maps admin-auth save errors to user-facing text.
+func adminAuthErrorMessage(err error) string {
+	if errors.Is(err, settings.ErrNoSettings) {
+		return "Save the CA connection first, then configure admin authentication."
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "subject and provisioner") {
+		return "Both admin subject and provisioner name are required for JWK authentication."
+	}
+	return "Could not save admin authentication settings."
 }
 
 // settingsErrorMessage maps Save's validation errors to user-facing text.

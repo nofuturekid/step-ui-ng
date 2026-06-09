@@ -98,9 +98,11 @@ func NewHandler(deps Deps) http.Handler {
 	mux.HandleFunc("POST /users/{id}", s.requireAuth(s.requireRole(users.RoleAdmin, s.postUser)))
 
 	// CA settings (admin+): view/save the connection, test connectivity (spec/0004).
+	// Admin-auth method + material (spec/0012 FR-1/FR-3).
 	mux.HandleFunc("GET /settings", s.requireAuth(s.requireRole(users.RoleAdmin, s.getSettings)))
 	mux.HandleFunc("POST /settings", s.requireAuth(s.requireRole(users.RoleAdmin, s.postSettings)))
 	mux.HandleFunc("POST /settings/test", s.requireAuth(s.requireRole(users.RoleAdmin, s.postSettingsTest)))
+	mux.HandleFunc("POST /settings/admin-auth", s.requireAuth(s.requireRole(users.RoleAdmin, s.postAdminAuth)))
 
 	// Provisioner management (admin+): list, select active, create, delete
 	// (spec/0005). Create/delete sign an x5c admin token from the stored admin

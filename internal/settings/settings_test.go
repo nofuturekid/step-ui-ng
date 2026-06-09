@@ -241,5 +241,7 @@ func renderAllFields(v settings.View) string {
 	return strings.Join([]string{
 		v.CAURL, v.RootFingerprint, v.AdminProvisioner, v.AdminSubject,
 		v.SelectedProvisioner, v.AdminCertPEM,
+		// spec/0012 additions: public fields only — secrets stay out.
+		string(v.AdminAuthMethod), v.AdminJWKSubject, v.AdminJWKProvisioner,
 	}, "\x00")
 }

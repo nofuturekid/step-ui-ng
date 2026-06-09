@@ -345,6 +345,207 @@ func TestSettingsViewerForbidden(t *testing.T) {
 	}
 }
 
+// --- Acceptance: Admin Authentication card (spec/0012) ----------------------
+
+// The settings page must render the admin-auth method selector with all three
+// options (none / x5c / jwk) so the operator can choose a method.
+func TestSettingsPageRendersAdminAuthSelector(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	_, body := e.get(t, "/settings")
+	for _, want := range []string{"admin_auth_method", "none", "x5c", "jwk"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("settings page missing admin-auth element %q; body:\n%s", want, body)
+		}
+	}
+}
+
+// POST /settings/admin-auth with method=jwk persists the subject, provisioner,
+// and a sealed password. The password must never be echoed on the page and the
+// HasAdminJWK indicator must flip to "set" (FR-5).
+func TestAdminAuthJWKSaveAndIndicator(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+	const jwkPass = "super-secret-jwk-password-9999"
+
+	// Seed base CA settings so SaveAdminJWK doesn't fail on ErrNoSettings.
+	if err := e.settingsRepo.Save(context.Background(), settings.Input{
+		CAURL: "https://ca.example", RootFingerprint: fakeFP,
+	}); err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+
+	token := e.csrfToken(t, "/settings")
+	resp := e.post(t, "/settings/admin-auth", url.Values{
+		"csrf_token":            {token},
+		"admin_auth_method":     {"jwk"},
+		"admin_jwk_subject":     {"step@example.com"},
+		"admin_jwk_provisioner": {"admin-jwk"},
+		"admin_jwk_password":    {jwkPass},
+	})
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("admin-auth JWK POST = %d, want 303", resp.StatusCode)
+	}
+
+	// After redirect: the page must show "jwk" badge, "set" password indicator,
+	// and MUST NOT echo the plaintext password.
+	_, body := e.get(t, "/settings")
+	if strings.Contains(body, jwkPass) {
+		t.Fatal("plaintext JWK password leaked into the /settings page")
+	}
+	if !strings.Contains(body, "jwk") {
+		t.Fatalf("expected 'jwk' method badge on /settings page; body:\n%s", body)
+	}
+	// The HasAdminJWK badge "set" must appear.
+	if !strings.Contains(body, ">set<") {
+		t.Fatalf("expected a 'set' indicator for the stored JWK password; body:\n%s", body)
+	}
+
+	// DB-level: password must be sealed (not plaintext).
+	var sealed string
+	if err := e.db.QueryRowContext(context.Background(),
+		"SELECT admin_jwk_password_sealed FROM ca_settings WHERE id = 1").Scan(&sealed); err != nil {
+		t.Fatalf("read sealed JWK password: %v", err)
+	}
+	if sealed == "" || sealed == jwkPass {
+		t.Fatalf("JWK password not sealed at rest (got %q)", sealed)
+	}
+}
+
+// POST /settings/admin-auth with method=none clears all admin credential
+// material and the page shows no "set" indicators.
+func TestAdminAuthNoneClears(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	// Seed a JWK auth first.
+	if err := e.settingsRepo.Save(context.Background(), settings.Input{
+		CAURL: "https://ca.example", RootFingerprint: fakeFP,
+	}); err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+	if err := e.settingsRepo.SaveAdminJWK(context.Background(), "step@example.com", "admin-jwk", "password-aaa"); err != nil {
+		t.Fatalf("seed JWK auth: %v", err)
+	}
+
+	// Now clear with method=none.
+	token := e.csrfToken(t, "/settings")
+	resp := e.post(t, "/settings/admin-auth", url.Values{
+		"csrf_token":        {token},
+		"admin_auth_method": {"none"},
+	})
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("admin-auth none POST = %d, want 303", resp.StatusCode)
+	}
+
+	// The repo must reflect method=none and no HasAdminJWK.
+	view, _, err := e.settingsRepo.Get(context.Background())
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if view.AdminAuthMethod != settings.AdminAuthNone {
+		t.Fatalf("AdminAuthMethod = %q, want none", view.AdminAuthMethod)
+	}
+	if view.HasAdminJWK {
+		t.Fatal("HasAdminJWK should be false after clearing to none")
+	}
+}
+
+// POST /settings/admin-auth with method=jwk and blank password must NOT
+// overwrite the existing sealed password (write-only semantics, FR-5).
+func TestAdminAuthJWKBlankPasswordKeepsExisting(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+	const origPass = "original-jwk-password-1234"
+
+	if err := e.settingsRepo.Save(context.Background(), settings.Input{
+		CAURL: "https://ca.example", RootFingerprint: fakeFP,
+	}); err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+	if err := e.settingsRepo.SaveAdminJWK(context.Background(), "step@example.com", "admin-jwk", origPass); err != nil {
+		t.Fatalf("seed JWK auth: %v", err)
+	}
+	var firstSealed string
+	if err := e.db.QueryRowContext(context.Background(),
+		"SELECT admin_jwk_password_sealed FROM ca_settings WHERE id = 1").Scan(&firstSealed); err != nil {
+		t.Fatalf("read first sealed: %v", err)
+	}
+
+	// Re-submit with blank password; sealed value must be unchanged.
+	token := e.csrfToken(t, "/settings")
+	resp := e.post(t, "/settings/admin-auth", url.Values{
+		"csrf_token":            {token},
+		"admin_auth_method":     {"jwk"},
+		"admin_jwk_subject":     {"step@example.com"},
+		"admin_jwk_provisioner": {"admin-jwk"},
+		"admin_jwk_password":    {""},
+	})
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("admin-auth JWK blank-pass POST = %d, want 303", resp.StatusCode)
+	}
+
+	var secondSealed string
+	if err := e.db.QueryRowContext(context.Background(),
+		"SELECT admin_jwk_password_sealed FROM ca_settings WHERE id = 1").Scan(&secondSealed); err != nil {
+		t.Fatalf("read second sealed: %v", err)
+	}
+	if secondSealed != firstSealed {
+		t.Fatalf("blank password changed the sealed value: %q -> %q", firstSealed, secondSealed)
+	}
+}
+
+// The provisioner page shows an honest FR-6 hint (naming both x5c and jwk)
+// when no admin authentication is configured. The old message "Add an admin
+// certificate and key" must not appear.
+func TestProvisionersPageHonestHintWhenNoAuth(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+	f := startAppAdminCA(t, `{"provisioners":[]}`)
+	e.seedCA(t, f, false) // no admin auth configured
+
+	_, body := e.getBody(t, "/provisioners")
+	// Must name both options and not use the old misleading text.
+	if !strings.Contains(strings.ToLower(body), "x5c") {
+		t.Fatalf("provisioners page missing 'x5c' hint; body:\n%s", body)
+	}
+	if !strings.Contains(strings.ToLower(body), "jwk") {
+		t.Fatalf("provisioners page missing 'jwk' hint; body:\n%s", body)
+	}
+	if strings.Contains(body, "Add an admin certificate and key") {
+		t.Fatalf("provisioners page still shows misleading old message; body:\n%s", body)
+	}
+}
+
+// method=jwk but NO password stored is not usable: the create controls must be
+// gated OFF (gate on usable material, not just the method label), otherwise the
+// form renders enabled while every action fails closed — a confusing footgun.
+func TestProvisionersPageGatedWhenJWKWithoutPassword(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+	f := startAppAdminCA(t, `{"provisioners":[]}`)
+	e.seedCA(t, f, false)
+
+	// Select JWK with subject + provisioner but a BLANK password (none stored).
+	token := e.csrfToken(t, "/settings")
+	resp := e.post(t, "/settings/admin-auth", url.Values{
+		"csrf_token":            {token},
+		"admin_auth_method":     {"jwk"},
+		"admin_jwk_subject":     {"step"},
+		"admin_jwk_provisioner": {"admin"},
+		"admin_jwk_password":    {""},
+	})
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("admin-auth POST status = %d, want 303", resp.StatusCode)
+	}
+
+	_, body := e.getBody(t, "/provisioners")
+	if !strings.Contains(body, "Creating and deleting provisioners requires an admin credential") {
+		t.Fatalf("jwk-without-password must gate the create form, but it appears enabled; body:\n%s", body)
+	}
+}
+
 // postBody sends a same-origin form POST and returns the status and the response
 // body (unlike testEnv.post, which discards the body). Used to assert on the
 // htmx test-connection partials.

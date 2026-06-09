@@ -16,6 +16,10 @@ import (
 	"github.com/nofuturekid/step-ui-ng/internal/settings"
 )
 
+// acmeHasAdminAuth reports whether ACME management controls should be enabled
+// for the given settings View, using the unified admin-auth method.
+func acmeHasAdminAuth(v settings.View) bool { return viewHasAdminAuth(v) }
+
 // acmeChallengeChoices are the challenge types the UI offers (FR-1). Ordered for
 // a stable form render.
 //
@@ -62,7 +66,7 @@ func (s *server) getACME(w http.ResponseWriter, r *http.Request) {
 	d.Error = s.sessions.PopString(r.Context(), errorKey)
 
 	av := acmeView{
-		HasAdminCred: view.HasAdminKey,
+		HasAdminCred: acmeHasAdminAuth(view),
 		CASettings:   ok,
 		Challenges:   acmeChallengeChoices,
 	}
@@ -214,7 +218,8 @@ func (s *server) getEAB(w http.ResponseWriter, r *http.Request) {
 	d.Flash = s.sessions.PopString(r.Context(), flashKey)
 	d.Error = s.sessions.PopString(r.Context(), errorKey)
 
-	ev := eabView{Provisioner: prov, HasAdminCred: ok && view.HasAdminKey}
+	hasAuth := ok && viewHasAdminAuth(view)
+	ev := eabView{Provisioner: prov, HasAdminCred: hasAuth}
 	if !ok {
 		ev.ListError = "Configure the CA connection first (CA settings)."
 		s.render(w, r, http.StatusOK, eabPage(d, ev))
@@ -228,10 +233,12 @@ func (s *server) getEAB(w http.ResponseWriter, r *http.Request) {
 	// keys must not show them. The public list needs no admin token.
 	ev.RequireEAB = s.currentACMEOptions(r, view, prov).RequireEAB
 
-	if view.HasAdminKey {
-		cred, credOK, cerr := s.adminCredential(r)
-		if cerr != nil || !credOK {
-			ev.ListError = "No admin credential configured — add an admin certificate and key on the CA settings page."
+	if hasAuth {
+		auth, authOK, cerr := s.adminAuth(r.Context(), view)
+		if cerr != nil || !authOK {
+			ev.ListError = adminAuthMissingMessage()
+		} else if cred, credErr := auth.Credential(r.Context()); credErr != nil {
+			ev.ListError = eabErrorMessage(credErr)
 		} else if keys, lerr := ca.ListEABKeys(r.Context(), view.CAURL, view.RootFingerprint, cred, prov); lerr != nil {
 			ev.ListError = eabErrorMessage(lerr)
 		} else {
@@ -334,14 +341,20 @@ func (s *server) acmeAdminContext(w http.ResponseWriter, r *http.Request) (view 
 		http.Redirect(w, r, "/acme", http.StatusSeeOther)
 		return view, cred, false
 	}
-	c, credOK, err := s.adminCredential(r)
-	if err != nil {
+	auth, authOK, authErr := s.adminAuth(r.Context(), v)
+	if authErr != nil {
 		s.sessions.Put(r.Context(), errorKey, "Could not load the admin credential.")
 		http.Redirect(w, r, "/acme", http.StatusSeeOther)
 		return view, cred, false
 	}
-	if !credOK {
-		s.sessions.Put(r.Context(), errorKey, "No admin credential configured — add an admin certificate and key to manage ACME.")
+	if !authOK {
+		s.sessions.Put(r.Context(), errorKey, adminAuthMissingMessage())
+		http.Redirect(w, r, "/acme", http.StatusSeeOther)
+		return view, cred, false
+	}
+	c, credErr := auth.Credential(r.Context())
+	if credErr != nil {
+		s.sessions.Put(r.Context(), errorKey, eabErrorMessage(credErr))
 		http.Redirect(w, r, "/acme", http.StatusSeeOther)
 		return view, cred, false
 	}
@@ -377,6 +390,8 @@ func eabErrorMessage(err error) string {
 		return "The CA rejected the admin credential (unauthorized). Check the admin certificate and key."
 	case errors.Is(err, ca.ErrInvalidAdminCredential):
 		return "The stored admin credential is invalid."
+	case errors.Is(err, ca.ErrProvisionerKey):
+		return "Could not decrypt the JWK provisioner key — check the admin password."
 	case errors.Is(err, ca.ErrFingerprintMismatch):
 		return "The CA's root certificate does not match the configured fingerprint."
 	case errors.Is(err, ca.ErrUnreachable):
