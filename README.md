@@ -109,6 +109,11 @@ App icon URL (resolves once merged to main):
 - **Appdata** — map `/home/step` to an appdata location (e.g. `/mnt/user/appdata/step-ca`).
   It holds the root/intermediate keys and config; back it up. Deleting it forces a reinit
   with a **new root**, invalidating all previously issued certificates.
+- **Runs as `99:100`** — the image's default user is `step` (uid 1000), which cannot write
+  a `99:100`-owned appdata dir; without it the first-run init fails with
+  `Permission denied`. The template sets `--user 99:100` (Extra Parameters). Make the
+  appdata dir match: `chown -R 99:100 /mnt/user/appdata/step-ca` once (a freshly created
+  bind-mount dir is `root:root`).
 
 Point step-ui-ng at the CA with its URL (`https://HOST:9000`) and the root fingerprint.
 

@@ -15,6 +15,9 @@ Versions are bumped only when a release is cut; in-progress work lives under
   repository serves both halves of the stack. Documented how to register the repo as an
   Unraid template source (CA scans `.xml`; each template's `<TemplateURL>` enables
   update tracking).
+- The Step-CA Unraid template now sets `--user 99:100` so the appdata bind mount is
+  writable; without it the first-run init failed with `Permission denied` writing the
+  generated password (the image runs as uid 1000, Unraid appdata is owned 99:100).
 
 ### Fixed
 
