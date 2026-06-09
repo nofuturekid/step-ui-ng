@@ -65,6 +65,14 @@ func TestInventoryPageHead(t *testing.T) {
 	if !strings.Contains(body, "Issue certificate") {
 		t.Error("inventory: admin should see 'Issue certificate' action button")
 	}
+	// Deliberate order: the primary "Issue certificate" action comes before the
+	// secondary "Sign CSR" in the page header (maintainer's choice). Scope the
+	// comparison to the actions block — "Sign CSR" also appears in the topbar nav
+	// (before the page head), which would otherwise skew the index check.
+	actions := body[strings.Index(body, "page-head__actions"):]
+	if iIssue, iSign := strings.Index(actions, "Issue certificate"), strings.Index(actions, "Sign CSR"); iIssue < 0 || iSign < 0 || iIssue > iSign {
+		t.Errorf("inventory header: 'Issue certificate' must come before 'Sign CSR' (got Issue@%d, Sign@%d)", iIssue, iSign)
+	}
 }
 
 // TestInventoryPageHeadViewerNoActions verifies that a viewer sees the page

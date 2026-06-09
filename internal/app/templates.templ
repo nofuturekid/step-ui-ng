@@ -1318,8 +1318,8 @@ templ inventoryPage(d pageData, v inventoryView) {
 					</div>
 					if d.User != nil && d.User.Role.AtLeast(users.RoleAdmin) {
 						<div class="page-head__actions">
-							<a class="btn" href="/sign-csr"><svg class="ico"><use href="/static/icons.svg#i-pen"></use></svg> Sign CSR</a>
 							<a class="btn btn--primary" href="/issue"><svg class="ico"><use href="/static/icons.svg#i-file-plus"></use></svg> Issue certificate</a>
+							<a class="btn" href="/sign-csr"><svg class="ico"><use href="/static/icons.svg#i-pen"></use></svg> Sign CSR</a>
 						</div>
 					}
 				</div>
