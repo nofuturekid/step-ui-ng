@@ -135,6 +135,47 @@ func TestShellCSSServed(t *testing.T) {
 	}
 }
 
+// TestBoostedNavigation verifies the SPA-feel wiring: the authenticated layout
+// opts every same-origin link/form into htmx boosting (hx-boost on <body>) so
+// navigation swaps the body instead of doing a full reload (which caused the
+// "jumping"/flash). The hx-indicator points at the #top-progress bar, and the
+// .progress-bar styles are served. Removing any of these regresses the fix.
+func TestBoostedNavigation(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+	_, body := e.get(t, "/inventory")
+
+	if !strings.Contains(body, `hx-boost="true"`) {
+		t.Error("layout <body>: missing hx-boost=\"true\" (navigation would full-reload)")
+	}
+	if !strings.Contains(body, `hx-indicator="#top-progress"`) {
+		t.Error("layout <body>: missing hx-indicator=\"#top-progress\"")
+	}
+	if !strings.Contains(body, `id="top-progress"`) {
+		t.Error("layout: missing #top-progress indicator element")
+	}
+
+	// The progress-bar must be styled, and react to the htmx-request class htmx
+	// toggles on the indicator target.
+	_, css := e.get(t, "/static/app.css")
+	for _, sel := range []string{".progress-bar", ".progress-bar.htmx-request"} {
+		if !strings.Contains(css, sel) {
+			t.Fatalf("GET /static/app.css: missing progress-bar selector %q", sel)
+		}
+	}
+}
+
+// TestLoginPageNotBoosted verifies the pre-auth shell does NOT opt into boosting:
+// login/setup use authShell (no topbar, no hx-boost) so the first paint and the
+// post-auth redirect are plain full navigations, not htmx swaps.
+func TestLoginPageNotBoosted(t *testing.T) {
+	e := newTestEnv(t)
+	_, body := e.get(t, "/login")
+	if strings.Contains(body, `hx-boost`) {
+		t.Errorf("login page must not be boosted (authShell has no hx-boost); body:\n%s", body)
+	}
+}
+
 // TestActiveSectionOnNav verifies that aria-current="page" appears on the correct
 // primary nav link for the inventory, issue, and sign-csr pages. This test would
 // fail if ActiveSection is not set in the handler, or if activeCurrent returns
