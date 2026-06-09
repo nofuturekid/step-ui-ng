@@ -420,6 +420,29 @@ func TestSettingsDesignContentNarrow(t *testing.T) {
 	}
 }
 
+// TestSettingsDesignX5CCopyButtonHasDataCopyTarget verifies that the "Copy"
+// button next to the guided "step ca certificate …" command in the x5c group
+// uses data-copy-target pointing at the visible <pre> element. This proves:
+//
+//	(a) the command is rendered as visible, selectable text in a <pre>
+//	(b) the copy button is wired via data-copy-target (shared delegated handler)
+//	    so it works without needing a separate onclick= attribute
+func TestSettingsDesignX5CCopyButtonHasDataCopyTarget(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	_, body := e.get(t, "/settings")
+
+	// The guided command must be in a <pre> element (visible, selectable text)
+	if !strings.Contains(body, ">step ca certificate") {
+		t.Error("settings x5c: guided command must appear as visible text (inside a <pre> element)")
+	}
+	// The copy button must carry a data-copy-target attribute pointing at the <pre>
+	if !strings.Contains(body, `data-copy-target=`) {
+		t.Error("settings x5c: copy button must use data-copy-target attribute (shared delegated handler)")
+	}
+}
+
 // extractAround returns up to n characters centered around the first
 // occurrence of needle in s; used for diagnostic snippets in failures.
 func extractAround(s, needle string, n int) string {
