@@ -1240,6 +1240,279 @@ table.table {
 }
 
 /* =========================================================================
+   CA settings page — design system components (PR C)
+   ========================================================================= */
+
+/* Narrow content wrapper (settings, forms) — narrower than data-heavy pages */
+.content--narrow {
+  padding-top: var(--space-8);
+  padding-bottom: var(--space-16);
+  max-width: 780px;
+}
+
+/* Required / optional field markers */
+.req {
+  color: var(--danger-fg);
+  font-weight: var(--fw-semibold);
+}
+.opt {
+  color: var(--text-subtle);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-sm);
+}
+
+/* Field hint text */
+.field__hint {
+  font-size: var(--fs-xs);
+  color: var(--text-subtle);
+}
+.field__hint code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--surface-2);
+  padding: 1px 4px;
+  border-radius: var(--r-sm);
+}
+
+/* form-grid column-span helper */
+.col-span-2 {
+  grid-column: 1 / -1;
+}
+
+/* Textarea (design system) — mirrors .input */
+.textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r);
+  font: inherit;
+  font-size: var(--fs-base);
+  resize: vertical;
+}
+.textarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+.textarea::placeholder {
+  color: var(--text-subtle);
+}
+
+/* Flash variants (--warn and --ok and --error for the test-connection result) */
+.flash--warn {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--warn-border);
+  border-radius: var(--r);
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+  font-size: var(--fs-base);
+}
+.flash--ok {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--ok-border);
+  border-radius: var(--r);
+  background: var(--ok-bg);
+  color: var(--ok-fg);
+  font-size: var(--fs-base);
+}
+.flash--error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--r);
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+  font-size: var(--fs-base);
+}
+.flash--warn .ico,
+.flash--ok .ico,
+.flash--error .ico {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-top: 1px;
+}
+.flash--warn .flash__body,
+.flash--ok .flash__body,
+.flash--error .flash__body {
+  flex: 1;
+}
+.flash--warn .flash__body strong,
+.flash--ok .flash__body strong,
+.flash--error .flash__body strong {
+  font-weight: var(--fw-semibold);
+}
+.flash--warn .flash__body p,
+.flash--ok .flash__body p,
+.flash--error .flash__body p {
+  color: inherit;
+  margin-top: 2px;
+  opacity: 0.85;
+}
+
+/* Segmented radio group (.seg) for method selector */
+.seg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+.seg > label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    border-color 0.1s ease,
+    background 0.1s ease;
+}
+.seg > label:hover {
+  border-color: var(--border-focus);
+  background: var(--surface-2);
+}
+.seg > label:has(input:checked) {
+  border-color: var(--accent-soft-border);
+  background: var(--accent-soft-bg);
+}
+.seg > label input[type="radio"] {
+  margin-top: 2px;
+  flex: none;
+  width: auto;
+}
+.seg__name {
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-sm);
+  min-width: 3em;
+}
+.seg__desc {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  flex: 1;
+}
+.seg > label .check {
+  margin-left: auto;
+  opacity: 0;
+  color: var(--accent);
+  flex: none;
+}
+.seg > label:has(input:checked) .check {
+  opacity: 1;
+}
+
+/* Method fieldset / method group reveal via CSS :has() */
+.method-fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+.method-fieldset > legend {
+  padding: 0;
+  border: none;
+}
+
+/* All method groups hidden by default */
+.method-group {
+  display: none;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  margin-top: var(--space-2);
+}
+
+/* :has() reveal — when the matching radio is checked, show that group.
+   No-:has() fallback: if :has() is unsupported, all groups are hidden;
+   the form still submits correctly since all inputs are present in the DOM,
+   and the server-rendered page opens at the stored method group (see fallback
+   rule below using the class that the template adds when :has() is absent). */
+.method-fieldset:has(#m-none:checked) .mg-none,
+.method-fieldset:has(#m-x5c:checked) .mg-x5c,
+.method-fieldset:has(#m-jwk:checked) .mg-jwk {
+  display: block;
+}
+
+/* No-:has() fallback: when the browser does not support :has(), show all
+   method groups so the form remains usable. On modern browsers this block
+   is ignored and the :has() reveal rules above take effect instead. */
+@supports not (selector(:has(*))) {
+  .method-group {
+    display: block;
+  }
+}
+
+/* Method group header bar */
+.method-group__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+  margin-bottom: var(--space-4);
+}
+
+/* badge--set / badge--none (secret-status indicators) — color-only modifiers;
+   box props come from the shared .badge--ok/warn/… block above via the
+   .badge--set, .badge--none addition below. */
+.badge--set,
+.badge--none {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 var(--space-2) 0 7px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  line-height: 1;
+}
+.badge--set {
+  color: var(--ok-fg);
+  background: var(--ok-bg);
+  border: 1px solid var(--ok-border);
+}
+.badge--none {
+  color: var(--neutral-fg);
+  background: var(--neutral-bg);
+  border: 1px solid var(--neutral-border);
+}
+
+/* Secret row: input + status badge side by side */
+.secret-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.secret-row .input {
+  flex: 1;
+  min-width: 0;
+}
+.secret-state {
+  flex: none;
+}
+
+/* codeblock--cmd: command variant of the code block */
+.codeblock--cmd pre {
+  color: var(--text);
+}
+
+/* =========================================================================
    Legacy page-interior styles
    These are used by templates not yet ported to the new design system.
    They intentionally continue to use old --content-width / --muted /

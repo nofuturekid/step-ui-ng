@@ -311,15 +311,6 @@ templ userRow(d pageData, u users.User) {
 	</tr>
 }
 
-// adminAuthOption renders a <select> option for the admin-auth method.
-templ adminAuthOption(opt settings.AdminAuthMethod, label string, current settings.AdminAuthMethod) {
-	if opt == current {
-		<option value={ string(opt) } selected>{ label }</option>
-	} else {
-		<option value={ string(opt) }>{ label }</option>
-	}
-}
-
 templ roleOption(opt users.Role, current users.Role) {
 	if opt == current {
 		<option value={ string(opt) } selected>{ string(opt) }</option>
@@ -330,135 +321,225 @@ templ roleOption(opt users.Role, current users.Role) {
 
 // settingsPage renders the CA connection form (spec/0004, admin+). The admin
 // secret is write-only: the form never renders the stored value, only whether
-// one is set (FR-5).
+// one is set (FR-5). Layout follows docs/design/ca-settings.html.
 templ settingsPage(d pageData, v settings.View) {
 	@layout(d) {
-		<div class="card">
-			<h1>CA connection</h1>
-			<p class="muted">Configure the Step-CA this UI talks to. Secrets are encrypted at rest and never shown.</p>
-			<form method="post" action="/settings">
-				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-				<label for="ca_url">CA URL</label>
-				<input id="ca_url" name="ca_url" type="url" inputmode="url" required placeholder="https://ca.example:9000" value={ v.CAURL }/>
-				<label for="root_fingerprint">Root fingerprint (SHA-256 hex)</label>
-				<input id="root_fingerprint" name="root_fingerprint" type="text" required minlength="40" maxlength="64" pattern="[0-9a-fA-F]{40,64}" value={ v.RootFingerprint }/>
-				<button type="submit">Save</button>
-			</form>
-		</div>
-		<div class="card">
-			<h1>Test connection</h1>
-			<p class="muted">Fetches the CA roots over HTTPS and verifies the configured fingerprint.</p>
-			<form
-				method="post"
-				action="/settings/test"
-				hx-post="/settings/test"
-				hx-target="#test-result"
-				hx-swap="innerHTML"
-			>
-				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-				<button class="secondary" type="submit">Test connection</button>
-			</form>
-			<div id="test-result"></div>
-		</div>
-		<div class="card">
-			<h1>Admin authentication</h1>
-			<p class="muted">
-				Configure how the UI authenticates to the CA admin API (used for provisioner and ACME management).
-				Secrets are encrypted at rest and never shown.
-			</p>
-			<form method="post" action="/settings/admin-auth">
-				<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-				<label for="admin-auth-method">
-					Method
-					if v.AdminAuthMethod != "" && v.AdminAuthMethod != settings.AdminAuthNone {
-						<span class="badge">{ string(v.AdminAuthMethod) }</span>
-					}
-				</label>
-				<select
-					id="admin-auth-method"
-					name="admin_auth_method"
-					onchange="(function(v){document.getElementById('x5c-fields').style.display=(v==='x5c'?'block':'none');document.getElementById('jwk-fields').style.display=(v==='jwk'?'block':'none');})(this.value)"
-				>
-					@adminAuthOption(settings.AdminAuthNone, "None (disable admin operations)", v.AdminAuthMethod)
-					@adminAuthOption(settings.AdminAuthX5C, "x5c — admin certificate + key", v.AdminAuthMethod)
-					@adminAuthOption(settings.AdminAuthJWK, "JWK — provisioner password", v.AdminAuthMethod)
-				</select>
-				<div
-					id="x5c-fields"
-					if v.AdminAuthMethod == settings.AdminAuthX5C {
-						style="display:block"
-					} else {
-						style="display:none"
-					}
-				>
-					<p>
-						Admin key status:
-						if v.HasAdminKey {
-							<span class="badge">set</span>
-						} else {
-							<span class="badge">none</span>
-						}
-					</p>
-					if v.AdminCertPEM != "" {
-						<label>Current certificate chain (read-only)</label>
-						<textarea rows="6" readonly class="mono">{ v.AdminCertPEM }</textarea>
-					}
-					<label for="admin-x5c-cert">Certificate chain (PEM, leaf first)</label>
-					<textarea id="admin-x5c-cert" name="admin_x5c_cert" rows="8" autocomplete="off" placeholder="-----BEGIN CERTIFICATE-----"></textarea>
-					<label for="admin-x5c-key">
-						Private key (PEM) — write-only, never shown
-						if v.HasAdminKey {
-							<span class="badge">set</span>
-						} else {
-							<span class="badge">none</span>
-						}
-					</label>
-					<textarea id="admin-x5c-key" name="admin_x5c_key" rows="6" autocomplete="off" placeholder="-----BEGIN PRIVATE KEY-----&#10;(required — the key is sealed at rest and never echoed)"></textarea>
-					<p class="muted">
-						To get an admin certificate, issue one for a registered super-admin subject using a
-						provisioner that can sign (e.g. your JWK provisioner). The leaf needs the clientAuth EKU:
-					</p>
-					<div class="copy">
-						<textarea rows="3" readonly class="mono">{ fmt.Sprintf(`step ca certificate "<admin-subject>" admin.crt admin.key --provisioner <provisioner> --ca-url %s --root root.crt`, v.CAURL) }</textarea>
-						<button type="button" class="secondary" onclick="copyText(this)">Copy</button>
+		<div class="content--narrow">
+			<!-- Page header -->
+			<div class="page-head">
+				<div class="breadcrumb"><a href="#">Settings</a><span class="sep">/</span><span>CA settings</span></div>
+				<h1 class="page-title">CA settings</h1>
+				<p class="page-sub">Connect step-ui-ng to your Step-CA instance and configure the admin credentials used for privileged operations.</p>
+			</div>
+			<div class="stack">
+				<!-- Card 1 — CA connection -->
+				<div class="card">
+					<div class="card__header">
+						<div>
+							<h2 class="card__title">CA connection</h2>
+							<p class="card__desc">How step-ui-ng reaches the CA's HTTP API. The root fingerprint pins the CA's identity.</p>
+						</div>
 					</div>
-					<p class="muted">
-						To register a super-admin or set up an X5C provisioner, see the
-						<a href="https://smallstep.com/docs/step-ca/provisioners/#x509-certificates-x5c" target="_blank" rel="noopener noreferrer">Step-CA admin/X5C docs</a>.
-					</p>
+					<form class="card__body stack-4" method="post" action="/settings">
+						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+						<div class="form-grid">
+							<div class="field col-span-2">
+								<label for="ca_url">CA URL <span class="req" aria-hidden="true">*</span></label>
+								<input class="input mono" id="ca_url" name="ca_url" type="url" inputmode="url" required placeholder="https://ca.example:9000" value={ v.CAURL }/>
+							</div>
+							<div class="field col-span-2">
+								<label for="root_fingerprint">Root fingerprint <span class="opt">(SHA-256, hex)</span></label>
+								<input class="input mono" id="root_fingerprint" name="root_fingerprint" type="text" required minlength="40" maxlength="64" pattern="[0-9a-fA-F]&#123;40,64&#125;" value={ v.RootFingerprint }/>
+								<span class="field__hint">From <code>step certificate fingerprint root_ca.crt</code>. Pins the root so a swapped CA is rejected.</span>
+							</div>
+						</div>
+						<div class="form-actions">
+							<button type="submit" class="btn btn--primary">Save connection</button>
+							<button
+								type="submit"
+								class="btn"
+								formaction="/settings/test"
+								formmethod="post"
+								hx-post="/settings/test"
+								hx-target="#test-result"
+								hx-swap="innerHTML"
+							>
+								<svg class="ico"><use href="/static/icons.svg#i-refresh"></use></svg> Test connection
+							</button>
+						</div>
+						<div id="test-result"></div>
+					</form>
 				</div>
-				<div
-					id="jwk-fields"
-					if v.AdminAuthMethod == settings.AdminAuthJWK {
-						style="display:block"
-					} else {
-						style="display:none"
-					}
-				>
-					<label for="admin-jwk-subject">Admin subject</label>
-					<input id="admin-jwk-subject" name="admin_jwk_subject" type="text" value={ v.AdminJWKSubject } placeholder="e.g. step"/>
-					<label for="admin-jwk-provisioner">JWK provisioner name</label>
-					<input id="admin-jwk-provisioner" name="admin_jwk_provisioner" type="text" value={ v.AdminJWKProvisioner } placeholder="e.g. admin-jwk"/>
-					<label for="admin-jwk-password">
-						Provisioner password
-						if v.HasAdminJWK {
-							<span class="badge">set</span>
-						} else {
-							<span class="badge">none</span>
-						}
-					</label>
-					<input id="admin-jwk-password" name="admin_jwk_password" type="password" autocomplete="new-password" placeholder="leave blank to keep the current password"/>
-					if v.HasAdminJWK {
-						<p class="muted">A password is stored — leave blank to keep it, or type a new one to replace it.</p>
-					} else {
-						<p class="muted">No password stored yet.</p>
-					}
+				<!-- Card 2 — Admin authentication -->
+				<div class="card">
+					<div class="card__header">
+						<div>
+							<h2 class="card__title">Admin authentication</h2>
+							<p class="card__desc">Credentials step-ui-ng uses for privileged CA operations (creating/deleting provisioners, ACME management). All secrets are write-only.</p>
+						</div>
+						<div class="card__actions">
+							<span class={ "badge", activeBadgeClass(v.AdminAuthMethod) }>
+								<span class="dot"></span>Active: { activeMethodLabel(v.AdminAuthMethod) }
+							</span>
+						</div>
+					</div>
+					<form class="card__body" method="post" action="/settings/admin-auth">
+						<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+						<!-- Method selector — reveal via CSS :has(); no JS -->
+						<fieldset class="method-fieldset">
+							<legend class="label" style="margin-bottom:var(--space-3)">Method</legend>
+							<div class="seg" role="radiogroup" aria-label="Admin authentication method">
+								<label>
+									<input type="radio" name="admin_auth_method" id="m-none" value="none" checked?={ v.AdminAuthMethod == settings.AdminAuthNone || v.AdminAuthMethod == "" }/>
+									<span class="seg__name"><span class="mono">none</span></span>
+									<span class="seg__desc">No stored admin credentials.</span>
+									<svg class="ico check"><use href="/static/icons.svg#i-check-circle"></use></svg>
+								</label>
+								<label>
+									<input type="radio" name="admin_auth_method" id="m-x5c" value="x5c" checked?={ v.AdminAuthMethod == settings.AdminAuthX5C }/>
+									<span class="seg__name"><span class="mono">x5c</span></span>
+									<span class="seg__desc">Admin certificate + key (PEM).</span>
+									<svg class="ico check"><use href="/static/icons.svg#i-check-circle"></use></svg>
+								</label>
+								<label>
+									<input type="radio" name="admin_auth_method" id="m-jwk" value="jwk" checked?={ v.AdminAuthMethod == settings.AdminAuthJWK }/>
+									<span class="seg__name"><span class="mono">jwk</span></span>
+									<span class="seg__desc">Subject + provisioner password.</span>
+									<svg class="ico check"><use href="/static/icons.svg#i-check-circle"></use></svg>
+								</label>
+							</div>
+							<!-- none group -->
+							<div class="method-group mg-none">
+								<div class="flash flash--warn">
+									<svg class="ico"><use href="/static/icons.svg#i-info"></use></svg>
+									<div class="flash__body">
+										<strong>No admin credentials stored.</strong>
+										<p>Browsing the inventory and issuing through an active provisioner still work, but creating or deleting provisioners and managing ACME are disabled.</p>
+									</div>
+								</div>
+							</div>
+							<!-- x5c group -->
+							<div class="method-group mg-x5c" id="x5c-fields">
+								<div class="method-group__title">
+									<svg class="ico" style="width:14px;height:14px"><use href="/static/icons.svg#i-file-text"></use></svg> x5c credentials
+									<span
+										class={ "badge", settingsSecretBadgeClass(v.HasAdminKey) }
+										style="margin-left:auto"
+									>
+										<span class="dot"></span>{ settingsSecretBadgeLabel(v.HasAdminKey) }
+									</span>
+								</div>
+								<div class="stack-4">
+									<div class="field">
+										<label for="admin-x5c-cert">Admin certificate chain (PEM)</label>
+										<textarea class="textarea mono" id="admin-x5c-cert" name="admin_x5c_cert" rows="4" autocomplete="off" placeholder="-----BEGIN CERTIFICATE-----&#10;…&#10;-----END CERTIFICATE-----"></textarea>
+									</div>
+									<div class="field">
+										<label for="admin-x5c-key">Admin private key (PEM) <span class="opt">— write-only</span></label>
+										<textarea class="textarea mono" id="admin-x5c-key" name="admin_x5c_key" rows="4" autocomplete="off" placeholder="-----BEGIN PRIVATE KEY-----&#10;…&#10;-----END PRIVATE KEY-----"></textarea>
+										<span class="field__hint">Stored encrypted and never rendered back. Leave blank to keep the current value.</span>
+									</div>
+									<div class="codeblock codeblock--cmd">
+										<div class="codeblock__bar">
+											<svg class="ico"><use href="/static/icons.svg#i-terminal"></use></svg>
+											<span class="label">Get an admin cert from the CA</span>
+											<span class="spacer"></span>
+											<button type="button" class="copy-btn" data-copy-target="#cmd-x5c">
+												<svg class="ico"><use href="/static/icons.svg#i-copy"></use></svg>
+												<span class="label">Copy</span>
+											</button>
+										</div>
+										<pre id="cmd-x5c">{ fmt.Sprintf("step ca certificate \"<admin-subject>\" admin.crt admin.key \\\n  --provisioner <provisioner> \\\n  --ca-url %s --root root.crt", v.CAURL) }</pre>
+									</div>
+								</div>
+							</div>
+							<!-- jwk group -->
+							<div class="method-group mg-jwk" id="jwk-fields">
+								<div class="method-group__title">
+									<svg class="ico" style="width:14px;height:14px"><use href="/static/icons.svg#i-key"></use></svg> jwk credentials
+									<span
+										class={ "badge", settingsSecretBadgeClass(v.HasAdminJWK) }
+										style="margin-left:auto"
+									>
+										<span class="dot"></span>{ settingsSecretBadgeLabel(v.HasAdminJWK) }
+									</span>
+								</div>
+								<div class="form-grid">
+									<div class="field">
+										<label for="admin-jwk-subject">Admin subject</label>
+										<input class="input mono" id="admin-jwk-subject" name="admin_jwk_subject" type="text" value={ v.AdminJWKSubject } placeholder="e.g. step"/>
+									</div>
+									<div class="field">
+										<label for="admin-jwk-provisioner">Provisioner name</label>
+										<input class="input mono" id="admin-jwk-provisioner" name="admin_jwk_provisioner" type="text" value={ v.AdminJWKProvisioner } placeholder="e.g. admin-jwk"/>
+									</div>
+									<div class="field col-span-2 secret-field">
+										<label for="admin-jwk-password">Provisioner password <span class="opt">— write-only</span></label>
+										<div class="secret-row">
+											<input class="input" id="admin-jwk-password" name="admin_jwk_password" type="password" autocomplete="off" placeholder="•••••••• (unchanged)"/>
+											<span class="secret-state">
+												<span class={ "badge", settingsSecretBadgeClass(v.HasAdminJWK) }>
+													<span class="dot"></span>{ settingsSecretBadgeLabel(v.HasAdminJWK) }
+												</span>
+											</span>
+										</div>
+										if v.HasAdminJWK {
+											<span class="field__hint">A value is stored. Leave blank to keep it; type to replace it. The stored value is never displayed.</span>
+										} else {
+											<span class="field__hint">No password stored yet.</span>
+										}
+									</div>
+								</div>
+							</div>
+						</fieldset>
+						<div class="form-actions" style="margin-top:var(--space-6)">
+							<button type="submit" class="btn btn--primary">Save authentication</button>
+							<a class="btn btn--ghost" href="/provisioners">Go to provisioners</a>
+						</div>
+					</form>
 				</div>
-				<p></p>
-				<button type="submit">Save admin authentication</button>
-			</form>
+			</div>
 		</div>
 	}
+}
+
+// activeBadgeClass returns the badge modifier class for the active-method badge.
+func activeBadgeClass(m settings.AdminAuthMethod) string {
+	switch m {
+	case settings.AdminAuthX5C, settings.AdminAuthJWK:
+		return "badge--info"
+	default:
+		return "badge--neutral"
+	}
+}
+
+// activeMethodLabel returns the display label for the active method badge.
+func activeMethodLabel(m settings.AdminAuthMethod) string {
+	switch m {
+	case settings.AdminAuthX5C:
+		return "x5c"
+	case settings.AdminAuthJWK:
+		return "jwk"
+	default:
+		return "none"
+	}
+}
+
+// settingsSecretBadgeClass returns the badge modifier class for a secret
+// status indicator: badge--set when present, badge--none when absent.
+func settingsSecretBadgeClass(hasSecret bool) string {
+	if hasSecret {
+		return "badge--set"
+	}
+	return "badge--none"
+}
+
+// settingsSecretBadgeLabel returns "set" or "none" for a secret status badge.
+func settingsSecretBadgeLabel(hasSecret bool) string {
+	if hasSecret {
+		return "set"
+	}
+	return "none"
 }
 
 // testSuccess is the htmx partial shown when the connection test passes (FR-2).
