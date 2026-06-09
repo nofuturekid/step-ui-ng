@@ -18,6 +18,10 @@ Versions are bumped only when a release is cut; in-progress work lives under
 - The Step-CA Unraid template now sets `--user 99:100` so the appdata bind mount is
   writable; without it the first-run init failed with `Permission denied` writing the
   generated password (the image runs as uid 1000, Unraid appdata is owned 99:100).
+- Container `HEALTHCHECK` in both runtime images (`Dockerfile`, `Dockerfile.release`):
+  probes the auth-exempt `/healthz` endpoint via busybox `wget`, honouring `${PORT}`. So
+  `docker`/compose/Unraid now report container health (previously the UI image reported
+  none).
 
 ### Fixed
 
