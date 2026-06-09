@@ -8,6 +8,13 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+### Changed
+
+- **Body copy uses the "NextGen UI" brand name** (backlog ⑥): user-facing prose,
+  page titles, the setup/login footer, and the certificate-bundle header now read
+  "NextGen UI" instead of "step-ui-ng". The header wordmark remains the full
+  "Step-CA NextGen UI"; the repository, Go module, and binary stay `step-ui-ng`.
+
 ### Added
 
 - **Audit log records failed login attempts** (backlog ④): the audit log now

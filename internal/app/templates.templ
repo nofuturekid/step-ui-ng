@@ -50,7 +50,7 @@ templ layout(d pageData) {
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
-			<title>{ d.Title } · step-ui-ng</title>
+			<title>{ d.Title } · NextGen UI</title>
 			<link rel="stylesheet" href="/static/fonts.css"/>
 			<link rel="stylesheet" href="/static/tokens.css"/>
 			<link rel="stylesheet" href="/static/app.css"/>
@@ -206,7 +206,7 @@ templ layout(d pageData) {
 				}
 				{ children... }
 			</main>
-			<div class="appver" title="step-ui-ng version">{ BuildInfo() }</div>
+			<div class="appver" title="NextGen UI version">{ BuildInfo() }</div>
 		</body>
 	</html>
 }
@@ -237,7 +237,7 @@ templ authShell(title string, d pageData) {
 // setupPage renders the first-run super-admin creation form (FR-1).
 // Centered auth layout — no topbar. Copy matches docs/design/setup.html verbatim.
 templ setupPage(d pageData) {
-	@authShell("Set up step-ui-ng", d) {
+	@authShell("Set up NextGen UI", d) {
 		<main class="authwrap" data-screen-label="First-run setup">
 			<div class="authbrand">
 				<img src="/static/logo.svg" alt="" width="56" height="56"/>
@@ -274,7 +274,7 @@ templ setupPage(d pageData) {
 					<div class="flash flash--info">
 						<svg class="ico"><use href="/static/icons.svg#i-info"></use></svg>
 						<div class="flash__body">
-							<p>After creating the superadmin you&#39;ll sign in, then connect step-ui-ng to your CA.</p>
+							<p>After creating the superadmin you&#39;ll sign in, then connect NextGen UI to your CA.</p>
 						</div>
 					</div>
 					<button type="submit" class="btn btn--primary" style="width:100%">
@@ -282,7 +282,7 @@ templ setupPage(d pageData) {
 					</button>
 				</form>
 			</div>
-			<p class="authfoot">step-ui-ng · first-run setup</p>
+			<p class="authfoot">NextGen UI · first-run setup</p>
 		</main>
 	}
 }
@@ -290,7 +290,7 @@ templ setupPage(d pageData) {
 // loginPage renders the login form.
 // Centered auth layout — no topbar. Copy matches docs/design/login.html verbatim.
 templ loginPage(d pageData) {
-	@authShell("Sign in · step-ui-ng", d) {
+	@authShell("Sign in · NextGen UI", d) {
 		<main class="authwrap" data-screen-label="Login">
 			<div class="authbrand">
 				<img src="/static/logo.svg" alt="" width="56" height="56"/>
@@ -316,7 +316,7 @@ templ loginPage(d pageData) {
 					<button type="submit" class="btn btn--primary" style="width:100%">Sign in</button>
 				</form>
 			</div>
-			<p class="authfoot">step-ui-ng · self-hosted Step-CA admin</p>
+			<p class="authfoot">NextGen UI · self-hosted Step-CA admin</p>
 		</main>
 	}
 }
@@ -343,7 +343,7 @@ templ usersPage(d pageData, list []users.User) {
 			<div class="page-head">
 				<div class="breadcrumb"><a href="#">Settings</a><span class="sep">/</span><span>Users</span></div>
 				<h1 class="page-title">Users</h1>
-				<p class="page-sub">Local accounts that can sign in to step-ui-ng. Roles: viewer &lt; admin &lt; superadmin.</p>
+				<p class="page-sub">Local accounts that can sign in to NextGen UI. Roles: viewer &lt; admin &lt; superadmin.</p>
 			</div>
 			<div class="stack">
 				<!-- Create user card -->
@@ -563,7 +563,7 @@ templ settingsPage(d pageData, v settings.View) {
 			<div class="page-head">
 				<div class="breadcrumb"><a href="#">Settings</a><span class="sep">/</span><span>CA settings</span></div>
 				<h1 class="page-title">CA settings</h1>
-				<p class="page-sub">Connect step-ui-ng to your Step-CA instance and configure the admin credentials used for privileged operations.</p>
+				<p class="page-sub">Connect NextGen UI to your Step-CA instance and configure the admin credentials used for privileged operations.</p>
 			</div>
 			<div class="stack">
 				<!-- Card 1 — CA connection -->
@@ -571,7 +571,7 @@ templ settingsPage(d pageData, v settings.View) {
 					<div class="card__header">
 						<div>
 							<h2 class="card__title">CA connection</h2>
-							<p class="card__desc">How step-ui-ng reaches the CA's HTTP API. The root fingerprint pins the CA's identity.</p>
+							<p class="card__desc">How NextGen UI reaches the CA's HTTP API. The root fingerprint pins the CA's identity.</p>
 						</div>
 					</div>
 					<form class="card__body stack-4" method="post" action="/settings">
@@ -609,7 +609,7 @@ templ settingsPage(d pageData, v settings.View) {
 					<div class="card__header">
 						<div>
 							<h2 class="card__title">Admin authentication</h2>
-							<p class="card__desc">Credentials step-ui-ng uses for privileged CA operations (creating/deleting provisioners, ACME management). All secrets are write-only.</p>
+							<p class="card__desc">Credentials NextGen UI uses for privileged CA operations (creating/deleting provisioners, ACME management). All secrets are write-only.</p>
 						</div>
 						<div class="card__actions">
 							<span class={ "badge", activeBadgeClass(v.AdminAuthMethod) }>
@@ -817,7 +817,7 @@ templ provisionersPage(d pageData, v provisionersView) {
 				<div class="page-head__row">
 					<div>
 						<h1 class="page-title">Provisioners</h1>
-						<p class="page-sub">Read live from the CA. The active provisioner is used when issuing certificates from step-ui-ng.</p>
+						<p class="page-sub">Read live from the CA. The active provisioner is used when issuing certificates from NextGen UI.</p>
 					</div>
 				</div>
 			</div>
@@ -842,7 +842,7 @@ templ provisionersPage(d pageData, v provisionersView) {
 						<svg class="ico"><use href="/static/icons.svg#i-lock"></use></svg>
 						<div class="locked__body">
 							<strong>Creating and deleting provisioners requires an admin credential.</strong>
-							<p>step-ui-ng can read provisioners and set the active one without credentials, but writing to the CA&#39;s admin API requires an <span class="mono">x5c</span> or <span class="mono">jwk</span> admin method. You can also manage provisioners directly with the <span class="mono">step</span> CLI.</p>
+							<p>NextGen UI can read provisioners and set the active one without credentials, but writing to the CA&#39;s admin API requires an <span class="mono">x5c</span> or <span class="mono">jwk</span> admin method. You can also manage provisioners directly with the <span class="mono">step</span> CLI.</p>
 							<div class="btn-row">
 								<a class="btn btn--sm" href="/settings"><svg class="ico"><use href="/static/icons.svg#i-settings"></use></svg> Configure admin authentication</a>
 							</div>
@@ -901,7 +901,7 @@ templ provisionersPage(d pageData, v provisionersView) {
 						<div class="card__header">
 							<div>
 								<h2 class="card__title">Active provisioner for issuance</h2>
-								<p class="card__desc">step-ui-ng signs new certificates through this provisioner. Some provisioners need a secret (password) to use.</p>
+								<p class="card__desc">NextGen UI signs new certificates through this provisioner. Some provisioners need a secret (password) to use.</p>
 							</div>
 						</div>
 						<form class="card__body" method="post" action="/provisioners/select">
@@ -1024,7 +1024,7 @@ templ issuePage(d pageData, v issueView) {
 			<div class="page-head">
 				<div class="breadcrumb"><a href="/inventory">Certificates</a><span class="sep">/</span><span>Issue</span></div>
 				<h1 class="page-title">Issue certificate</h1>
-				<p class="page-sub">step-ui-ng asks the CA to sign a new leaf certificate using the active provisioner.</p>
+				<p class="page-sub">NextGen UI asks the CA to sign a new leaf certificate using the active provisioner.</p>
 			</div>
 			<div class="stack">
 				<!-- Active provisioner note (or prompt to select one) -->
@@ -1080,7 +1080,7 @@ templ issuePage(d pageData, v issueView) {
 									<div class="field">
 										<label>Key type</label>
 										<div class="input input--readonly" aria-readonly="true">ECDSA P-256</div>
-										<span class="field__hint">step-ui-ng generates the key pair and returns the private key once.</span>
+										<span class="field__hint">NextGen UI generates the key pair and returns the private key once.</span>
 									</div>
 									<div class="field col-span-2" style="display:none">
 										<!-- Format is fixed to PEM for the new design; PFX can be done via the detail page -->
@@ -1204,7 +1204,7 @@ templ signCSRPage(d pageData, v signView) {
 			<div class="page-head">
 				<div class="breadcrumb"><a href="/inventory">Certificates</a><span class="sep">/</span><span>Sign CSR</span></div>
 				<h1 class="page-title">Sign CSR</h1>
-				<p class="page-sub">Paste a PEM-encoded certificate signing request. step-ui-ng forwards it to the CA using the active provisioner and returns the signed certificate — no private key is involved.</p>
+				<p class="page-sub">Paste a PEM-encoded certificate signing request. NextGen UI forwards it to the CA using the active provisioner and returns the signed certificate — no private key is involved.</p>
 			</div>
 			<div class="stack">
 				<!-- Active provisioner note -->
@@ -1311,7 +1311,7 @@ templ inventoryPage(d pageData, v inventoryView) {
 				<div class="page-head__row">
 					<div>
 						<h1 class="page-title">Certificates</h1>
-						<p class="page-sub">Issued certificates from step-ui-ng's local record.</p>
+						<p class="page-sub">Issued certificates from NextGen UI's local record.</p>
 					</div>
 					if d.User != nil && d.User.Role.AtLeast(users.RoleAdmin) {
 						<div class="page-head__actions">
@@ -1326,8 +1326,8 @@ templ inventoryPage(d pageData, v inventoryView) {
 				<div class="flash--info" role="status">
 					<svg class="ico"><use href="/static/icons.svg#i-info"></use></svg>
 					<div class="flash__body">
-						<strong>This is step-ui-ng's recorded view.</strong>
-						<p>Reflects what step-ui-ng has issued and can drift from the CA.</p>
+						<strong>This is NextGen UI's recorded view.</strong>
+						<p>Reflects what NextGen UI has issued and can drift from the CA.</p>
 					</div>
 				</div>
 				<!-- Filter bar + table -->
@@ -1639,7 +1639,7 @@ templ certDetailPage(d pageData, v certDetailView) {
 					<div class="card__header">
 						<div>
 							<h2 class="card__title">Certificate (PEM)</h2>
-							<p class="card__desc">Read-only. The private key is never stored or displayed by step-ui-ng.</p>
+							<p class="card__desc">Read-only. The private key is never stored or displayed by NextGen UI.</p>
 						</div>
 					</div>
 					<div class="card__body">
@@ -1809,7 +1809,7 @@ templ auditPage(d pageData, v auditView) {
 			<!-- Page header -->
 			<div class="page-head">
 				<h1 class="page-title">Audit log</h1>
-				<p class="page-sub">Every privileged action step-ui-ng performs. Append-only and never contains secret values.</p>
+				<p class="page-sub">Every privileged action NextGen UI performs. Append-only and never contains secret values.</p>
 			</div>
 
 			<div>
@@ -2119,7 +2119,7 @@ templ eabPage(d pageData, v eabView) {
 							<div class="onetime">
 								<div class="onetime__head">
 									<svg class="ico"><use href="/static/icons.svg#i-alert-triangle"></use></svg>
-									<div><strong>Copy this HMAC key now</strong> <span>— step-ui-ng stores only its hash and will never show it again.</span></div>
+									<div><strong>Copy this HMAC key now</strong> <span>— NextGen UI stores only its hash and will never show it again.</span></div>
 								</div>
 								<div class="onetime__body stack-4">
 									<div class="field">
