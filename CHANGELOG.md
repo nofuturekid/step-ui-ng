@@ -13,9 +13,17 @@ Versions are bumped only when a release is cut; in-progress work lives under
 - **Dual admin authentication** (spec/0012): the CA-settings page gains an
   **Admin authentication** card. Operators choose between three methods:
   - `none` — disables admin operations (create/delete provisioners, ACME management).
-  - `x5c` — uses an admin certificate + private key (existing mechanism;
-    `SaveAdminCredential` sets the method). The guided **upload form** lands in a
-    follow-up PR; for now `jwk` is the method wired end-to-end from the UI.
+  - `x5c` — the **upload form** is now wired end-to-end. The operator pastes the
+    admin certificate chain (PEM, leaf first) and the private key into the
+    Admin authentication card; the handler validates keypair match,
+    `digitalSignature` key usage, non-empty leaf CN (via `ca.NewAdminCredential`),
+    **and** the `clientAuth` extended key usage required by Step-CA's
+    `AuthorizeAdminToken`. The key is AES-256-GCM–sealed at rest and is
+    write-only: never echoed in the response or any audit log detail
+    (only `method=x5c subject=<leaf CN>` is recorded). A `set`/`none` status badge
+    reflects whether a key is stored. A pre-filled `step ca certificate` command
+    (with the stored CA URL) is shown as a guided hint for operators who need to
+    issue the admin cert.
   - `jwk` — stores a JWK provisioner name, subject, and password. On demand the app
     mints an ephemeral P-256 key, obtains a short-lived admin cert via `POST /1.0/sign`
     (signed with a JWK OTT), then uses that cert to sign admin tokens — the ephemeral
