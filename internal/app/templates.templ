@@ -112,10 +112,7 @@ templ layout(d pageData) {
 				});
 			</script>
 		</head>
-		<body hx-boost="true" hx-indicator="#top-progress">
-			<!-- Top progress bar: shown by htmx (via hx-indicator) during boosted
-			     navigation and any htmx request. Pure CSS, no custom JS. -->
-			<div id="top-progress" class="progress-bar" aria-hidden="true"></div>
+		<body hx-boost="true">
 			if d.User != nil {
 				<header class="topbar">
 					<div class="topbar-inner">

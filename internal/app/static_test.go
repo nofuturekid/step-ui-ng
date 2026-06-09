@@ -138,30 +138,30 @@ func TestShellCSSServed(t *testing.T) {
 // TestBoostedNavigation verifies the SPA-feel wiring: the authenticated layout
 // opts every same-origin link/form into htmx boosting (hx-boost on <body>) so
 // navigation swaps the body instead of doing a full reload (which caused the
-// "jumping"/flash). The hx-indicator points at the #top-progress bar, and the
-// .progress-bar styles are served. Removing any of these regresses the fix.
+// "jumping"/flash). The progress bar indicator was removed (too distracting) but
+// hx-boost must remain. Removing hx-boost regresses the navigation fix.
 func TestBoostedNavigation(t *testing.T) {
 	e := newTestEnv(t)
 	e.completeSetup(t, "root")
 	_, body := e.get(t, "/inventory")
 
+	// Boosting must stay: same-origin navigation is still swapped, not reloaded.
 	if !strings.Contains(body, `hx-boost="true"`) {
 		t.Error("layout <body>: missing hx-boost=\"true\" (navigation would full-reload)")
 	}
-	if !strings.Contains(body, `hx-indicator="#top-progress"`) {
-		t.Error("layout <body>: missing hx-indicator=\"#top-progress\"")
+
+	// The progress bar element and its hx-indicator wiring must be gone.
+	if strings.Contains(body, `hx-indicator="#top-progress"`) {
+		t.Error("layout <body>: hx-indicator=\"#top-progress\" must be removed (progress bar was removed)")
 	}
-	if !strings.Contains(body, `id="top-progress"`) {
-		t.Error("layout: missing #top-progress indicator element")
+	if strings.Contains(body, `id="top-progress"`) {
+		t.Error("layout: #top-progress element must be removed (progress bar was removed)")
 	}
 
-	// The progress-bar must be styled, and react to the htmx-request class htmx
-	// toggles on the indicator target.
+	// The .progress-bar CSS rules must be gone from the served stylesheet.
 	_, css := e.get(t, "/static/app.css")
-	for _, sel := range []string{".progress-bar", ".progress-bar.htmx-request"} {
-		if !strings.Contains(css, sel) {
-			t.Fatalf("GET /static/app.css: missing progress-bar selector %q", sel)
-		}
+	if strings.Contains(css, ".progress-bar") {
+		t.Error("GET /static/app.css: .progress-bar selector must be removed (progress bar was removed)")
 	}
 }
 
