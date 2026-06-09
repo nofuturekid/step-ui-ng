@@ -17,6 +17,13 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- **Inventory list is now paginated** (backlog ③): the certificate inventory
+  shows 50 certificates per page with a "Showing X–Y of N" footer and prev/next
+  chevron controls. Pagination is applied after the Go-side status filter
+  (derived from `not_after`), so the range and page count always reflect the
+  filtered total. Active filters (status, search, provisioner) are carried on
+  pagination links so navigation preserves the current filter.
+
 - **Audit log records failed login attempts** (backlog ④): the audit log now
   captures denied authentication events alongside successful ones.
   - Migration `0009` adds a `result TEXT NOT NULL DEFAULT 'ok'` column to

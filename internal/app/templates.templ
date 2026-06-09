@@ -1419,6 +1419,26 @@ templ inventoryTable(d pageData, v inventoryView) {
 				</tbody>
 			</table>
 		</div>
+		// Pagination footer — inside inventoryTable so that an htmx filter change
+		// (which swaps #inventory-table) also refreshes the page range and controls.
+		// The mock (docs/design/inventory.html lines 211-222) shows numbered page
+		// links; we ship range-text + prev/next chevrons to match the already-shipped
+		// audit page pattern. Numbered links can be a later follow-up.
+		<div class="pagination">
+			<span>Showing <b>{ strconv.Itoa(v.RangeFrom) }–{ strconv.Itoa(v.RangeTo) }</b> of { strconv.Itoa(v.Total) }</span>
+			<div class="pages">
+				if v.Page > 0 {
+					<a href={ inventoryPageURL(v.Filter, v.PrevPage) } aria-label="Previous page"><svg class="ico"><use href="/static/icons.svg#i-chevron-left"></use></svg></a>
+				} else {
+					<span class="is-disabled" aria-hidden="true"><svg class="ico"><use href="/static/icons.svg#i-chevron-left"></use></svg></span>
+				}
+				if v.HasMore {
+					<a href={ inventoryPageURL(v.Filter, v.NextPage) } aria-label="Next page"><svg class="ico"><use href="/static/icons.svg#i-chevron-right"></use></svg></a>
+				} else {
+					<span class="is-disabled" aria-hidden="true"><svg class="ico"><use href="/static/icons.svg#i-chevron-right"></use></svg></span>
+				}
+			</div>
+		</div>
 	}
 }
 
@@ -2339,3 +2359,22 @@ func auditPageURL(ff auditFilterForm, page int) templ.SafeURL {
 	return templ.SafeURL(u)
 }
 
+// inventoryPageURL builds a relative URL for a given inventory page + existing
+// filters. Each filter value is percent-encoded so that values containing &, =,
+// or spaces do not corrupt the query string.
+//
+// The filter form uses hx-push-url="false", so pagination links must carry the
+// active filter explicitly — the URL is not updated by htmx filter submissions.
+func inventoryPageURL(f certs.ListFilter, page int) templ.SafeURL {
+	u := "/inventory?page=" + strconv.Itoa(page)
+	if f.Status != "" {
+		u += "&status=" + url.QueryEscape(f.Status)
+	}
+	if f.Search != "" {
+		u += "&q=" + url.QueryEscape(f.Search)
+	}
+	if f.Provisioner != "" {
+		u += "&provisioner=" + url.QueryEscape(f.Provisioner)
+	}
+	return templ.SafeURL(u)
+}
