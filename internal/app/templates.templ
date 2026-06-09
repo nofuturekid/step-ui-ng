@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nofuturekid/step-ui-ng/internal/certs"
@@ -15,16 +16,34 @@ import (
 // pageData carries the bits every page needs: the CSRF token (rendered into a
 // hidden field and an htmx header) and the current user (may be nil).
 type pageData struct {
-	Title     string
-	CSRFToken string
-	User      *users.User
-	Flash     string // non-fatal info message
-	Error     string // error message
-	Wide      bool   // render <main> at the wider content width (data-heavy pages)
+	Title         string
+	CSRFToken     string
+	User          *users.User
+	Flash         string // non-fatal info message
+	Error         string // error message
+	Wide          bool   // render <main> at the wider content width (data-heavy pages)
+	ActiveSection string // path prefix for aria-current="page" on primary nav links (e.g. "/inventory")
+}
+
+// userInitials returns up to two uppercase letters from the username for the avatar chip.
+func userInitials(username string) string {
+	if username == "" {
+		return "?"
+	}
+	parts := strings.Fields(strings.ReplaceAll(username, ".", " "))
+	if len(parts) >= 2 {
+		return strings.ToUpper(string([]rune(parts[0])[0])) + strings.ToUpper(string([]rune(parts[1])[0]))
+	}
+	r := []rune(parts[0])
+	if len(r) >= 2 {
+		return strings.ToUpper(string(r[:2]))
+	}
+	return strings.ToUpper(string(r))
 }
 
 // layout is the shared HTML shell. htmx is configured to attach the CSRF token
 // to every request via the X-CSRF-Token header, matching the hidden form field.
+// Link order: fonts.css → tokens.css → app.css (tokens must be available when app.css runs).
 templ layout(d pageData) {
 	<!DOCTYPE html>
 	<html lang="en">
@@ -32,6 +51,8 @@ templ layout(d pageData) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<title>{ d.Title } · step-ui-ng</title>
+			<link rel="stylesheet" href="/static/fonts.css"/>
+			<link rel="stylesheet" href="/static/tokens.css"/>
 			<link rel="stylesheet" href="/static/app.css"/>
 			<link rel="icon" type="image/png" href="/static/favicon-32.png"/>
 			<link rel="apple-touch-icon" href="/static/icon-256.png"/>
@@ -57,42 +78,96 @@ templ layout(d pageData) {
 			if d.User != nil {
 				<header class="topbar">
 					<div class="topbar-inner">
-						<a href="/inventory" class="brand"><img src="/static/logo.svg" alt="" width="28" height="28" class="brand-logo"/>step-ui-ng</a>
-						<details class="navmenu">
-							<summary class="navtoggle" aria-label="Toggle navigation"></summary>
-						</details>
-						<div class="navwrap popover">
-							<nav class="mainnav">
-								<div class="navgroup">
-									<span class="navhead">Certificates</span>
-									<a href="/inventory">List</a>
+						<!-- Brand -->
+						<a href="/inventory" class="brand" aria-label="step-ui-ng — home">
+							<img src="/static/logo.svg" alt="" width="28" height="28" class="brand-logo"/>
+							<span class="brand-name">
+								<span class="b1">step-ui-ng</span>
+							</span>
+						</a>
+						<!-- JS-free checkbox hamburger -->
+						<div class="nav">
+							<input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation menu"/>
+							<label class="nav__burger" for="nav-toggle" title="Menu">
+								<svg class="ico" style="width:20px;height:20px"><use href="/static/icons.svg#i-menu"></use></svg>
+							</label>
+							<div class="nav__panel">
+								<!-- Primary nav (workspace actions) -->
+								<nav class="nav__primary" aria-label="Primary">
+									if d.ActiveSection == "/inventory" {
+										<a class="navlink" href="/inventory" aria-current="page">
+											<svg class="ico"><use href="/static/icons.svg#i-list"></use></svg> Certificates
+										</a>
+									} else {
+										<a class="navlink" href="/inventory">
+											<svg class="ico"><use href="/static/icons.svg#i-list"></use></svg> Certificates
+										</a>
+									}
 									if d.User.Role.AtLeast(users.RoleAdmin) {
-										<a href="/issue">Issue</a>
-										<a href="/sign-csr">Sign CSR</a>
+										if d.ActiveSection == "/issue" {
+											<a class="navlink" href="/issue" aria-current="page">
+												<svg class="ico"><use href="/static/icons.svg#i-file-plus"></use></svg> Issue
+											</a>
+										} else {
+											<a class="navlink" href="/issue">
+												<svg class="ico"><use href="/static/icons.svg#i-file-plus"></use></svg> Issue
+											</a>
+										}
+										if d.ActiveSection == "/sign-csr" {
+											<a class="navlink" href="/sign-csr" aria-current="page">
+												<svg class="ico"><use href="/static/icons.svg#i-pen"></use></svg> Sign CSR
+											</a>
+										} else {
+											<a class="navlink" href="/sign-csr">
+												<svg class="ico"><use href="/static/icons.svg#i-pen"></use></svg> Sign CSR
+											</a>
+										}
+									}
+								</nav>
+								<!-- User chip + main menu (admin only) -->
+								<div class="topbar-user">
+									if d.User.Role.AtLeast(users.RoleAdmin) {
+										<details class="menu mainmenu">
+											<summary class="mainmenu-trigger" aria-label="Main menu">
+												<span class="avatar" aria-hidden="true">{ userInitials(d.User.Username) }</span>
+												<span class="mainmenu-id">
+													<span class="uname">{ d.User.Username }</span>
+													<span class="urole">{ string(d.User.Role) }</span>
+												</span>
+												<svg class="ico chev" style="width:14px;height:14px"><use href="/static/icons.svg#i-chevron-down"></use></svg>
+											</summary>
+											<div class="menu__list mainmenu-list">
+												<div class="menu__label">App</div>
+												<a href="/users"><svg class="ico"><use href="/static/icons.svg#i-users"></use></svg> Users</a>
+												<a href="/settings"><svg class="ico"><use href="/static/icons.svg#i-server"></use></svg> CA settings</a>
+												<div class="menu__label">Step-CA</div>
+												<a href="/provisioners"><svg class="ico"><use href="/static/icons.svg#i-key"></use></svg> Provisioners</a>
+												<a href="/acme"><svg class="ico"><use href="/static/icons.svg#i-globe"></use></svg> ACME</a>
+												<div class="menu__sep"></div>
+												<div class="menu__label">Audit</div>
+												<a href="/audit"><svg class="ico"><use href="/static/icons.svg#i-scroll"></use></svg> Log</a>
+												<div class="menu__sep"></div>
+												<form method="post" action="/logout">
+													<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+													<button type="submit" class="menu__logout">
+														<svg class="ico"><use href="/static/icons.svg#i-logout"></use></svg> Log out
+													</button>
+												</form>
+											</div>
+										</details>
+									} else {
+										<!-- Viewer: show username chip without menu -->
+										<span class="mainmenu-id">
+											<span class="uname">{ d.User.Username }</span>
+											<span class="urole">{ string(d.User.Role) }</span>
+										</span>
+										<form method="post" action="/logout">
+											<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
+											<button type="submit" class="logout">Log out</button>
+										</form>
 									}
 								</div>
-								if d.User.Role.AtLeast(users.RoleAdmin) {
-									<a href="/audit">Audit log</a>
-									<div class="navsettings">
-										<details class="menu">
-											<summary aria-label="Settings">Settings</summary>
-										</details>
-										<div class="menu-items popover">
-											<a href="/users">Users</a>
-											<a href="/settings">CA settings</a>
-											<a href="/provisioners">Provisioners</a>
-											<a href="/acme">ACME</a>
-										</div>
-									</div>
-								}
-							</nav>
-							<span class="who">
-								{ d.User.Username } <span class="badge">{ string(d.User.Role) }</span>
-								<form method="post" action="/logout" style="display:inline">
-									<input type="hidden" name="csrf_token" value={ d.CSRFToken }/>
-									<button class="secondary" type="submit">Log out</button>
-								</form>
-							</span>
+							</div>
 						</div>
 					</div>
 				</header>
@@ -110,6 +185,7 @@ templ layout(d pageData) {
 		</body>
 	</html>
 }
+
 
 // setupPage renders the first-run super-admin creation form (FR-1).
 templ setupPage(d pageData) {

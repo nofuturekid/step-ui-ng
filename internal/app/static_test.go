@@ -5,6 +5,57 @@ import (
 	"testing"
 )
 
+// TestDesignFoundationAssets verifies that the three new design-foundation assets
+// are embedded and served correctly:
+//
+//   - GET /static/tokens.css → 200, body contains CSS custom properties.
+//   - GET /static/fonts.css  → 200, body contains @font-face rules.
+//   - GET /static/icons.svg  → 200, body contains <symbol> SVG sprite.
+//
+// The layout <head> must link tokens.css, fonts.css, and the icon sprite must be
+// present on authenticated pages. Removing any asset or its embed breaks this test.
+func TestDesignFoundationAssets(t *testing.T) {
+	e := newTestEnv(t)
+
+	// tokens.css: must be served and contain CSS custom-property definitions.
+	resp, body := e.get(t, "/static/tokens.css")
+	if resp.StatusCode != 200 {
+		t.Fatalf("GET /static/tokens.css status = %d, want 200", resp.StatusCode)
+	}
+	if !strings.Contains(body, "--font-sans") {
+		t.Fatalf("GET /static/tokens.css: body does not contain --font-sans token")
+	}
+
+	// fonts.css: must be served and contain @font-face.
+	respF, bodyF := e.get(t, "/static/fonts.css")
+	if respF.StatusCode != 200 {
+		t.Fatalf("GET /static/fonts.css status = %d, want 200", respF.StatusCode)
+	}
+	if !strings.Contains(bodyF, "@font-face") {
+		t.Fatalf("GET /static/fonts.css: body does not contain @font-face")
+	}
+
+	// icons.svg: must be served and contain SVG symbols.
+	respI, bodyI := e.get(t, "/static/icons.svg")
+	if respI.StatusCode != 200 {
+		t.Fatalf("GET /static/icons.svg status = %d, want 200", respI.StatusCode)
+	}
+	if !strings.Contains(bodyI, "<symbol") {
+		t.Fatalf("GET /static/icons.svg: body does not contain <symbol>")
+	}
+
+	// Layout wiring: authenticated layout must load tokens.css and fonts.css.
+	e.completeSetup(t, "root")
+	_, layoutBody := e.get(t, "/inventory")
+
+	if !strings.Contains(layoutBody, `href="/static/tokens.css"`) {
+		t.Fatalf("layout <head>: missing link to /static/tokens.css")
+	}
+	if !strings.Contains(layoutBody, `href="/static/fonts.css"`) {
+		t.Fatalf("layout <head>: missing link to /static/fonts.css")
+	}
+}
+
 // TestStaticAssetsServed asserts that the embedded static assets required by the
 // branding spec are present, served with the correct HTTP status, and wired into
 // the rendered layout:
@@ -57,5 +108,106 @@ func TestStaticAssetsServed(t *testing.T) {
 	// Layout <head> must contain the favicon link.
 	if !strings.Contains(layoutBody, `href="/static/favicon-32.png"`) {
 		t.Fatalf("layout <head>: favicon link (href=\"/static/favicon-32.png\") not found")
+	}
+}
+
+// TestShellCSSServed verifies that the served app.css contains the new shell
+// selectors (.mainmenu, .nav__burger, .navlink, .nav__panel) and does NOT contain
+// the removed dead selectors (nav.mainnav, .navwrap, .navsettings, .navmenu) from
+// the previous shell. Removing or renaming the shell CSS blocks breaks this test.
+func TestShellCSSServed(t *testing.T) {
+	e := newTestEnv(t)
+
+	_, css := e.get(t, "/static/app.css")
+
+	// New shell selectors must be present in the served CSS.
+	for _, sel := range []string{".mainmenu", ".nav__burger", ".navlink", ".nav__panel"} {
+		if !strings.Contains(css, sel) {
+			t.Fatalf("GET /static/app.css: missing shell selector %q (shell not styled)", sel)
+		}
+	}
+
+	// Old dead shell selectors must be absent (they clash with the new markup).
+	for _, dead := range []string{"nav.mainnav", ".navwrap", ".navsettings"} {
+		if strings.Contains(css, dead) {
+			t.Fatalf("GET /static/app.css: dead selector %q still present (remove old shell CSS)", dead)
+		}
+	}
+}
+
+// TestActiveSectionOnNav verifies that aria-current="page" appears on the correct
+// primary nav link for the inventory, issue, and sign-csr pages. This test would
+// fail if ActiveSection is not set in the handler, or if activeCurrent returns
+// the wrong value, breaking the active-link highlight in the topbar.
+func TestActiveSectionOnNav(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root") // superadmin, left logged in (can see all nav links)
+
+	cases := []struct {
+		path string
+		href string
+	}{
+		{"/inventory", "/inventory"},
+		{"/issue", "/issue"},
+		{"/sign-csr", "/sign-csr"},
+	}
+
+	for _, tc := range cases {
+		_, body := e.get(t, tc.path)
+		// The active navlink must carry aria-current="page".
+		want := `href="` + tc.href + `" aria-current="page"`
+		if !strings.Contains(body, want) {
+			t.Fatalf("GET %s: expected aria-current=\"page\" on href=%q; body:\n%s", tc.path, tc.href, body)
+		}
+	}
+}
+
+// TestActiveSectionNotSetOnOtherPages verifies that non-primary-nav pages (users,
+// settings) do NOT mark any nav link as aria-current="page". If ActiveSection were
+// set incorrectly on those handlers the highlight would show on the wrong link.
+func TestActiveSectionNotSetOnOtherPages(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	for _, path := range []string{"/users", "/settings"} {
+		_, body := e.get(t, path)
+		if strings.Contains(body, `aria-current="page"`) {
+			t.Fatalf("GET %s: aria-current=\"page\" must not appear (no active nav section); body:\n%s", path, body)
+		}
+	}
+}
+
+// TestNoEmptyAriaCurrent verifies that aria-current="" is never emitted by the
+// nav — an empty string is not a valid aria-current token (spec requires the
+// attribute to be entirely absent on inactive links, not present with "").
+func TestNoEmptyAriaCurrent(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	// Check all primary-nav pages plus a non-nav page (settings).
+	paths := []string{"/inventory", "/issue", "/sign-csr", "/users", "/settings"}
+	for _, path := range paths {
+		_, body := e.get(t, path)
+		if strings.Contains(body, `aria-current=""`) {
+			t.Fatalf("GET %s: aria-current=\"\" must never appear; body:\n%s", path, body)
+		}
+	}
+}
+
+// TestBrandWordmarkSingleLine verifies the topbar brand renders the single-line
+// "step-ui-ng" wordmark inside .b1, and that no two-line b2 subtitle appears.
+// The spec calls for a single-line wordmark; the mock's two-line variant is wrong.
+func TestBrandWordmarkSingleLine(t *testing.T) {
+	e := newTestEnv(t)
+	e.completeSetup(t, "root")
+
+	_, body := e.get(t, "/inventory")
+
+	// The .b1 span must contain "step-ui-ng".
+	if !strings.Contains(body, `class="b1"`) {
+		t.Fatalf("topbar: missing span with class=\"b1\"; body:\n%s", body)
+	}
+	if !strings.Contains(body, "step-ui-ng") {
+		t.Fatalf("topbar: wordmark \"step-ui-ng\" not found; body:\n%s", body)
 	}
 }

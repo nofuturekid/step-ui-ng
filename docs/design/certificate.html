@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>vault.lab.internal · step-ui-ng</title>
+  <link rel="icon" href="static/logo.svg" />
+  <link rel="stylesheet" href="css/fonts.css" />
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="inventory.html" aria-label="Step-CA NextGen UI — home">
+          <img src="static/logo.svg" alt="" />
+          <span class="brand-name"><span class="b1">Step-CA</span><span class="b2">NextGen UI</span></span>
+        </a>
+        <div class="nav">
+          <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation menu" />
+          <label class="nav__burger" for="nav-toggle" title="Menu"><svg class="ico" style="width:20px;height:20px"><use href="icons.svg#i-menu"></use></svg></label>
+          <div class="nav__panel">
+            <nav class="nav__primary" aria-label="Primary">
+              <a class="navlink" href="inventory.html" aria-current="page"><svg class="ico"><use href="icons.svg#i-list"></use></svg> Certificates</a>
+              <a class="navlink" href="issue.html"><svg class="ico"><use href="icons.svg#i-file-plus"></use></svg> Issue</a>
+              <a class="navlink" href="sign-csr.html"><svg class="ico"><use href="icons.svg#i-pen"></use></svg> Sign CSR</a>
+            </nav>
+            <div class="topbar-user">
+                            <div class="theme-footer"><span class="theme-label">Theme</span><div class="theme-toggle" role="group" aria-label="Theme (review-mock affordance)">
+                <button type="button" data-theme-set="auto" title="System theme"><svg class="ico"><use href="icons.svg#i-monitor"></use></svg></button>
+                <button type="button" data-theme-set="light" title="Light theme"><svg class="ico"><use href="icons.svg#i-sun"></use></svg></button>
+                <button type="button" data-theme-set="dark" title="Dark theme"><svg class="ico"><use href="icons.svg#i-moon"></use></svg></button>
+              </div></div>
+              <details class="menu mainmenu">
+                <summary class="mainmenu-trigger" aria-label="Main menu">
+                  <span class="avatar" aria-hidden="true">MR</span>
+                  <span class="mainmenu-id">
+                    <span class="uname">m.reyes</span>
+                    <span class="urole">admin</span>
+                  </span>
+                  <svg class="ico chev" style="width:14px;height:14px"><use href="icons.svg#i-chevron-down"></use></svg>
+                </summary>
+                <div class="menu__list mainmenu-list">
+                  <div class="menu__label">App</div>
+                  <a href="users.html"><svg class="ico"><use href="icons.svg#i-users"></use></svg> Users</a>
+                  <a href="ca-settings.html"><svg class="ico"><use href="icons.svg#i-server"></use></svg> CA settings</a>
+                  <div class="menu__label">Step-CA</div>
+                  <a href="provisioners.html"><svg class="ico"><use href="icons.svg#i-key"></use></svg> Provisioners</a>
+                  <a href="acme.html"><svg class="ico"><use href="icons.svg#i-globe"></use></svg> ACME</a>
+                  <div class="menu__sep"></div>
+                  <div class="menu__label">Audit</div>
+                  <a href="audit.html"><svg class="ico"><use href="icons.svg#i-scroll"></use></svg> Log</a>
+                  <div class="menu__sep"></div>
+                  <a class="menu__logout" href="login.html"><svg class="ico"><use href="icons.svg#i-logout"></use></svg> Log out</a>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content" data-screen-label="Certificate detail (admin)">
+      <div class="page-head">
+        <div class="breadcrumb">
+          <a href="inventory.html">Certificates</a><span class="sep">/</span><span>vault.lab.internal</span>
+        </div>
+        <div class="page-head__row">
+          <div>
+            <h1 class="page-title mono">vault.lab.internal</h1>
+            <div class="btn-row" style="margin-top:var(--space-3)">
+              <span class="badge badge--ok"><span class="dot"></span>Valid</span>
+              <span class="tag">leaf</span>
+              <span class="tag">RSA-2048</span>
+              <span class="tag">server-auth</span>
+            </div>
+          </div>
+          <!-- Admin+ action buttons. A viewer sees metadata + PEM only (no buttons). -->
+          <div class="page-head__actions">
+            <a class="btn btn--primary" href="#"><svg class="ico"><use href="icons.svg#i-download"></use></svg> Download bundle</a>
+            <a class="btn" href="#"><svg class="ico"><use href="icons.svg#i-renew"></use></svg> Renew</a>
+            <a class="btn btn--danger" href="#revoke"><svg class="ico"><use href="icons.svg#i-ban"></use></svg> Revoke</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="grid-2">
+          <!-- Metadata -->
+          <div class="card">
+            <div class="card__header"><h2 class="card__title">Overview</h2></div>
+            <div class="card__body">
+              <dl class="dl">
+                <dt>Common name</dt>
+                <dd class="mono">vault.lab.internal</dd>
+                <dt>Subject alt names</dt>
+                <dd>
+                  <div class="btn-row" style="gap:6px">
+                    <span class="tag">vault.lab.internal</span>
+                    <span class="tag">vault</span>
+                    <span class="tag">10.10.0.12</span>
+                  </div>
+                </dd>
+                <dt>Status</dt>
+                <dd><span class="badge badge--ok"><span class="dot"></span>Valid</span></dd>
+                <dt>Provisioner</dt>
+                <dd class="mono">admin-jwk</dd>
+                <dt>Key type</dt>
+                <dd>RSA 2048</dd>
+                <dt>Not before</dt>
+                <dd class="mono">2026-06-04 14:22:07 UTC</dd>
+                <dt>Not after</dt>
+                <dd class="mono">2026-09-02 14:22:07 UTC <span class="subtle">· in 85 days</span></dd>
+                <dt>Issuer</dt>
+                <dd class="mono">Homelab Root CA</dd>
+              </dl>
+            </div>
+          </div>
+
+          <!-- Identifiers -->
+          <div class="card">
+            <div class="card__header"><h2 class="card__title">Identifiers</h2></div>
+            <div class="card__body stack-4">
+              <div class="field">
+                <span class="label">Serial number</span>
+                <div class="copyline">
+                  <span class="mono" id="serial">3FA29C7B118E0044D9A6112C0E5B7C1B</span>
+                  <button type="button" class="copy-btn" data-copy-target="#serial" aria-label="Copy serial">
+                    <svg class="ico"><use href="icons.svg#i-copy"></use></svg><span class="label">Copy</span><span class="copied"><svg class="ico"><use href="icons.svg#i-check"></use></svg>Copied</span>
+                  </button>
+                </div>
+              </div>
+              <div class="field">
+                <span class="label">SHA-256 fingerprint</span>
+                <div class="copyline">
+                  <span class="mono" id="fp">5b:1f:9a:c2:7d:44:e0:91:aa:36:8c:b0:12:fe:77:4a:3d:9c:e1:60:88:21:0b:cd:74:55:90:e7:1b:24:af:33</span>
+                  <button type="button" class="copy-btn" data-copy-target="#fp" aria-label="Copy fingerprint">
+                    <svg class="ico"><use href="icons.svg#i-copy"></use></svg><span class="label">Copy</span><span class="copied"><svg class="ico"><use href="icons.svg#i-check"></use></svg>Copied</span>
+                  </button>
+                </div>
+              </div>
+              <div class="field">
+                <span class="label">Key usage</span>
+                <div class="btn-row" style="gap:6px">
+                  <span class="tag">digitalSignature</span>
+                  <span class="tag">keyEncipherment</span>
+                  <span class="tag">serverAuth</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PEM blocks (read-only) -->
+        <div class="card">
+          <div class="card__header">
+            <div>
+              <h2 class="card__title">Certificate (PEM)</h2>
+              <p class="card__desc">Read-only. The private key is never stored or displayed by step-ui-ng.</p>
+            </div>
+          </div>
+          <div class="card__body">
+            <div class="codeblock pem" id="pem-leaf">
+              <div class="codeblock__bar">
+                <svg class="ico"><use href="icons.svg#i-file-text"></use></svg>
+                <span class="label">leaf-certificate.pem</span>
+                <span class="spacer"></span>
+                <button type="button" class="copy-btn" data-pem-toggle="#pem-leaf">Expand</button>
+                <button type="button" class="copy-btn" data-copy-target="#pem-leaf-text"><svg class="ico"><use href="icons.svg#i-copy"></use></svg><span class="label">Copy</span><span class="copied"><svg class="ico"><use href="icons.svg#i-check"></use></svg>Copied</span></button>
+              </div>
+              <pre id="pem-leaf-text">-----BEGIN CERTIFICATE-----
+MIIDdjCCAl6gAwIBAgIQ P6Kce7EYAETZphEsDlt8GzANBgkqhkiG9w0BAQsFADAk
+MSIwIAYDVQQDExlIb21lbGFiIFJvb3QgQ2VydGlmaWNhdGUwHhcNMjYwNjA0MTQy
+MjA3WhcNMjYwOTAyMTQyMjA3WjAdMRswGQYDVQQDExJ2YXVsdC5sYWIuaW50ZXJu
+YWwwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC8mzx6t7e0r0k2gqfk
+9mJxq2nQ5o5m1tWw5o0Vd0e7n8mE2bV0F3k8mEd1cQ2J0pK0aZl9mO2qg4hH3vG
+7kV1d0e7n8mE2bV0F3k8mEd1cQ2J0pK0aZl9mO2qg4hH3vG7kV1d0e7n8mE2bV0
+F3k8mEd1cQ2J0pK0aZl9mO2qg4hH3vG7kV1d0e7n8mE2bV0F3k8mEd1cQ2J0pK0
+aZl9mO2qg4hH3vG7kV1d0e7n8mE2bV0F3k8mEd1cQ2J0pK0aZl9mO2qg4hAgMBAAGj
+gZkwgZYwDgYDVR0PAQH/BAQDAgWgMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEF
+BQcDAjAdBgNVHQ4EFgQU7n8mE2bV0F3k8mEd1cQ2J0pK0aYwHwYDVR0jBBgwFoAU
+Zl9mO2qg4hH3vG7kV1d0e7n8mEYwJwYDVR0RBCAwHoISdmF1bHQubGFiLmludGVy
+bmFshwQKCgAMggV2YXVsdDANBgkqhkiG9w0BAQsFAAOCAQEAa1Vd0e7n8mE2bV0F
+-----END CERTIFICATE-----</pre>
+            </div>
+          </div>
+          <div class="card__footer">
+            <span class="muted inline-icon"><svg class="ico" style="width:14px;height:14px"><use href="icons.svg#i-info"></use></svg> Chain available below.</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__header"><h2 class="card__title">Chain (PEM)</h2></div>
+          <div class="card__body">
+            <div class="codeblock pem" id="pem-chain">
+              <div class="codeblock__bar">
+                <svg class="ico"><use href="icons.svg#i-file-text"></use></svg>
+                <span class="label">chain.pem</span>
+                <span class="spacer"></span>
+                <button type="button" class="copy-btn" data-pem-toggle="#pem-chain">Expand</button>
+                <button type="button" class="copy-btn" data-copy-target="#pem-chain-text"><svg class="ico"><use href="icons.svg#i-copy"></use></svg><span class="label">Copy</span><span class="copied"><svg class="ico"><use href="icons.svg#i-check"></use></svg>Copied</span></button>
+              </div>
+              <pre id="pem-chain-text">-----BEGIN CERTIFICATE-----
+MIIDLjCCAhagAwIBAgIRAL0e7n8mE2bV0F3k8mEd1cQwDQYJKoZIhvcNAQELBQAw
+JDEiMCAGA1UEAxMZSG9tZWxhYiBSb290IENlcnRpZmljYXRlMB4XDTI2MDEwMTAw
+MDAwMFoXDTM2MDEwMTAwMDAwMFowJDEiMCAGA1UEAxMZSG9tZWxhYiBSb290IENl
+cnRpZmljYXRlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvJs8ere3
+tK9JNoKn5PZicatp0OaOZtbVsOaNFXdHu5/JhNm1dBd5PJhHdXENidKStGmZfZjt
+qoOIR97xu5FdXdHu5/JhNm1dBd5PJhHdXENidKStGmZfZjtqoOIR97xAgMBAAGj
+-----END CERTIFICATE-----</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Revoke (admin+) — confirmation with reason. Real app posts this form. -->
+        <div class="card" id="revoke" style="border-color:var(--danger-border)">
+          <div class="card__header">
+            <div>
+              <h2 class="card__title text-danger">Revoke certificate</h2>
+              <p class="card__desc">Revocation is permanent and cannot be undone. The certificate will be reported revoked at the CA and in this inventory.</p>
+            </div>
+          </div>
+          <div class="card__body">
+            <form class="stack-4" method="post" action="#">
+              <div class="form-grid">
+                <div class="field">
+                  <label for="reason">Reason <span class="opt">(recorded in the audit log)</span></label>
+                  <select class="select" id="reason" name="reason">
+                    <option>unspecified</option>
+                    <option>keyCompromise</option>
+                    <option>affiliationChanged</option>
+                    <option>superseded</option>
+                    <option>cessationOfOperation</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn--danger"><svg class="ico"><use href="icons.svg#i-ban"></use></svg> Revoke this certificate</button>
+                <a class="btn btn--ghost" href="inventory.html">Cancel</a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="js/ui.js"></script>
+</body>
+</html>

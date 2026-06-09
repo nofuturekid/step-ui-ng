@@ -271,14 +271,14 @@ func TestLoginWritesAuditEventEndToEnd(t *testing.T) {
 
 // --- Users admin nav link ---------------------------------------------------
 
-// An admin must see a Users link in the topbar routing to /users (the handler +
-// page exist and are admin-gated, but were previously unreachable from the nav).
+// TestAdminTopbarHasUsersLink: an admin must see a Users link in the mainmenu (admin-gated, was
+// previously unreachable). The link must be present on any admin-accessible page.
 func TestAdminTopbarHasUsersLink(t *testing.T) {
 	e := newTestEnv(t)
 	e.completeSetup(t, "root") // superadmin (AtLeast admin) is left logged in
 	_, body := e.get(t, "/users")
-	if !strings.Contains(body, `<a href="/users">Users</a>`) {
-		t.Fatalf("admin topbar missing the Users nav link; body:\n%s", body)
+	if !strings.Contains(body, `href="/users"`) {
+		t.Fatalf("admin topbar missing href=\"/users\" Users link in mainmenu; body:\n%s", body)
 	}
 }
 
@@ -893,9 +893,8 @@ func TestViewerLogoLinkPointsToInventory(t *testing.T) {
 }
 
 // TestAdminLogoLinkPointsToInventoryAndUsersLinkPresent verifies that the logo
-// still links to /inventory for an admin, and that the admin Users link is present.
-// This guards the other side of the fix: we must not have accidentally removed the
-// admin nav link in closing the logo-link viewer bug.
+// still links to /inventory for an admin, and that the admin Users link is present (in the mainmenu).
+// This guards the RBAC boundary: the brand always goes to /inventory; Users is admin-only in the menu.
 func TestAdminLogoLinkPointsToInventoryAndUsersLinkPresent(t *testing.T) {
 	e := newTestEnv(t)
 	e.completeSetup(t, "root") // superadmin, left logged in
@@ -909,9 +908,9 @@ func TestAdminLogoLinkPointsToInventoryAndUsersLinkPresent(t *testing.T) {
 	if !strings.Contains(body, `src="/static/logo.svg"`) {
 		t.Fatalf("admin page: brand anchor missing logo img; body:\n%s", body)
 	}
-	// Admin Users nav link must still be present.
-	if !strings.Contains(body, `<a href="/users">Users</a>`) {
-		t.Fatalf("admin page: missing href=\"/users\" Users link; body:\n%s", body)
+	// Admin Users link must be present (inside mainmenu).
+	if !strings.Contains(body, `href="/users"`) {
+		t.Fatalf("admin page: missing href=\"/users\" Users link in mainmenu; body:\n%s", body)
 	}
 }
 
@@ -924,84 +923,103 @@ func TestAdminLogoLinkPointsToInventoryAndUsersLinkPresent(t *testing.T) {
 // operational/observation link is pulled into it, or if the menu items are reordered
 // away from the chosen logical setup order.
 
-// TestAdminTopbarHasSettingsMenu: the Settings summary and all four config links render.
-func TestAdminTopbarHasSettingsMenu(t *testing.T) {
+// TestAdminTopbarHasMainMenu: the admin shell renders the main menu (user chip / details.mainmenu)
+// with all expected config links: Users, CA settings, Provisioners, ACME, Audit log, and Log out.
+// This encodes the new IA decision: config links live in the main menu, not a flat nav "Settings" group.
+// Failure mode: removing any link from the mainmenu or gating it behind the wrong role breaks this.
+func TestAdminTopbarHasMainMenu(t *testing.T) {
 	e := newTestEnv(t)
 	e.completeSetup(t, "root")
 
 	_, body := e.get(t, "/inventory")
 
-	if !strings.Contains(body, `>Settings<`) {
-		t.Fatalf("admin topbar missing the Settings menu summary; body:\n%s", body)
+	// The main menu container must be present.
+	if !strings.Contains(body, `class="menu mainmenu"`) {
+		t.Fatalf("admin topbar missing <details class=\"menu mainmenu\">; body:\n%s", body)
 	}
-	for _, href := range []string{`href="/users"`, `href="/settings"`, `href="/provisioners"`, `href="/acme"`} {
+	// All config + admin routes must appear inside the page for an admin.
+	for _, href := range []string{`href="/users"`, `href="/settings"`, `href="/provisioners"`, `href="/acme"`, `href="/audit"`} {
 		if !strings.Contains(body, href) {
-			t.Fatalf("admin topbar missing config link %s; body:\n%s", href, body)
+			t.Fatalf("admin topbar missing expected link %s; body:\n%s", href, body)
 		}
+	}
+	// Log out action (POST /logout) must be present.
+	if !strings.Contains(body, `action="/logout"`) {
+		t.Fatalf("admin topbar missing logout form action; body:\n%s", body)
 	}
 }
 
-// TestAdminTopbarGrouping: operational/observation links are top-level (before the
-// Settings group); configuration links live inside the Settings group (.navsettings).
+// TestAdminTopbarGrouping: the three workspace nav items (Certificates, Issue, Sign CSR) live in the
+// primary nav (.nav__primary); the config links (settings, provisioners, acme, users, audit) live
+// inside the main menu (.mainmenu). This encodes the IA: workspace = primary nav, admin config = menu.
+// Failure mode: moving any config link to the primary nav or workspace link to the menu fails this test.
 func TestAdminTopbarGrouping(t *testing.T) {
 	e := newTestEnv(t)
 	e.completeSetup(t, "root")
 
 	_, body := e.get(t, "/inventory")
 
-	// The Settings config items (.menu-items) are a sibling of the <details class="menu">
-	// summary, both wrapped in .navsettings — so bound the group by that wrapper.
-	grp := strings.Index(body, `class="navsettings"`)
-	if grp < 0 {
-		t.Fatalf("admin topbar has no .navsettings Settings group; body:\n%s", body)
+	// The primary nav must exist.
+	primaryStart := strings.Index(body, `class="nav__primary"`)
+	if primaryStart < 0 {
+		t.Fatalf("admin topbar has no .nav__primary; body:\n%s", body)
 	}
-	// Top-level: operational actions + observation (must appear before the group).
-	for _, href := range []string{`href="/audit"`, `href="/issue"`, `href="/sign-csr"`} {
+	// The main menu must exist after the primary nav.
+	menuStart := strings.Index(body, `class="menu mainmenu"`)
+	if menuStart < 0 {
+		t.Fatalf("admin topbar has no .mainmenu; body:\n%s", body)
+	}
+
+	// Primary nav workspace links must appear before the mainmenu.
+	for _, href := range []string{`href="/inventory"`, `href="/issue"`, `href="/sign-csr"`} {
 		i := strings.Index(body, href)
-		if i < 0 || i >= grp {
-			t.Fatalf("expected %s top-level (before .navsettings at %d), got index %d; body:\n%s", href, grp, i, body)
+		if i < 0 || i >= menuStart {
+			t.Fatalf("expected workspace link %s in primary nav (before mainmenu at %d), got index %d; body:\n%s", href, menuStart, i, body)
 		}
 	}
-	// Configuration: must appear inside the Settings group.
-	for _, href := range []string{`href="/settings"`, `href="/provisioners"`, `href="/acme"`} {
+	// Config links must appear inside the mainmenu (after its opening tag).
+	for _, href := range []string{`href="/settings"`, `href="/provisioners"`, `href="/acme"`, `href="/users"`, `href="/audit"`} {
 		i := strings.Index(body, href)
-		if i <= grp {
-			t.Fatalf("expected %s inside the Settings group (after .navsettings at %d), got index %d; body:\n%s", href, grp, i, body)
+		if i < 0 || i < menuStart {
+			t.Fatalf("expected config link %s inside mainmenu (after index %d), got index %d; body:\n%s", href, menuStart, i, body)
 		}
 	}
 }
 
-// TestSettingsMenuOrder: inside the Settings group the items follow the logical setup
-// order Users -> CA settings -> Provisioners -> ACME.
-func TestSettingsMenuOrder(t *testing.T) {
+// TestMainMenuOrder: inside the main menu the groups appear in the order
+// APP (Users, CA settings) → STEP-CA (Provisioners, ACME) → AUDIT (Log) → Log out.
+// This encodes the logical setup order so link reordering breaks the test.
+func TestMainMenuOrder(t *testing.T) {
 	e := newTestEnv(t)
 	e.completeSetup(t, "root")
 
 	_, body := e.get(t, "/inventory")
 
-	grp := strings.Index(body, `class="navsettings"`)
-	if grp < 0 {
-		t.Fatalf("admin topbar has no .navsettings Settings group; body:\n%s", body)
+	menuStart := strings.Index(body, `class="menu mainmenu"`)
+	if menuStart < 0 {
+		t.Fatalf("admin topbar has no .mainmenu; body:\n%s", body)
 	}
-	tail := body[grp:]
+	tail := body[menuStart:]
 	prev := -1
-	for _, href := range []string{`href="/users"`, `href="/settings"`, `href="/provisioners"`, `href="/acme"`} {
+	// Expected order within the mainmenu: Users, CA settings, Provisioners, ACME, Audit, logout.
+	for _, href := range []string{`href="/users"`, `href="/settings"`, `href="/provisioners"`, `href="/acme"`, `href="/audit"`, `action="/logout"`} {
 		i := strings.Index(tail, href)
 		if i < 0 {
-			t.Fatalf("Settings group missing %s; body:\n%s", href, body)
+			t.Fatalf("mainmenu missing %s; body:\n%s", href, body)
 		}
 		if i <= prev {
-			t.Fatalf("Settings order wrong at %s (index %d not after previous %d); want Users, CA settings, Provisioners, ACME; body:\n%s", href, i, prev, body)
+			t.Fatalf("mainmenu order wrong at %s (index %d not after previous %d); body:\n%s", href, i, prev, body)
 		}
 		prev = i
 	}
 }
 
-// TestViewerHasNoSettingsMenu: the Settings menu is admin-only; a viewer must see
-// neither the <details class="menu"> Settings dropdown nor its summary (no 403-bait
-// config links). The <details class="navmenu"> hamburger wrapper IS present for every
-// role (responsive nav) and is therefore explicitly allowed here.
-func TestViewerHasNoSettingsMenu(t *testing.T) {
+// TestViewerHasNoMainMenu: the main menu (user chip + admin config) is admin-only; a viewer must not
+// see the mainmenu or any admin-gated config/operation links. Viewers also see only the Certificates
+// primary nav link; Issue and Sign CSR are absent. This encodes the RBAC boundary for UI navigation.
+// Failure mode: exposing any admin link (mainmenu, /issue, /sign-csr, /users, /settings, /provisioners,
+// /acme, /audit) to a viewer breaks this test.
+func TestViewerHasNoMainMenu(t *testing.T) {
 	e := newTestEnv(t)
 	e.completeSetup(t, "root")
 	e.seedUser(t, "viewer1", users.RoleViewer)
@@ -1009,31 +1027,43 @@ func TestViewerHasNoSettingsMenu(t *testing.T) {
 
 	_, body := e.get(t, "/inventory")
 
-	if strings.Contains(body, `<details class="menu"`) {
-		t.Fatalf("viewer page: contains a <details class=\"menu\"> Settings menu (admin-only leaked); body:\n%s", body)
+	// No mainmenu (user chip) for viewers.
+	if strings.Contains(body, `class="menu mainmenu"`) {
+		t.Fatalf("viewer page: mainmenu present (admin-only leaked); body:\n%s", body)
 	}
-	if strings.Contains(body, `>Settings<`) {
-		t.Fatalf("viewer page: contains the Settings summary (admin-only leaked); body:\n%s", body)
+	// No admin-gated operational links.
+	for _, href := range []string{`href="/issue"`, `href="/sign-csr"`, `href="/users"`, `href="/settings"`, `href="/provisioners"`, `href="/acme"`, `href="/audit"`} {
+		if strings.Contains(body, href) {
+			t.Fatalf("viewer page: admin link %s leaked to viewer; body:\n%s", href, body)
+		}
+	}
+	// The Certificates primary nav link must still be present for viewers.
+	if !strings.Contains(body, `href="/inventory"`) {
+		t.Fatalf("viewer page: missing href=\"/inventory\" Certificates link; body:\n%s", body)
 	}
 }
 
-// TestTopbarHasNavToggle: the responsive hamburger toggle is present for every
-// logged-in role (the nav collapses behind it on narrow screens). It is a JS-free
-// <summary> inside the <details class="navmenu"> wrapper, with an accessible label.
+// TestTopbarHasNavToggle: the JS-free checkbox hamburger toggle is present for every logged-in role.
+// The new shell uses an <input type="checkbox" id="nav-toggle"> + <label class="nav__burger"> pattern
+// (not a <details>). This test encodes the mechanism: break the checkbox id/for pair and responsive
+// nav stops working.
 func TestTopbarHasNavToggle(t *testing.T) {
 	e := newTestEnv(t)
 	e.completeSetup(t, "root") // admin, left logged in
 
 	assertToggle := func(t *testing.T, label, body string) {
 		t.Helper()
-		if !strings.Contains(body, `<details class="navmenu">`) {
-			t.Fatalf("%s: missing <details class=\"navmenu\"> hamburger wrapper; body:\n%s", label, body)
+		// Checkbox input with id="nav-toggle" that drives the JS-free hamburger.
+		if !strings.Contains(body, `id="nav-toggle"`) {
+			t.Fatalf("%s: missing checkbox id=\"nav-toggle\"; body:\n%s", label, body)
 		}
-		if !strings.Contains(body, `class="navtoggle"`) {
-			t.Fatalf("%s: missing the navtoggle hamburger summary; body:\n%s", label, body)
+		// Label with class nav__burger wired to the checkbox via for="nav-toggle".
+		if !strings.Contains(body, `class="nav__burger"`) {
+			t.Fatalf("%s: missing label with class nav__burger; body:\n%s", label, body)
 		}
-		if !strings.Contains(body, `aria-label="Toggle navigation"`) {
-			t.Fatalf("%s: navtoggle missing its aria-label; body:\n%s", label, body)
+		// Nav panel that opens when the checkbox is checked.
+		if !strings.Contains(body, `class="nav__panel"`) {
+			t.Fatalf("%s: missing nav panel with class nav__panel; body:\n%s", label, body)
 		}
 	}
 
@@ -1065,37 +1095,49 @@ func TestWideMainOnDataPages(t *testing.T) {
 	}
 }
 
-// TestPopoverClassesShared: the Settings dropdown and the mobile nav panel both carry
-// the shared .popover chrome class (single source of visual truth for floating panels).
-func TestPopoverClassesShared(t *testing.T) {
+// TestMenuListClassPresent: the mainmenu dropdown carries the .menu__list class
+// (the new design system's floating panel chrome). Removing the class breaks CSS scoping.
+func TestMenuListClassPresent(t *testing.T) {
 	e := newTestEnv(t)
 	e.completeSetup(t, "root")
 
 	_, body := e.get(t, "/inventory")
-	if !strings.Contains(body, `class="navwrap popover"`) {
-		t.Fatalf("nav panel missing the shared .popover class; body:\n%s", body)
-	}
-	if !strings.Contains(body, `class="menu-items popover"`) {
-		t.Fatalf("Settings dropdown missing the shared .popover class; body:\n%s", body)
+	if !strings.Contains(body, `class="menu__list mainmenu-list"`) {
+		t.Fatalf("mainmenu dropdown missing class=\"menu__list mainmenu-list\"; body:\n%s", body)
 	}
 }
 
-// TestNavListLabelAndCertificatesHeading: the inventory nav item is labelled "List"
-// (not "Certificates"), and the cert operations sit under a "Certificates" section
-// heading (shown in the hamburger; collapsed to a flat row on desktop via CSS).
-func TestNavListLabelAndCertificatesHeading(t *testing.T) {
+// TestPrimaryNavLabels: the three primary nav links carry correct labels and hrefs.
+// The inventory link is labelled "Certificates" (icon + text navlink); Issue and Sign CSR are
+// present for admins. Each link uses the .navlink class from the new design system.
+// Failure mode: renaming a label, changing an href, or dropping .navlink breaks navigation affordance.
+func TestPrimaryNavLabels(t *testing.T) {
 	e := newTestEnv(t)
 	e.completeSetup(t, "root")
 
 	_, body := e.get(t, "/inventory")
-	if !strings.Contains(body, `<a href="/inventory">List</a>`) {
-		t.Fatalf("nav: missing the renamed \"List\" link; body:\n%s", body)
+
+	// Certificates nav link (was "List" in old IA, is now "Certificates").
+	if !strings.Contains(body, `href="/inventory"`) {
+		t.Fatalf("primary nav: missing href=\"/inventory\"; body:\n%s", body)
 	}
-	if strings.Contains(body, `<a href="/inventory">Certificates</a>`) {
-		t.Fatalf("nav: still contains the old \"Certificates\" nav link; body:\n%s", body)
+	// The navlink class must be present (design system class for topbar links).
+	if !strings.Contains(body, `class="navlink"`) {
+		t.Fatalf("primary nav: navlink class not found; body:\n%s", body)
 	}
-	if !strings.Contains(body, `<span class="navhead">Certificates</span>`) {
-		t.Fatalf("nav: missing the \"Certificates\" section heading; body:\n%s", body)
+	// Issue and Sign CSR nav links present for admin.
+	if !strings.Contains(body, `href="/issue"`) {
+		t.Fatalf("primary nav: missing href=\"/issue\"; body:\n%s", body)
+	}
+	if !strings.Contains(body, `href="/sign-csr"`) {
+		t.Fatalf("primary nav: missing href=\"/sign-csr\"; body:\n%s", body)
+	}
+	// No old "List" label or "navhead" section heading from the previous IA.
+	if strings.Contains(body, `>List<`) {
+		t.Fatalf("primary nav: old \"List\" label still present (should be \"Certificates\"); body:\n%s", body)
+	}
+	if strings.Contains(body, `class="navhead"`) {
+		t.Fatalf("primary nav: old navhead class present (removed in new IA); body:\n%s", body)
 	}
 }
 

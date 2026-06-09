@@ -33,6 +33,7 @@ type signView struct {
 // getIssue renders the issue form (admin+).
 func (s *server) getIssue(w http.ResponseWriter, r *http.Request) {
 	d := s.page(r, "Issue certificate")
+	d.ActiveSection = "/issue"
 	s.render(w, r, http.StatusOK, issuePage(d, issueView{Validity: "30", Format: "pem"}))
 }
 
@@ -82,6 +83,7 @@ func (s *server) postIssue(w http.ResponseWriter, r *http.Request) {
 	}
 
 	d := s.page(r, "Issue certificate")
+	d.ActiveSection = "/issue"
 	d.Flash = "Certificate issued."
 	view.Result = &cert
 	// The result carries freshly-generated key material (PEM key or PFX). Mark the
@@ -110,6 +112,7 @@ func noStore(w http.ResponseWriter) {
 // getSignCSR renders the sign-csr form (admin+).
 func (s *server) getSignCSR(w http.ResponseWriter, r *http.Request) {
 	d := s.page(r, "Sign CSR")
+	d.ActiveSection = "/sign-csr"
 	s.render(w, r, http.StatusOK, signCSRPage(d, signView{Validity: "30"}))
 }
 
@@ -148,6 +151,7 @@ func (s *server) postSignCSR(w http.ResponseWriter, r *http.Request) {
 	}
 
 	d := s.page(r, "Sign CSR")
+	d.ActiveSection = "/sign-csr"
 	d.Flash = "Certificate signed."
 	view.Result = &cert
 	s.render(w, r, http.StatusOK, signCSRPage(d, view))
@@ -215,6 +219,7 @@ func (s *server) resolveConn(r *http.Request) (issuanceConn, string) {
 // renderIssueError re-renders the issue form with the prior input and an error.
 func (s *server) renderIssueError(w http.ResponseWriter, r *http.Request, view issueView, msg string) {
 	d := s.page(r, "Issue certificate")
+	d.ActiveSection = "/issue"
 	d.Error = msg
 	s.render(w, r, http.StatusBadRequest, issuePage(d, view))
 }
@@ -222,6 +227,7 @@ func (s *server) renderIssueError(w http.ResponseWriter, r *http.Request, view i
 // renderSignError re-renders the sign form with the prior input and an error.
 func (s *server) renderSignError(w http.ResponseWriter, r *http.Request, view signView, msg string) {
 	d := s.page(r, "Sign CSR")
+	d.ActiveSection = "/sign-csr"
 	d.Error = msg
 	s.render(w, r, http.StatusBadRequest, signCSRPage(d, view))
 }

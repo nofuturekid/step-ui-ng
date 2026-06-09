@@ -10,6 +10,25 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- **Design foundation + new app shell** (PR A): ports the approved Claude-Design
+  token system and app shell into the Templ/htmx app.
+  - `internal/app/static/tokens.css` — IBM Plex design token system (pure
+    `prefers-color-scheme` dark mode; no `[data-theme]` toggle); includes
+    compatibility alias tokens mapping the old vocabulary (`--fg`, `--card`,
+    `--radius`, `--shadow`, `--content-width`, etc.) to new tokens so existing
+    page bodies keep rendering without changes.
+  - `internal/app/static/fonts.css` — self-hosted IBM Plex Sans + IBM Plex Mono
+    `@font-face` declarations (paths relative to `/static/`).
+  - `internal/app/static/icons.svg` — Lucide-style SVG `<symbol>` sprite.
+  - **Rebuilt app shell** (`layout` templ): dark-navy topbar with brand logo,
+    `.nav__primary` (Certificates / Issue / Sign CSR with icons), JS-free
+    checkbox-hamburger (`#nav-toggle` + `.nav__burger`), and a
+    `<details class="menu mainmenu">` user-chip menu holding admin config links (Users,
+    CA settings, Provisioners, ACME, Audit log, Log out). Viewers see only the
+    Certificates primary link; no admin menu is rendered.
+  - Link order in `<head>`: `fonts.css` → `tokens.css` → `app.css`.
+  - `pageData.ActiveSection` field for `aria-current="page"` on primary nav.
+
 - **Dual admin authentication** (spec/0012): the CA-settings page gains an
   **Admin authentication** card. Operators choose between three methods:
   - `none` — disables admin operations (create/delete provisioners, ACME management).

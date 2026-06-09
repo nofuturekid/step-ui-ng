@@ -1,0 +1,233 @@
+/* =========================================================================
+   step-ui-ng — tokens.css
+   One themed set of design tokens. Light is the :root default; dark is applied
+   automatically via prefers-color-scheme. The [data-theme] attribute lets the
+   review mock force a theme — in the real app, delete the [data-theme] rules
+   and keep only :root + the @media block (pure prefers-color-scheme).
+   ========================================================================= */
+
+:root {
+  /* ---- Typography ---------------------------------------------------- */
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --fs-xs: 0.75rem;     /* 12 */
+  --fs-sm: 0.8125rem;   /* 13 */
+  --fs-base: 0.875rem;  /* 14 — dense UI base */
+  --fs-md: 0.9375rem;   /* 15 */
+  --fs-lg: 1.0625rem;   /* 17 */
+  --fs-xl: 1.25rem;     /* 20 */
+  --fs-2xl: 1.625rem;   /* 26 */
+  --fs-3xl: 2.125rem;   /* 34 */
+
+  --lh-tight: 1.2;
+  --lh-snug: 1.35;
+  --lh-base: 1.5;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* ---- Spacing (4px base) -------------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ---- Radius -------------------------------------------------------- */
+  --r-sm: 4px;
+  --r: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+
+  /* ---- Layout -------------------------------------------------------- */
+  --topbar-h: 56px;
+  --content-max: 1180px;     /* width-cap for ultrawide; centered */
+  --content-pad: var(--space-8);
+  --field-h: 38px;           /* comfortable form control height */
+  --row-h: 40px;             /* dense table row */
+
+  /* ---- Brand (theme-independent) ------------------------------------- */
+  --navy-900: #0a1422;
+  --navy-800: #0d1a2c;
+  --navy-700: #13243c;
+  --brand-grad: linear-gradient(135deg, #34d399 0%, #06b6d4 100%);
+  --brand-cyan: #06b6d4;
+  --brand-emerald: #10b981;
+
+  /* The topbar is a persistent navy brand anchor in BOTH themes. */
+  --topbar-bg: linear-gradient(180deg, #13243c 0%, #0c1a2e 100%);
+  --topbar-fg: #e9eef6;
+  --topbar-fg-muted: #93a3ba;
+  --topbar-border: rgba(255, 255, 255, 0.09);
+  --topbar-hover: rgba(255, 255, 255, 0.07);
+  --topbar-active: rgba(56, 189, 248, 0.16);
+  --topbar-active-fg: #ffffff;
+  --topbar-accent: #34d399; /* nav active underline / brand line */
+
+  /* ===================================================================== */
+  /* LIGHT THEME (default)                                                 */
+  /* ===================================================================== */
+  --bg: #f6f8fa;
+  --surface: #ffffff;
+  --surface-2: #f1f4f7;       /* table header, subtle raised, hover */
+  --surface-inset: #f3f6f9;   /* code / PEM wells */
+  --border: #dde2e9;          /* hairline */
+  --border-strong: #c6cdd8;
+  --border-focus: #0e98c0;
+
+  --text: #15202b;
+  --text-muted: #586473;
+  --text-subtle: #8a94a3;
+  --text-inverse: #ffffff;
+
+  --accent: #0e7490;          /* links / accent text on white (cyan, AA) */
+  --accent-strong: #0891b2;   /* button fill */
+  --accent-hover: #0e7c97;
+  --accent-contrast: #ffffff;
+  --accent-soft-bg: #e3f5fb;
+  --accent-soft-border: #b1e2ef;
+  --focus-ring: rgba(8, 145, 178, 0.45);
+
+  /* Status — valid GREEN kept clearly distinct from the cyan accent */
+  --ok-fg: #15803d;     --ok-bg: #e7f6ec;   --ok-border: #b4e2c2;
+  --warn-fg: #b45309;   --warn-bg: #fdf2e2; --warn-border: #f2d6a2;
+  --danger-fg: #b91c1c; --danger-bg: #fdebeb; --danger-border: #f2bfbf;
+  --neutral-fg: #475569;--neutral-bg: #eceff3; --neutral-border: #d4dae2;
+  --info-fg: #0e7490;   --info-bg: #e3f5fb; --info-border: #b1e2ef;
+
+  --danger-strong: #c0392f; /* danger button fill */
+  --danger-strong-hover: #a8322a;
+
+  /* Shadows — reserved for floating elements only */
+  --shadow-pop: 0 10px 28px rgba(15, 30, 50, 0.14), 0 2px 6px rgba(15, 30, 50, 0.08);
+  --shadow-sticky: 0 1px 0 var(--border), 0 6px 12px -10px rgba(15, 30, 50, 0.25);
+
+  color-scheme: light;
+}
+
+/* ===================================================================== */
+/* DARK THEME                                                            */
+/* ===================================================================== */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #0a1422;
+    --surface: #0f1d31;
+    --surface-2: #16273f;
+    --surface-inset: #0b1828;
+    --border: #21344d;
+    --border-strong: #314a68;
+    --border-focus: #38bdf8;
+
+    --text: #e6edf5;
+    --text-muted: #a0b1c5;
+    --text-subtle: #6c7e94;
+    --text-inverse: #0a1422;
+
+    --accent: #34d399;
+    --accent-strong: #22d3ee;
+    --accent-hover: #4fdded;
+    --accent-contrast: #062029;
+    --accent-soft-bg: rgba(34, 211, 238, 0.12);
+    --accent-soft-border: rgba(34, 211, 238, 0.3);
+    --focus-ring: rgba(56, 189, 248, 0.5);
+
+    --ok-fg: #4ade80;     --ok-bg: rgba(34, 197, 94, 0.14);   --ok-border: rgba(34, 197, 94, 0.34);
+    --warn-fg: #fbbf24;   --warn-bg: rgba(245, 158, 11, 0.14);--warn-border: rgba(245, 158, 11, 0.34);
+    --danger-fg: #f87171; --danger-bg: rgba(239, 68, 68, 0.15);--danger-border: rgba(239, 68, 68, 0.36);
+    --neutral-fg: #94a3b8;--neutral-bg: rgba(148, 163, 184, 0.13);--neutral-border: rgba(148, 163, 184, 0.28);
+    --info-fg: #38bdf8;   --info-bg: rgba(56, 189, 248, 0.13);--info-border: rgba(56, 189, 248, 0.32);
+
+    --danger-strong: #e25549;
+    --danger-strong-hover: #ef6b60;
+
+    --shadow-pop: 0 14px 36px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
+    --shadow-sticky: 0 1px 0 var(--border), 0 8px 16px -12px rgba(0, 0, 0, 0.7);
+
+    color-scheme: dark;
+  }
+}
+
+/* Forced-dark (review mock toggle). Mirrors the @media block above. */
+[data-theme="dark"] {
+  --bg: #0a1422;
+  --surface: #0f1d31;
+  --surface-2: #16273f;
+  --surface-inset: #0b1828;
+  --border: #21344d;
+  --border-strong: #314a68;
+  --border-focus: #38bdf8;
+
+  --text: #e6edf5;
+  --text-muted: #a0b1c5;
+  --text-subtle: #6c7e94;
+  --text-inverse: #0a1422;
+
+  --accent: #34d399;
+  --accent-strong: #22d3ee;
+  --accent-hover: #4fdded;
+  --accent-contrast: #062029;
+  --accent-soft-bg: rgba(34, 211, 238, 0.12);
+  --accent-soft-border: rgba(34, 211, 238, 0.3);
+  --focus-ring: rgba(56, 189, 248, 0.5);
+
+  --ok-fg: #4ade80;     --ok-bg: rgba(34, 197, 94, 0.14);   --ok-border: rgba(34, 197, 94, 0.34);
+  --warn-fg: #fbbf24;   --warn-bg: rgba(245, 158, 11, 0.14);--warn-border: rgba(245, 158, 11, 0.34);
+  --danger-fg: #f87171; --danger-bg: rgba(239, 68, 68, 0.15);--danger-border: rgba(239, 68, 68, 0.36);
+  --neutral-fg: #94a3b8;--neutral-bg: rgba(148, 163, 184, 0.13);--neutral-border: rgba(148, 163, 184, 0.28);
+  --info-fg: #38bdf8;   --info-bg: rgba(56, 189, 248, 0.13);--info-border: rgba(56, 189, 248, 0.32);
+
+  --danger-strong: #e25549;
+  --danger-strong-hover: #ef6b60;
+
+  --shadow-pop: 0 14px 36px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-sticky: 0 1px 0 var(--border), 0 8px 16px -12px rgba(0, 0, 0, 0.7);
+
+  color-scheme: dark;
+}
+
+/* Forced-light — mirrors :root, used to override an OS dark preference. */
+[data-theme="light"] {
+  --bg: #f6f8fa;
+  --surface: #ffffff;
+  --surface-2: #f1f4f7;
+  --surface-inset: #f3f6f9;
+  --border: #dde2e9;
+  --border-strong: #c6cdd8;
+  --border-focus: #0e98c0;
+
+  --text: #15202b;
+  --text-muted: #586473;
+  --text-subtle: #8a94a3;
+  --text-inverse: #ffffff;
+
+  --accent: #0e7490;
+  --accent-strong: #0891b2;
+  --accent-hover: #0e7c97;
+  --accent-contrast: #ffffff;
+  --accent-soft-bg: #e3f5fb;
+  --accent-soft-border: #b1e2ef;
+  --focus-ring: rgba(8, 145, 178, 0.45);
+
+  --ok-fg: #15803d;     --ok-bg: #e7f6ec;   --ok-border: #b4e2c2;
+  --warn-fg: #b45309;   --warn-bg: #fdf2e2; --warn-border: #f2d6a2;
+  --danger-fg: #b91c1c; --danger-bg: #fdebeb; --danger-border: #f2bfbf;
+  --neutral-fg: #475569;--neutral-bg: #eceff3; --neutral-border: #d4dae2;
+  --info-fg: #0e7490;   --info-bg: #e3f5fb; --info-border: #b1e2ef;
+
+  --danger-strong: #c0392f;
+  --danger-strong-hover: #a8322a;
+
+  --shadow-pop: 0 10px 28px rgba(15, 30, 50, 0.14), 0 2px 6px rgba(15, 30, 50, 0.08);
+  --shadow-sticky: 0 1px 0 var(--border), 0 6px 12px -10px rgba(15, 30, 50, 0.25);
+
+  color-scheme: light;
+}

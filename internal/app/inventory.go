@@ -45,6 +45,7 @@ func (s *server) getInventory(w http.ResponseWriter, r *http.Request) {
 
 	d := s.page(r, "Certificates")
 	d.Wide = true // data-heavy table: render at the wider content width
+	d.ActiveSection = "/inventory"
 	v := inventoryView{Filter: filter, Items: list}
 
 	if r.Header.Get("HX-Request") == "true" {

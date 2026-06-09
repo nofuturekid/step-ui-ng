@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>step-ui-ng — design system & screens</title>
+  <link rel="icon" href="static/logo.svg" />
+  <link rel="stylesheet" href="css/fonts.css" />
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/app.css" />
+  <style>
+    .hero {
+      display: flex; align-items: center; gap: var(--space-5);
+      padding: var(--space-8) 0 var(--space-6);
+    }
+    .hero img { width: 64px; height: 64px; border-radius: 16px; }
+    .hero .name { font-size: var(--fs-3xl); font-weight: var(--fw-semibold); letter-spacing: -0.02em; }
+    .hero .name b { } .hero .name span { color: var(--text-muted); }
+    .hero .dir { color: var(--accent); font-family: var(--font-mono); font-size: var(--fs-sm); }
+    .screens { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5); }
+    @media (max-width: 900px) { .screens { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 560px) { .screens { grid-template-columns: 1fr; } }
+    .screen-card {
+      display: flex; flex-direction: column; gap: var(--space-2);
+      padding: var(--space-5); background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--r-md);
+      color: var(--text); transition: border-color .12s ease, transform .12s ease;
+    }
+    .screen-card:hover { border-color: var(--accent-strong); text-decoration: none; transform: translateY(-1px); }
+    .screen-card .sc-icon {
+      width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+      border-radius: var(--r); background: var(--accent-soft-bg); color: var(--accent);
+      border: 1px solid var(--accent-soft-border); margin-bottom: var(--space-2);
+    }
+    .screen-card .sc-icon .ico { width: 18px; height: 18px; }
+    .screen-card h3 { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+    .screen-card p { font-size: var(--fs-sm); color: var(--text-muted); }
+    .screen-card .role { margin-top: auto; padding-top: var(--space-3); }
+    .swatches { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+    .swatch { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-xs); color: var(--text-muted); }
+    .swatch .chip { width: 92px; height: 44px; border-radius: var(--r); border: 1px solid var(--border); }
+    .legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
+    .principles { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-4) var(--space-6); }
+    @media (max-width: 720px) { .principles { grid-template-columns: 1fr; } }
+    .principles li { color: var(--text-muted); }
+    .principles b { color: var(--text); font-weight: var(--fw-semibold); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="index.html" aria-label="Step-CA NextGen UI — home">
+          <img src="static/logo.svg" alt="" />
+          <span class="brand-name"><span class="b1">Step-CA</span><span class="b2">NextGen UI</span></span>
+        </a>
+        <div class="nav">
+          <div class="nav__panel" style="margin-left:auto">
+            <div class="topbar-user">
+              <div class="theme-footer"><span class="theme-label">Theme</span><div class="theme-toggle" role="group" aria-label="Theme">
+                <button type="button" data-theme-set="auto" title="System theme"><svg class="ico"><use href="icons.svg#i-monitor"></use></svg></button>
+                <button type="button" data-theme-set="light" title="Light theme"><svg class="ico"><use href="icons.svg#i-sun"></use></svg></button>
+                <button type="button" data-theme-set="dark" title="Dark theme"><svg class="ico"><use href="icons.svg#i-moon"></use></svg></button>
+              </div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content" data-screen-label="Overview">
+      <div class="hero">
+        <img src="static/logo.svg" alt="" />
+        <div>
+          <div class="name"><b>Step-CA</b> <span>NextGen UI</span></div>
+          <div class="dir">design direction: “Hairline” — crisp, border-defined operator console</div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="flash flash--info">
+          <svg class="ico"><use href="icons.svg#i-info"></use></svg>
+          <div class="flash__body">
+            <strong>What this is.</strong>
+            <p>One coherent visual direction for the step-ui-ng admin UI: server-render-friendly, semantic HTML + hand-written CSS tokens (no framework), light &amp; dark from one token set, fully usable without JavaScript. Use the theme switch (top-right) to compare light and dark — production drives it purely from <span class="mono">prefers-color-scheme</span>. Toggle the browser narrow to see the JS-free hamburger.</p>
+          </div>
+        </div>
+
+        <!-- Direction rationale -->
+        <div class="card">
+          <div class="card__header"><div><h2 class="card__title">The direction in one line</h2></div></div>
+          <div class="card__body stack-4">
+            <p style="max-width:80ch"><b>Hairline</b> treats the UI like a piece of infrastructure: 1px borders define every surface, shadows are reserved only for things that float (menus), corners are tight (6–8px), and type is IBM Plex Sans with Plex Mono for anything cryptographic. The deep-navy brand bar is a constant anchor across both themes; the accent leans <b>cyan</b> so it never collides with the green “valid” status. Dense tables, calm forms.</p>
+            <ul class="principles" style="list-style:none;padding:0;margin:0">
+              <li><b>Trust through legibility</b> — nothing decorative competes with the data.</li>
+              <li><b>Honest states</b> — disabled controls always say <em>why</em>, with a link to fix it.</li>
+              <li><b>Secrets are write-only</b> — shown once at creation, otherwise a <span class="badge badge--set" style="vertical-align:middle"><span class="dot"></span>set</span> / <span class="badge badge--none" style="vertical-align:middle"><span class="dot"></span>none</span> badge.</li>
+              <li><b>Status by label + colour</b> — never colour alone, for accessibility.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Tokens quick reference -->
+        <div class="grid-2">
+          <div class="card">
+            <div class="card__header"><div><h2 class="card__title">Core colour tokens</h2><p class="card__desc">Shown for the current theme. Switch themes above to see both.</p></div></div>
+            <div class="card__body stack-4">
+              <div class="swatches">
+                <div class="swatch"><span class="chip" style="background:var(--bg)"></span>--bg</div>
+                <div class="swatch"><span class="chip" style="background:var(--surface)"></span>--surface</div>
+                <div class="swatch"><span class="chip" style="background:var(--surface-2)"></span>--surface-2</div>
+                <div class="swatch"><span class="chip" style="background:var(--accent-strong)"></span>--accent</div>
+                <div class="swatch"><span class="chip" style="background:linear-gradient(135deg,#34d399,#06b6d4)"></span>brand</div>
+              </div>
+              <div class="legend">
+                <span class="badge badge--ok"><span class="dot"></span>Valid</span>
+                <span class="badge badge--warn"><svg class="ico"><use href="icons.svg#i-clock"></use></svg>Expiring</span>
+                <span class="badge badge--neutral"><span class="dot"></span>Expired</span>
+                <span class="badge badge--danger"><svg class="ico"><use href="icons.svg#i-ban"></use></svg>Revoked</span>
+                <span class="badge badge--set"><span class="dot"></span>set</span>
+                <span class="badge badge--none"><span class="dot"></span>none</span>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card__header"><div><h2 class="card__title">Type &amp; buttons</h2></div></div>
+            <div class="card__body stack-4">
+              <div>
+                <div style="font-size:var(--fs-2xl);font-weight:var(--fw-semibold);letter-spacing:-0.02em">IBM Plex Sans</div>
+                <div class="mono" style="color:var(--text-muted)">IBM Plex Mono · 0 O 1 l I — fingerprints &amp; PEM</div>
+              </div>
+              <div class="btn-row">
+                <button class="btn btn--primary">Primary</button>
+                <button class="btn">Secondary</button>
+                <button class="btn btn--danger">Danger</button>
+                <button class="btn" disabled>Disabled</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Screens -->
+        <h2 class="section-title" style="margin-top:var(--space-4)">App shell &amp; roles</h2>
+        <div class="screens">
+          <a class="screen-card" href="inventory.html">
+            <span class="sc-icon"><svg class="ico"><use href="icons.svg#i-list"></use></svg></span>
+            <h3>Certificate list — admin</h3>
+            <p>Full nav, filters, status badges, pagination, “as recorded” affordance.</p>
+            <div class="role"><span class="badge badge--role">admin</span></div>
+          </a>
+          <a class="screen-card" href="inventory-viewer.html">
+            <span class="sc-icon"><svg class="ico"><use href="icons.svg#i-eye"></use></svg></span>
+            <h3>Certificate list — viewer</h3>
+            <p>Minimal nav (List only), read-only, no action buttons.</p>
+            <div class="role"><span class="badge badge--role">viewer</span></div>
+          </a>
+          <a class="screen-card" href="certificate.html">
+            <span class="sc-icon"><svg class="ico"><use href="icons.svg#i-file-text"></use></svg></span>
+            <h3>Certificate detail</h3>
+            <p>Metadata, copyable IDs, read-only PEM, download / renew / revoke-with-reason.</p>
+            <div class="role"><span class="badge badge--role">admin · viewer (read-only)</span></div>
+          </a>
+        </div>
+
+        <h2 class="section-title" style="margin-top:var(--space-2)">Certificates</h2>
+        <div class="screens">
+          <a class="screen-card" href="issue.html">
+            <span class="sc-icon"><svg class="ico"><use href="icons.svg#i-file-plus"></use></svg></span>
+            <h3>Issue certificate</h3>
+            <p>Form + one-time private key + PKCS#12 (htmx success swap).</p>
+            <div class="role"><span class="badge badge--role">admin</span></div>
+          </a>
+          <a class="screen-card" href="sign-csr.html">
+            <span class="sc-icon"><svg class="ico"><use href="icons.svg#i-pen"></use></svg></span>
+            <h3>Sign CSR</h3>
+            <p>Paste a PEM CSR, get a signed certificate back.</p>
+            <div class="role"><span class="badge badge--role">admin</span></div>
+          </a>
+          <a class="screen-card" href="audit.html">
+            <span class="sc-icon"><svg class="ico"><use href="icons.svg#i-scroll"></use></svg></span>
+            <h3>Audit log</h3>
+            <p>Filterable, paginated events. Never shows secrets.</p>
+            <div class="role"><span class="badge badge--role">admin</span></div>
+          </a>
+        </div>
+
+        <h2 class="section-title" style="margin-top:var(--space-2)">Settings</h2>
+        <div class="screens">
+          <a class="screen-card" href="ca-settings.html">
+            <span class="sc-icon"><svg class="ico"><use href="icons.svg#i-server"></use></svg></span>
+            <h3>CA settings</h3>
+            <p>Connection + test, and the admin-auth method selector (none/x5c/jwk) with set/none badges.</p>
+            <div class="role"><span class="badge badge--role">admin</span></div>
+          </a>
+          <a class="screen-card" href="provisioners.html">
+            <span class="sc-icon"><svg class="ico"><use href="icons.svg#i-key"></use></svg></span>
+            <h3>Provisioners</h3>
+            <p>Live list, set-active, and the disabled-with-reason create/delete state.</p>
+            <div class="role"><span class="badge badge--role">admin</span></div>
+          </a>
+          <a class="screen-card" href="acme.html">
+            <span class="sc-icon"><svg class="ico"><use href="icons.svg#i-globe"></use></svg></span>
+            <h3>ACME + EAB</h3>
+            <p>ACME provisioners, one-time HMAC, EAB list, client snippets.</p>
+            <div class="role"><span class="badge badge--role">admin</span></div>
+          </a>
+          <a class="screen-card" href="users.html">
+            <span class="sc-icon"><svg class="ico"><use href="icons.svg#i-users"></use></svg></span>
+            <h3>Users</h3>
+            <p>Create users, roles, superadmin protections.</p>
+            <div class="role"><span class="badge badge--role">admin</span></div>
+          </a>
+          <a class="screen-card" href="login.html">
+            <span class="sc-icon"><svg class="ico"><use href="icons.svg#i-logout"></use></svg></span>
+            <h3>Login</h3>
+            <p>Centered auth card.</p>
+            <div class="role"><span class="badge badge--role">public</span></div>
+          </a>
+          <a class="screen-card" href="setup.html">
+            <span class="sc-icon"><svg class="ico"><use href="icons.svg#i-shield-check"></use></svg></span>
+            <h3>First-run setup</h3>
+            <p>Create the first superadmin; replaces the app.</p>
+            <div class="role"><span class="badge badge--role">public</span></div>
+          </a>
+        </div>
+
+        <!-- Build notes -->
+        <div class="card">
+          <div class="card__header"><div><h2 class="card__title">Notes for the port to Templ + htmx</h2></div></div>
+          <div class="card__body">
+            <ul class="principles" style="list-style:disc;padding-left:1.2em;margin:0">
+              <li><b>Tokens:</b> <span class="mono">css/tokens.css</span> is the single source of truth. To go pure <span class="mono">prefers-color-scheme</span>, delete the two <span class="mono">[data-theme]</span> blocks and keep <span class="mono">:root</span> + the <span class="mono">@media</span> block.</li>
+              <li><b>No framework:</b> all styling is in <span class="mono">tokens.css</span> + <span class="mono">app.css</span>. The only JS (<span class="mono">js/ui.js</span>) is progressive enhancement — copy buttons, PEM expand, theme switch.</li>
+              <li><b>JS-free:</b> nav hamburger is a checkbox+label; dropdowns are <span class="mono">&lt;details&gt;</span>; the method-selector reveal is CSS <span class="mono">:has()</span>. All work with JS off.</li>
+              <li><b>htmx points</b> are marked with a dashed cyan <span class="mono">htmx swap target</span> tag: test-connection result, method-selector reveal, issue success, one-time EAB HMAC.</li>
+              <li><b>Fonts</b> are self-hosted woff2 in <span class="mono">/fonts</span> (OFL) — no CDN, works fully offline.</li>
+              <li><b>Secrets</b> never become input <span class="mono">value</span>s; rendered as set/none badges or one-time panels only.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="js/ui.js"></script>
+</body>
+</html>

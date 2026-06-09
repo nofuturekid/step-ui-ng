@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Provisioners · step-ui-ng</title>
+  <link rel="icon" href="static/logo.svg" />
+  <link rel="stylesheet" href="css/fonts.css" />
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="inventory.html" aria-label="Step-CA NextGen UI — home">
+          <img src="static/logo.svg" alt="" />
+          <span class="brand-name"><span class="b1">Step-CA</span><span class="b2">NextGen UI</span></span>
+        </a>
+        <div class="nav">
+          <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation menu" />
+          <label class="nav__burger" for="nav-toggle" title="Menu"><svg class="ico" style="width:20px;height:20px"><use href="icons.svg#i-menu"></use></svg></label>
+          <div class="nav__panel">
+            <nav class="nav__primary" aria-label="Primary">
+              <a class="navlink" href="inventory.html"><svg class="ico"><use href="icons.svg#i-list"></use></svg> Certificates</a>
+              <a class="navlink" href="issue.html"><svg class="ico"><use href="icons.svg#i-file-plus"></use></svg> Issue</a>
+              <a class="navlink" href="sign-csr.html"><svg class="ico"><use href="icons.svg#i-pen"></use></svg> Sign CSR</a>
+            </nav>
+            <div class="topbar-user">
+                            <div class="theme-footer"><span class="theme-label">Theme</span><div class="theme-toggle" role="group" aria-label="Theme (review-mock affordance)">
+                <button type="button" data-theme-set="auto" title="System theme"><svg class="ico"><use href="icons.svg#i-monitor"></use></svg></button>
+                <button type="button" data-theme-set="light" title="Light theme"><svg class="ico"><use href="icons.svg#i-sun"></use></svg></button>
+                <button type="button" data-theme-set="dark" title="Dark theme"><svg class="ico"><use href="icons.svg#i-moon"></use></svg></button>
+              </div></div>
+              <details class="menu mainmenu">
+                <summary class="mainmenu-trigger" aria-label="Main menu">
+                  <span class="avatar" aria-hidden="true">MR</span>
+                  <span class="mainmenu-id">
+                    <span class="uname">m.reyes</span>
+                    <span class="urole">admin</span>
+                  </span>
+                  <svg class="ico chev" style="width:14px;height:14px"><use href="icons.svg#i-chevron-down"></use></svg>
+                </summary>
+                <div class="menu__list mainmenu-list">
+                  <div class="menu__label">App</div>
+                  <a href="users.html"><svg class="ico"><use href="icons.svg#i-users"></use></svg> Users</a>
+                  <a href="ca-settings.html"><svg class="ico"><use href="icons.svg#i-server"></use></svg> CA settings</a>
+                  <div class="menu__label">Step-CA</div>
+                  <a href="provisioners.html" aria-current="page"><svg class="ico"><use href="icons.svg#i-key"></use></svg> Provisioners</a>
+                  <a href="acme.html"><svg class="ico"><use href="icons.svg#i-globe"></use></svg> ACME</a>
+                  <div class="menu__sep"></div>
+                  <div class="menu__label">Audit</div>
+                  <a href="audit.html"><svg class="ico"><use href="icons.svg#i-scroll"></use></svg> Log</a>
+                  <div class="menu__sep"></div>
+                  <a class="menu__logout" href="login.html"><svg class="ico"><use href="icons.svg#i-logout"></use></svg> Log out</a>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content" data-screen-label="Provisioners (admin)">
+      <div class="page-head">
+        <div class="breadcrumb"><a href="#">Settings</a><span class="sep">/</span><span>Provisioners</span></div>
+        <div class="page-head__row">
+          <div>
+            <h1 class="page-title">Provisioners</h1>
+            <p class="page-sub">Read live from the CA. The active provisioner is used when issuing certificates from step-ui-ng.</p>
+          </div>
+          <div class="page-head__actions">
+            <!-- Create is DISABLED until admin auth is configured. Honest, not a bare grey button. -->
+            <button class="btn btn--primary" aria-disabled="true" disabled title="Requires admin authentication"><svg class="ico"><use href="icons.svg#i-plus"></use></svg> Create provisioner</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <!-- Disabled-with-a-reason: first-class explanation -->
+        <div class="locked">
+          <svg class="ico"><use href="icons.svg#i-lock"></use></svg>
+          <div class="locked__body">
+            <strong>Creating and deleting provisioners needs admin authentication.</strong>
+            <p>step-ui-ng can read provisioners and set the active one without credentials, but writing to the CA's admin API requires an <span class="mono">x5c</span> or <span class="mono">jwk</span> admin method. You can also manage provisioners directly with the <span class="mono">step</span> CLI.</p>
+            <div class="btn-row">
+              <a class="btn btn--sm" href="ca-settings.html"><svg class="ico"><use href="icons.svg#i-settings"></use></svg> Configure admin authentication</a>
+              <button type="button" class="btn btn--sm" data-copy="step ca provisioner add homelab-ca --type JWK --create"><svg class="ico"><use href="icons.svg#i-terminal"></use></svg> Copy CLI command</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active provisioner control — works without admin auth -->
+        <div class="card">
+          <div class="card__header">
+            <div>
+              <h2 class="card__title">Active provisioner for issuance</h2>
+              <p class="card__desc">step-ui-ng signs new certificates through this provisioner. Some provisioners need a secret (password) to use.</p>
+            </div>
+          </div>
+          <form class="card__body" method="post" action="#">
+            <div class="form-grid">
+              <div class="field">
+                <label for="active-prov">Provisioner</label>
+                <select class="select" id="active-prov" name="active">
+                  <option selected>acme-internal — ACME</option>
+                  <option>admin-jwk — JWK</option>
+                  <option>homelab-ca — JWK</option>
+                  <option>oidc-google — OIDC</option>
+                </select>
+              </div>
+              <div class="field secret-field">
+                <label for="active-secret">Provisioner password <span class="opt">(if required)</span></label>
+                <div class="secret-row">
+                  <input class="input" id="active-secret" name="secret" type="password" placeholder="•••••••• (unchanged)" />
+                  <span class="secret-state"><span class="badge badge--set"><span class="dot"></span>set</span></span>
+                </div>
+                <span class="field__hint">Write-only. Stored encrypted for the active provisioner only.</span>
+              </div>
+            </div>
+            <div class="form-actions" style="margin-top:var(--space-5)">
+              <button type="submit" class="btn btn--primary">Set active</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Live list from the CA -->
+        <div>
+          <h2 class="section-title">All provisioners <span class="badge badge--neutral" style="vertical-align:middle">4 from CA</span></h2>
+          <div class="table-wrap table-scroll">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Details</th>
+                  <th scope="col">Issuance</th>
+                  <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="mono">acme-internal</td>
+                  <td><span class="tag">ACME</span></td>
+                  <td class="muted">challenges: http-01, dns-01</td>
+                  <td><span class="badge badge--info"><span class="dot"></span>Active</span></td>
+                  <td class="col-actions">
+                    <div class="rowact">
+                      <!-- active provisioner cannot be deleted -->
+                      <button class="iconbtn" aria-disabled="true" disabled title="The active provisioner cannot be deleted"><svg class="ico"><use href="icons.svg#i-trash"></use></svg></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="mono">admin-jwk</td>
+                  <td><span class="tag">JWK</span></td>
+                  <td class="muted">key: P-256 · admin</td>
+                  <td><button type="button" class="btn btn--sm">Set active</button></td>
+                  <td class="col-actions">
+                    <div class="rowact">
+                      <button class="iconbtn" aria-disabled="true" disabled title="Requires admin authentication"><svg class="ico"><use href="icons.svg#i-trash"></use></svg></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="mono">homelab-ca</td>
+                  <td><span class="tag">JWK</span></td>
+                  <td class="muted">key: RSA-2048</td>
+                  <td><button type="button" class="btn btn--sm">Set active</button></td>
+                  <td class="col-actions">
+                    <div class="rowact">
+                      <button class="iconbtn" aria-disabled="true" disabled title="Requires admin authentication"><svg class="ico"><use href="icons.svg#i-trash"></use></svg></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="mono">oidc-google</td>
+                  <td><span class="tag">OIDC</span></td>
+                  <td class="muted">issuer: accounts.google.com</td>
+                  <td><button type="button" class="btn btn--sm">Set active</button></td>
+                  <td class="col-actions">
+                    <div class="rowact">
+                      <button class="iconbtn" aria-disabled="true" disabled title="Requires admin authentication"><svg class="ico"><use href="icons.svg#i-trash"></use></svg></button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="field__hint" style="margin-top:var(--space-3)"><svg class="ico" style="width:13px;height:13px"><use href="icons.svg#i-lock"></use></svg> Delete is disabled until admin auth is set; the <span class="mono">Active</span> provisioner can never be deleted.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="js/ui.js"></script>
+</body>
+</html>

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Certificates · step-ui-ng</title>
+  <link rel="icon" href="static/logo.svg" />
+  <link rel="stylesheet" href="css/fonts.css" />
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- ============================ TOPBAR ============================ -->
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="inventory.html" aria-label="Step-CA NextGen UI — home">
+          <img src="static/logo.svg" alt="" />
+          <span class="brand-name"><span class="b1">Step-CA</span><span class="b2">NextGen UI</span></span>
+        </a>
+
+        <div class="nav">
+          <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation menu" />
+          <label class="nav__burger" for="nav-toggle" title="Menu">
+            <svg class="ico" style="width:20px;height:20px"><use href="icons.svg#i-menu"></use></svg>
+          </label>
+          <div class="nav__panel">
+            <nav class="nav__primary" aria-label="Primary">
+              <a class="navlink" href="inventory.html" aria-current="page"><svg class="ico"><use href="icons.svg#i-list"></use></svg> Certificates</a>
+              <a class="navlink" href="issue.html"><svg class="ico"><use href="icons.svg#i-file-plus"></use></svg> Issue</a>
+              <a class="navlink" href="sign-csr.html"><svg class="ico"><use href="icons.svg#i-pen"></use></svg> Sign CSR</a>
+            </nav>
+
+            <div class="topbar-user">
+                            <div class="theme-footer"><span class="theme-label">Theme</span><div class="theme-toggle" role="group" aria-label="Theme (review-mock affordance)">
+                <button type="button" data-theme-set="auto" title="System theme"><svg class="ico"><use href="icons.svg#i-monitor"></use></svg></button>
+                <button type="button" data-theme-set="light" title="Light theme"><svg class="ico"><use href="icons.svg#i-sun"></use></svg></button>
+                <button type="button" data-theme-set="dark" title="Dark theme"><svg class="ico"><use href="icons.svg#i-moon"></use></svg></button>
+              </div></div>
+              <details class="menu mainmenu">
+                <summary class="mainmenu-trigger" aria-label="Main menu">
+                  <span class="avatar" aria-hidden="true">MR</span>
+                  <span class="mainmenu-id">
+                    <span class="uname">m.reyes</span>
+                    <span class="urole">admin</span>
+                  </span>
+                  <svg class="ico chev" style="width:14px;height:14px"><use href="icons.svg#i-chevron-down"></use></svg>
+                </summary>
+                <div class="menu__list mainmenu-list">
+                  <div class="menu__label">App</div>
+                  <a href="users.html"><svg class="ico"><use href="icons.svg#i-users"></use></svg> Users</a>
+                  <a href="ca-settings.html"><svg class="ico"><use href="icons.svg#i-server"></use></svg> CA settings</a>
+                  <div class="menu__label">Step-CA</div>
+                  <a href="provisioners.html"><svg class="ico"><use href="icons.svg#i-key"></use></svg> Provisioners</a>
+                  <a href="acme.html"><svg class="ico"><use href="icons.svg#i-globe"></use></svg> ACME</a>
+                  <div class="menu__sep"></div>
+                  <div class="menu__label">Audit</div>
+                  <a href="audit.html"><svg class="ico"><use href="icons.svg#i-scroll"></use></svg> Log</a>
+                  <div class="menu__sep"></div>
+                  <a class="menu__logout" href="login.html"><svg class="ico"><use href="icons.svg#i-logout"></use></svg> Log out</a>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============================ CONTENT =========================== -->
+    <main class="content" data-screen-label="Certificate List (admin)">
+      <div class="page-head">
+        <div class="page-head__row">
+          <div>
+            <h1 class="page-title">Certificates</h1>
+            <p class="page-sub">Issued certificates from step-ui-ng's local record.</p>
+          </div>
+          <div class="page-head__actions">
+            <a class="btn" href="sign-csr.html"><svg class="ico"><use href="icons.svg#i-pen"></use></svg> Sign CSR</a>
+            <a class="btn btn--primary" href="issue.html"><svg class="ico"><use href="icons.svg#i-file-plus"></use></svg> Issue certificate</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <!-- "As recorded" affordance -->
+        <div class="flash flash--info" role="status">
+          <svg class="ico"><use href="icons.svg#i-info"></use></svg>
+          <div class="flash__body">
+            <strong>This is step-ui-ng's recorded view.</strong>
+            <p>Reflects what step-ui-ng has issued and can drift from the CA — last reconciled 14 minutes ago.</p>
+          </div>
+          <button type="button" class="btn btn--sm flash__close"><svg class="ico"><use href="icons.svg#i-refresh"></use></svg> Reconcile</button>
+        </div>
+
+        <!-- Filter bar (htmx: filtering swaps just the table body below) -->
+        <div>
+          <form class="filterbar" role="search" aria-label="Filter certificates">
+            <div class="searchbox">
+              <svg class="ico"><use href="icons.svg#i-search"></use></svg>
+              <input class="input" type="search" name="q" placeholder="Search common name, SAN or serial…" />
+            </div>
+            <label class="visually-hidden" for="f-status">Status</label>
+            <select class="select" id="f-status" name="status" style="max-width:170px">
+              <option value="">All statuses</option>
+              <option>Valid</option>
+              <option>Expiring soon</option>
+              <option>Expired</option>
+              <option>Revoked</option>
+            </select>
+            <label class="visually-hidden" for="f-prov">Provisioner</label>
+            <select class="select" id="f-prov" name="provisioner" style="max-width:190px">
+              <option value="">All provisioners</option>
+              <option>acme-internal</option>
+              <option>admin-jwk</option>
+              <option>homelab-ca</option>
+            </select>
+            <div class="spacer"></div>
+            <span class="result-count">128 certificates</span>
+          </form>
+
+          <div class="table-wrap table-scroll">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th scope="col">Common name</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Provisioner</th>
+                  <th scope="col">Expires</th>
+                  <th scope="col">Serial</th>
+                  <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><a class="rowlink cn-cell" href="certificate.html" title="vault.lab.internal">vault.lab.internal</a></td>
+                  <td class="muted">Leaf · server</td>
+                  <td><span class="badge badge--ok"><span class="dot"></span>Valid</span></td>
+                  <td class="muted">admin-jwk</td>
+                  <td class="nowrap">2026-09-02 <span class="subtle">· 85d</span></td>
+                  <td><span class="mono subtle">3F:A2:9C…1B</span></td>
+                  <td class="col-actions"><a class="iconbtn" href="certificate.html" aria-label="View vault.lab.internal"><svg class="ico"><use href="icons.svg#i-chevron-right"></use></svg></a></td>
+                </tr>
+                <tr>
+                  <td><a class="rowlink cn-cell" href="certificate.html" title="grafana.lab.internal">grafana.lab.internal</a></td>
+                  <td class="muted">Leaf · server</td>
+                  <td><span class="badge badge--warn"><svg class="ico"><use href="icons.svg#i-clock"></use></svg>Expiring</span></td>
+                  <td class="muted">acme-internal</td>
+                  <td class="nowrap text-warn">2026-06-18 <span>· 9d</span></td>
+                  <td><span class="mono subtle">7C:01:DE…4A</span></td>
+                  <td class="col-actions"><a class="iconbtn" href="certificate.html" aria-label="View grafana.lab.internal"><svg class="ico"><use href="icons.svg#i-chevron-right"></use></svg></a></td>
+                </tr>
+                <tr>
+                  <td><a class="rowlink cn-cell" href="certificate.html" title="*.svc.cluster.local">*.svc.cluster.local</a></td>
+                  <td class="muted">Leaf · server</td>
+                  <td><span class="badge badge--ok"><span class="dot"></span>Valid</span></td>
+                  <td class="muted">acme-internal</td>
+                  <td class="nowrap">2026-07-30 <span class="subtle">· 51d</span></td>
+                  <td><span class="mono subtle">A1:55:90…E7</span></td>
+                  <td class="col-actions"><a class="iconbtn" href="certificate.html" aria-label="View wildcard svc.cluster.local"><svg class="ico"><use href="icons.svg#i-chevron-right"></use></svg></a></td>
+                </tr>
+                <tr>
+                  <td><a class="rowlink cn-cell" href="certificate.html" title="proxmox.home.arpa">proxmox.home.arpa</a></td>
+                  <td class="muted">Leaf · server</td>
+                  <td><span class="badge badge--danger"><svg class="ico"><use href="icons.svg#i-ban"></use></svg>Revoked</span></td>
+                  <td class="muted">admin-jwk</td>
+                  <td class="nowrap subtle">2026-08-11</td>
+                  <td><span class="mono subtle">0B:44:71…C2</span></td>
+                  <td class="col-actions"><a class="iconbtn" href="certificate.html" aria-label="View proxmox.home.arpa"><svg class="ico"><use href="icons.svg#i-chevron-right"></use></svg></a></td>
+                </tr>
+                <tr>
+                  <td><a class="rowlink cn-cell" href="certificate.html" title="gitea.lab.internal">gitea.lab.internal</a></td>
+                  <td class="muted">Leaf · server</td>
+                  <td><span class="badge badge--neutral"><span class="dot"></span>Expired</span></td>
+                  <td class="muted">homelab-ca</td>
+                  <td class="nowrap subtle">2026-05-21 <span>· 19d ago</span></td>
+                  <td><span class="mono subtle">5E:9A:30…88</span></td>
+                  <td class="col-actions"><a class="iconbtn" href="certificate.html" aria-label="View gitea.lab.internal"><svg class="ico"><use href="icons.svg#i-chevron-right"></use></svg></a></td>
+                </tr>
+                <tr>
+                  <td><a class="rowlink cn-cell" href="certificate.html" title="mqtt.home.arpa">mqtt.home.arpa</a></td>
+                  <td class="muted">Leaf · client</td>
+                  <td><span class="badge badge--ok"><span class="dot"></span>Valid</span></td>
+                  <td class="muted">acme-internal</td>
+                  <td class="nowrap">2026-10-14 <span class="subtle">· 127d</span></td>
+                  <td><span class="mono subtle">D2:7F:65…9F</span></td>
+                  <td class="col-actions"><a class="iconbtn" href="certificate.html" aria-label="View mqtt.home.arpa"><svg class="ico"><use href="icons.svg#i-chevron-right"></use></svg></a></td>
+                </tr>
+                <tr>
+                  <td><a class="rowlink cn-cell" href="certificate.html" title="unifi.lab.internal">unifi.lab.internal</a></td>
+                  <td class="muted">Leaf · server</td>
+                  <td><span class="badge badge--warn"><svg class="ico"><use href="icons.svg#i-clock"></use></svg>Expiring</span></td>
+                  <td class="muted">homelab-ca</td>
+                  <td class="nowrap text-warn">2026-06-13 <span>· 4d</span></td>
+                  <td><span class="mono subtle">9A:14:CB…2D</span></td>
+                  <td class="col-actions"><a class="iconbtn" href="certificate.html" aria-label="View unifi.lab.internal"><svg class="ico"><use href="icons.svg#i-chevron-right"></use></svg></a></td>
+                </tr>
+                <tr>
+                  <td><a class="rowlink cn-cell" href="certificate.html" title="registry.svc.cluster.local">registry.svc.cluster.local</a></td>
+                  <td class="muted">Leaf · server</td>
+                  <td><span class="badge badge--ok"><span class="dot"></span>Valid</span></td>
+                  <td class="muted">acme-internal</td>
+                  <td class="nowrap">2026-09-28 <span class="subtle">· 111d</span></td>
+                  <td><span class="mono subtle">6B:2C:AA…51</span></td>
+                  <td class="col-actions"><a class="iconbtn" href="certificate.html" aria-label="View registry.svc.cluster.local"><svg class="ico"><use href="icons.svg#i-chevron-right"></use></svg></a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <span>Showing <b>1–8</b> of 128</span>
+            <div class="pages">
+              <span class="is-disabled" aria-hidden="true"><svg class="ico"><use href="icons.svg#i-chevron-left"></use></svg></span>
+              <a href="#" aria-current="page">1</a>
+              <a href="#">2</a>
+              <a href="#">3</a>
+              <span>…</span>
+              <a href="#">16</a>
+              <a href="#" aria-label="Next page"><svg class="ico"><use href="icons.svg#i-chevron-right"></use></svg></a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/ui.js"></script>
+</body>
+</html>

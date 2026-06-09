@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Set up step-ui-ng</title>
+  <link rel="icon" href="static/logo.svg" />
+  <link rel="stylesheet" href="css/fonts.css" />
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <main class="authwrap" data-screen-label="First-run setup">
+    <div class="authbrand">
+      <img src="static/logo.svg" alt="" />
+      <div class="wordmark"><span class="b1">Step-CA</span><span class="b2">NextGen UI</span></div>
+      <div class="tagline">Welcome — let's create the first administrator</div>
+    </div>
+
+    <div class="card" style="max-width:460px">
+      <div class="card__header">
+        <div>
+          <h1 class="card__title">Create the first account</h1>
+          <p class="card__desc">No users exist yet. This account will be a <strong>superadmin</strong> with full access. You can add more users afterwards.</p>
+        </div>
+      </div>
+      <form class="card__body stack-4" method="post" action="login.html">
+        <div class="field">
+          <label for="su-user">Username <span class="req" aria-hidden="true">*</span></label>
+          <input class="input" id="su-user" name="username" autocomplete="username" autofocus value="" placeholder="admin" />
+        </div>
+        <div class="field">
+          <label for="su-pw">Password <span class="req" aria-hidden="true">*</span></label>
+          <input class="input" id="su-pw" name="password" type="password" autocomplete="new-password" />
+          <span class="field__hint">At least 12 characters. Use a generated passphrase you store in your password manager.</span>
+        </div>
+        <div class="field">
+          <label for="su-pw2">Confirm password <span class="req" aria-hidden="true">*</span></label>
+          <input class="input" id="su-pw2" name="password_confirm" type="password" autocomplete="new-password" />
+        </div>
+        <div class="flash flash--info">
+          <svg class="ico"><use href="icons.svg#i-info"></use></svg>
+          <div class="flash__body">
+            <strong>This screen replaces the app until setup is complete.</strong>
+            <p>After creating the superadmin you'll sign in, then connect step-ui-ng to your CA.</p>
+          </div>
+        </div>
+        <button type="submit" class="btn btn--primary" style="width:100%"><svg class="ico"><use href="icons.svg#i-shield-check"></use></svg> Create superadmin & continue</button>
+      </form>
+    </div>
+
+    <p class="authfoot">step-ui-ng · first-run setup</p>
+  </main>
+  <script src="js/ui.js"></script>
+</body>
+</html>
