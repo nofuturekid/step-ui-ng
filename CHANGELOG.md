@@ -10,6 +10,54 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ### Added
 
+- **Issue certificate + Sign CSR pages redesign** (PR F): ports `GET /issue` and
+  `GET /sign-csr` to the approved design mock (`docs/design/issue.html`,
+  `docs/design/sign-csr.html`). No behaviour change to handlers, routes, field
+  names, validation, htmx wiring, or RBAC.
+  - **Issue page** (`issuePage`): `content--narrow` wrapper, `page-head` with
+    breadcrumb (`Certificates / Issue`), `page-title` "Issue certificate", `page-sub`
+    intro copy. Active-provisioner `flash--info` banner (provisioner name + link to
+    change it on `/provisioners`); `flash--warn` prompt when none is selected.
+    State 1 form: CN (`input.mono`), SANs (`textarea.mono`, comma/newline-separated),
+    Validity (number input, "Capped by provisioner's max duration" hint), Key type
+    (static read-only readout "ECDSA P-256" — the backend always generates ECDSA P-256;
+    hint "step-ui-ng generates the key pair and returns the private key once"), Issue
+    certificate `btn--primary`. Form uses `hx-post="/issue" hx-target="#issue-panel"
+hx-select="#issue-panel"` so htmx swaps only the panel; plain POST degrades
+    correctly. State 2 (`v.Result != nil`): `flash--ok` "Certificate issued for
+    <CN>", one-time private-key panel (`class="onetime"`) with the private key PEM
+    in a `<pre id="pem-key-text">` and a `data-copy-target` copy button (app-wide
+    handler), plus a `Download private key` link (PEM data URI). Issued cert block
+    with `codeblock pem` + copy button.
+  - **One-time key invariant**: `v.Result` is `nil` on every `GET /issue`, so the
+    private key (`PRIVATE KEY`) and `.onetime` panel are structurally absent from
+    the plain-GET response. Only the immediate `POST /issue` response (with
+    `v.Result != nil`) renders the key. The response is already marked
+    `Cache-Control: no-store` by the handler.
+  - **Sign CSR page** (`signCSRPage`): `content--narrow` wrapper, `page-head` with
+    breadcrumb (`Certificates / Sign CSR`), `page-title` "Sign CSR", `page-sub`
+    copy ("no private key is involved"). Active-provisioner `flash--info` banner.
+    State 1 form: CSR `textarea.mono` + Validity number input. Form uses
+    `hx-post="/sign-csr" hx-target="#sign-panel" hx-select="#sign-panel"`. State 2:
+    `flash--ok` "CSR signed for <CN>", signed cert in `codeblock pem` with
+    `data-copy-target` copy button. No private key is ever rendered (structurally
+    absent — `signSuccessPanel` contains no `PrivateKeyPEM` output).
+  - **PKCS#12 recovery via the certificate-detail download form**: the "Download
+    bundle" form on `GET /certificates/{id}` now exposes an optional
+    `pfx_password` text input (type=password). When filled, `postCertDownload`
+    passes the value to `Service.Bundle`, which builds a password-protected
+    `cert.p12` and includes it in the ZIP alongside the PEM files. Leaving the
+    field empty produces the existing PEM-only bundle. No handler change was
+    required — the `pfx_password` path already existed; this restores the UI path
+    to it after the issue-form redesign removed the PFX mode from there.
+  - **`ActiveProvisioner`** field added to `issueView` and `signView`; loaded from
+    settings in `getIssue`, `getSignCSR`, `postIssue`, and `postSignCSR` via the
+    new `loadActiveProvisioner` helper (best-effort, silently empty on error).
+  - Removed unused `certResult`, `formatOption`, `copyField`, `copyBlock` templ
+    components, the `issueKeyTypeOption` helper, and the `joinSANs` helper (all
+    were only used by the old `certResult` component which is superseded by
+    `issueSuccessPanel` and `signSuccessPanel`).
+
 - **ACME + EAB pages redesign** (PR E): ports `GET /acme` and `GET /acme/eab/{provisioner}`
   to the approved design mock (`docs/design/acme.html`). No behaviour change to
   handlers, routes, field names, validation, htmx wiring, or RBAC.

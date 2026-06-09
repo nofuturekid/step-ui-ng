@@ -16,25 +16,30 @@ import (
 // issueView carries the issue form's prior input (so a failed submit is
 // repopulated) and the rendered result of a successful issue.
 type issueView struct {
-	CN       string
-	SANs     string
-	Validity string
-	Format   string
-	Result   *certs.Certificate
+	CN                string
+	SANs              string
+	Validity          string
+	Format            string
+	KeyType           string
+	ActiveProvisioner string // empty when none is selected
+	Result            *certs.Certificate
 }
 
 // signView carries the sign-csr form's prior input and the result.
 type signView struct {
-	CSR      string
-	Validity string
-	Result   *certs.Certificate
+	CSR               string
+	Validity          string
+	ActiveProvisioner string // empty when none is selected
+	Result            *certs.Certificate
 }
 
 // getIssue renders the issue form (admin+).
 func (s *server) getIssue(w http.ResponseWriter, r *http.Request) {
 	d := s.page(r, "Issue certificate")
 	d.ActiveSection = "/issue"
-	s.render(w, r, http.StatusOK, issuePage(d, issueView{Validity: "30", Format: "pem"}))
+	v := issueView{Validity: "90", Format: "pem", KeyType: "ECDSA P-256"}
+	v.ActiveProvisioner = s.loadActiveProvisioner(r)
+	s.render(w, r, http.StatusOK, issuePage(d, v))
 }
 
 // postIssue generates a keypair, requests a certificate from the CA via the
@@ -44,10 +49,12 @@ func (s *server) getIssue(w http.ResponseWriter, r *http.Request) {
 func (s *server) postIssue(w http.ResponseWriter, r *http.Request) {
 	actor := userFromContext(r.Context())
 	view := issueView{
-		CN:       strings.TrimSpace(r.PostFormValue("cn")),
-		SANs:     r.PostFormValue("sans"),
-		Validity: r.PostFormValue("validity"),
-		Format:   r.PostFormValue("format"),
+		CN:                strings.TrimSpace(r.PostFormValue("cn")),
+		SANs:              r.PostFormValue("sans"),
+		Validity:          r.PostFormValue("validity"),
+		Format:            r.PostFormValue("format"),
+		KeyType:           r.PostFormValue("keytype"),
+		ActiveProvisioner: s.loadActiveProvisioner(r),
 	}
 
 	conn, ok := s.issuanceConn(w, r, &view)
@@ -113,7 +120,9 @@ func noStore(w http.ResponseWriter) {
 func (s *server) getSignCSR(w http.ResponseWriter, r *http.Request) {
 	d := s.page(r, "Sign CSR")
 	d.ActiveSection = "/sign-csr"
-	s.render(w, r, http.StatusOK, signCSRPage(d, signView{Validity: "30"}))
+	v := signView{Validity: "90"}
+	v.ActiveProvisioner = s.loadActiveProvisioner(r)
+	s.render(w, r, http.StatusOK, signCSRPage(d, v))
 }
 
 // postSignCSR parses + verifies the submitted CSR, requests a certificate via the
@@ -121,8 +130,9 @@ func (s *server) getSignCSR(w http.ResponseWriter, r *http.Request) {
 func (s *server) postSignCSR(w http.ResponseWriter, r *http.Request) {
 	actor := userFromContext(r.Context())
 	view := signView{
-		CSR:      r.PostFormValue("csr"),
-		Validity: r.PostFormValue("validity"),
+		CSR:               r.PostFormValue("csr"),
+		Validity:          r.PostFormValue("validity"),
+		ActiveProvisioner: s.loadActiveProvisioner(r),
 	}
 
 	conn, ok := s.signConn(w, r, &view)
@@ -242,9 +252,6 @@ func parseValidity(raw string) (int, error) {
 	return n, nil
 }
 
-// joinSANs renders a SAN list for display.
-func joinSANs(sans []string) string { return strings.Join(sans, ", ") }
-
 // splitSANs splits a comma/newline/space-separated SAN list into trimmed,
 // non-empty entries.
 func splitSANs(raw string) []string {
@@ -316,6 +323,18 @@ func downloadName(cn string) string {
 		return "certificate"
 	}
 	return safe
+}
+
+// loadActiveProvisioner reads the selected provisioner name from settings and
+// returns it, or "" if settings are unavailable or none is selected. This is a
+// best-effort read for display only; failures are silently ignored because the
+// POST handlers will surface a clearer error when issuance is actually attempted.
+func (s *server) loadActiveProvisioner(r *http.Request) string {
+	v, ok, err := s.settings.Get(r.Context())
+	if err != nil || !ok {
+		return ""
+	}
+	return v.SelectedProvisioner
 }
 
 // caSignErrorMessage maps the shared CA-layer sign errors to messages.
