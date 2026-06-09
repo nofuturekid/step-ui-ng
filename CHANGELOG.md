@@ -8,6 +8,25 @@ Versions are bumped only when a release is cut; in-progress work lives under
 
 ## [Unreleased]
 
+### Added
+
+- **Certificate detail enrichment** (backlog ①): the cert-detail page now
+  derives and displays richer metadata directly from the stored leaf PEM — no
+  schema change. New fields surfaced:
+  - **SHA-256 fingerprint** (plain lowercase hex, no separators, matching the
+    default output of `step certificate fingerprint`) — Identifiers card,
+    copyable via `data-copy-target`.
+  - **Issuer** (issuing CA's Common Name / full DN) — Overview card.
+  - **Public key** (algorithm + size, e.g. "ECDSA P-256", "RSA 2048",
+    "Ed25519") — Overview card + page-head tag chip.
+  - **Key usage + EKU tags** (e.g. `digitalSignature`, `keyEncipherment`,
+    `serverAuth`, `clientAuth`) — Identifiers card tag chips + page-head EKU
+    chips.
+  - Parsing is done in `internal/certs.ParseLeafPEM` (pure Go, stdlib
+    `crypto/x509` + `crypto/sha256`). If the PEM cannot be parsed the page
+    degrades gracefully — existing fields (CN, SANs, dates, serial, PEM viewer)
+    are still shown and derived fields are omitted.
+
 ### Changed
 
 - **Login and Setup pages redesign** (PR H): `GET /login` and `GET /setup` now

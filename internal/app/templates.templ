@@ -1465,8 +1465,13 @@ templ expiryCell(notAfter int64, daysLeft int, status string) {
 // certDetailView carries the certificate plus the view inputs the detail page
 // needs that are not part of the stored certificate (spec/0008): the
 // configurable default renew validity (FR-2, shown pre-filled on the renew form).
+// Parsed holds the derived certificate metadata (fingerprint, issuer, key type,
+// key usage / EKU) computed from CertPEM at request time — no schema change.
+// When CertPEM cannot be parsed the zero value is used and derived fields are
+// omitted (graceful degradation).
 type certDetailView struct {
 	Cert             certs.Certificate
+	Parsed           certs.ParsedCert
 	RenewDefaultDays int
 }
 
@@ -1476,18 +1481,16 @@ type certDetailView struct {
 // RBAC: admin+ sees action buttons (Download bundle, Renew, Revoke).
 // A viewer sees metadata + PEM only — no action buttons, no forms.
 //
-// FLAGS (mock affordances not backed by our data model):
-//   - Provisioner field in metadata   — FLAG: not stored in certificates table
-//   - SHA-256 fingerprint             — FLAG: not stored; would need crypto parse
-//   - Key usage / EKU tags            — FLAG: not stored
-//   - Issuer (CA name)                — FLAG: not stored
-//   - Cert type tags (leaf, RSA-2048) — FLAG: not stored
+// Derived fields (SHA-256 fingerprint, issuer, public-key type, key usage / EKU
+// tags) are populated from v.Parsed when the leaf PEM parsed successfully.
+// When CertPEM is malformed the fields are empty and omitted (graceful degradation).
 templ certDetailPage(d pageData, v certDetailView) {
 	@layout(d) {
 		{{ c := v.Cert }}
+		{{ p := v.Parsed }}
 		{{ status, daysLeft := certs.DeriveStatus(c.Status, c.NotAfter) }}
 		<div class="content">
-			<!-- Page header with breadcrumb, CN as title, status badge, admin actions -->
+			<!-- Page header with breadcrumb, CN as title, status badge + key-type tags, admin actions -->
 			<div class="page-head">
 				<div class="breadcrumb">
 					<a href="/inventory">Certificates</a><span class="sep">/</span><span>{ c.CN }</span>
@@ -1497,6 +1500,12 @@ templ certDetailPage(d pageData, v certDetailView) {
 						<h1 class="page-title mono">{ c.CN }</h1>
 						<div class="btn-row" style="margin-top:var(--space-3)">
 							@statusBadge(status, daysLeft)
+							if p.PublicKeyType != "" {
+								<span class="tag">{ p.PublicKeyType }</span>
+							}
+							for _, eku := range p.ExtKeyUsages {
+								<span class="tag">{ eku }</span>
+							}
 						</div>
 					</div>
 					<!-- Admin+ action buttons. A viewer sees metadata + PEM only. -->
@@ -1544,10 +1553,18 @@ templ certDetailPage(d pageData, v certDetailView) {
 								<dd>@statusBadge(status, daysLeft)</dd>
 								<dt>Key strategy</dt>
 								<dd>{ c.KeyStrategy }</dd>
+								if p.PublicKeyType != "" {
+									<dt>Public key</dt>
+									<dd>{ p.PublicKeyType }</dd>
+								}
 								<dt>Not before</dt>
 								<dd class="mono">{ fmtUnix(c.NotBefore) }</dd>
 								<dt>Not after</dt>
 								<dd class="mono">{ fmtUnix(c.NotAfter) }{ fmtDaysHint(daysLeft, status) }</dd>
+								if p.Issuer != "" {
+									<dt>Issuer</dt>
+									<dd class="mono">{ p.Issuer }</dd>
+								}
 							</dl>
 						</div>
 					</div>
@@ -1565,6 +1582,31 @@ templ certDetailPage(d pageData, v certDetailView) {
 									</button>
 								</div>
 							</div>
+							if p.Fingerprint != "" {
+								<div class="field">
+									<span class="label">SHA-256 fingerprint</span>
+									<div class="copyline">
+										<span class="mono" id="cert-fp">{ p.Fingerprint }</span>
+										<button type="button" class="copy-btn" data-copy-target="#cert-fp" aria-label="Copy fingerprint">
+											<svg class="ico"><use href="/static/icons.svg#i-copy"></use></svg>
+											<span class="label">Copy</span>
+										</button>
+									</div>
+								</div>
+							}
+							if len(p.KeyUsages) > 0 || len(p.ExtKeyUsages) > 0 {
+								<div class="field">
+									<span class="label">Key usage</span>
+									<div class="btn-row" style="gap:6px">
+										for _, ku := range p.KeyUsages {
+											<span class="tag">{ ku }</span>
+										}
+										for _, eku := range p.ExtKeyUsages {
+											<span class="tag">{ eku }</span>
+										}
+									</div>
+								</div>
+							}
 						</div>
 					</div>
 				</div>
